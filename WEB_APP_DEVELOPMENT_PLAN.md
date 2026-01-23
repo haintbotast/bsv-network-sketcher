@@ -24,6 +24,7 @@
 - `docs/BRD.md`
 - `docs/PRD.md`
 - `docs/SRS.md`
+- `docs/DIAGRAM_STYLE_SPEC.md`
 
 ---
 
@@ -65,11 +66,11 @@ Xây dựng Web Application mới hoàn toàn để thay thế Network Sketcher 
 | **Trình biên tập sơ đồ** | Trình biên tập topo mạng tương tác |
 | **Xem trước trực tiếp** | Kết xuất SVG/Canvas thời gian thực |
 | **Bộ máy xuất** | Sinh PPTX/Excel qua API |
-| **Nhập dữ liệu** | Tải lên và phân tích Excel/CSV |
+| **Nhập dữ liệu** | Nhập trực tiếp theo mẫu chuẩn (Excel/CSV tùy chọn) |
 
 ### 1.3 Tiêu chí thành công
 
-- [ ] Tạo được diagram L1/L2/L3 từ Excel input
+- [ ] Tạo được diagram L1/L2/L3 từ dữ liệu nhập trực tiếp hoặc template chuẩn (Excel/CSV tùy chọn)
 - [ ] Xuất PPTX với bố cục tương tự phiên bản gốc Network Sketcher
 - [ ] Xuất file thiết bị Excel với đầy đủ bảng L1/L2/L3
 - [ ] Xem trước sơ đồ thời gian thực trên trình duyệt
@@ -522,7 +523,7 @@ class DiagramData(BaseModel):
 │   ├── PUT    /{id}              # Update project
 │   ├── DELETE /{id}              # Delete project
 │   ├── POST   /{id}/duplicate    # Clone project
-│   └── POST   /{id}/import       # Import from Excel
+│   └── POST   /{id}/import       # Import dữ liệu (template JSON; Excel/CSV tùy chọn)
 │
 ├── /projects/{project_id}
 │   ├── /areas
@@ -583,13 +584,13 @@ class DiagramData(BaseModel):
 │       └── GET    /jobs/{id}     # Job status + download URL
 │
 ├── /templates
-│   ├── GET    /                  # List available templates
-│   ├── GET    /{id}              # Get template details
+│   ├── GET    /                  # List template dữ liệu
+│   ├── GET    /{id}              # Get template details (JSON)
 │   └── POST   /{id}/apply        # Apply template to project
 │
 └── /uploads
-    ├── POST   /excel             # Upload Excel for import
-    └── POST   /csv               # Upload CSV for import
+    ├── POST   /excel             # (Tùy chọn) Upload Excel for import
+    └── POST   /csv               # (Tùy chọn) Upload CSV for import
 ```
 
 ### 5.2 Sự kiện WebSocket
@@ -694,7 +695,7 @@ async def export_l1_diagram(
 │       ├── /                 # Project overview
 │       ├── /editor           # Main diagram editor
 │       ├── /data             # Data tables (devices, links, IPs)
-│       ├── /import           # Import wizard
+│       ├── /import           # Nhập liệu (template + grid)
 │       ├── /export           # Tùy chọn xuất
 │       └── /settings         # Project settings
 └── /templates                # Template gallery
@@ -731,8 +732,10 @@ src/
 │   │   └── L3AddressEditor.vue     # IP address management
 │   │
 │   ├── import/
-│   │   ├── ExcelImporter.vue       # Tải lên Excel + xem trước
-│   │   ├── CSVImporter.vue         # CSV upload + mapping
+│   │   ├── TemplateLibrary.vue     # Danh sách template dữ liệu
+│   │   ├── DataEntryGrid.vue       # Nhập liệu trực tiếp dạng bảng
+│   │   ├── ExcelImporter.vue       # (Tùy chọn) Tải lên Excel + xem trước
+│   │   ├── CSVImporter.vue         # (Tùy chọn) CSV upload + mapping
 │   │   ├── ImportPreview.vue       # Xem trước khi nhập
 │   │   └── ImportProgress.vue      # Import status
 │   │
@@ -775,6 +778,11 @@ Mục tiêu: gom **hình vẽ + màu sắc + nét vẽ** vào một nguồn chu�
 - `frontend/src/styles/diagram-tokens.ts`: nguồn chuẩn (TS object).
 - `frontend/src/styles/diagram-tokens.css`: (tùy chọn) map tokens sang CSS variables để các component UI dùng được.
 - Không phụ thuộc framework; PrimeVue/Naive chỉ cần đọc CSS variables.
+- Tham chiếu tiêu chuẩn tại `docs/DIAGRAM_STYLE_SPEC.md`.
+
+**Chế độ style:**
+- **Strict NS (mặc định):** khóa preset để đảm bảo tương thích 1:1 với NS gốc.
+- **Flexible (tùy chọn):** chỉ cho phép override trong danh sách được phép; cảnh báo khi xuất.
 
 ```typescript
 // styles/diagram-tokens.ts
@@ -1991,7 +1999,7 @@ Tuần 2:
 
 **Mục tiêu:**
 - [ ] Hoàn thiện CRUD cho tất cả thực thể
-- [ ] Nhập từ Excel/CSV
+- [ ] Nhập liệu trực tiếp + template dữ liệu (Excel/CSV tùy chọn)
 - [ ] Dịch vụ kiểm tra hợp lệ
 - [ ] Đồng bộ giữa các lớp
 
@@ -1999,7 +2007,7 @@ Tuần 2:
 - Quản lý liên kết L1
 - API phân đoạn L2/gán cổng
 - API địa chỉ L3
-- Endpoint nhập Excel
+- Endpoint nhập liệu (template JSON; Excel/CSV tùy chọn)
 - Chuẩn hóa tên cổng
 
 **Công việc:**
@@ -2010,8 +2018,8 @@ Tuần 3:
 └── Ngày 5: API địa chỉ L3
 
 Tuần 4:
-├── Ngày 1-2: Parser nhập Excel
-├── Ngày 3-4: Parser nhập CSV
+├── Ngày 1-2: Schema template dữ liệu + API nhập liệu
+├── Ngày 3-4: (Tùy chọn) parser Excel/CSV
 └── Ngày 5: Dịch vụ kiểm tra hợp lệ + đồng bộ
 ```
 
@@ -2110,14 +2118,15 @@ Tuần 10:
 ### Giai đoạn 6: Nhập liệu & hoàn thiện (Tuần 11-12)
 
 **Mục tiêu:**
-- [ ] Nhập template Excel
+- [ ] Nhập liệu trực tiếp theo mẫu chuẩn (template dữ liệu)
+- [ ] (Tùy chọn) Nhập Excel/CSV để chuyển đổi dữ liệu cũ
 - [ ] Xem trước/kiểm tra hợp lệ nhập liệu
 - [ ] Xử lý lỗi
 - [ ] Tối ưu hiệu năng
 
 **Sản phẩm bàn giao:**
-- UI wizard nhập liệu
-- Xem trước khi nhập
+- UI wizard nhập liệu + thư viện template
+- Xem trước khi áp dụng template
 - Phản hồi kiểm tra hợp lệ
 - Thao tác hàng loạt
 - Trạng thái tải
@@ -2125,14 +2134,14 @@ Tuần 10:
 **Công việc:**
 ```
 Tuần 11:
-├── Ngày 1-2: Cải thiện parser Excel
-├── Ngày 3-4: UI wizard nhập liệu
+├── Ngày 1-2: Thiết kế schema template dữ liệu
+├── Ngày 3-4: UI nhập liệu (grid) + áp dụng template
 └── Ngày 5: Phản hồi kiểm tra hợp lệ
 
 Tuần 12:
 ├── Ngày 1-2: Xử lý lỗi, trường hợp biên
-├── Ngày 3-4: Tinh chỉnh hiệu năng
-└── Ngày 5: Dọn dẹp code, refactor
+├── Ngày 3-4: (Tùy chọn) parser Excel/CSV cho dữ liệu cũ
+└── Ngày 5: Tinh chỉnh hiệu năng, dọn dẹp
 ```
 
 ---
@@ -2606,7 +2615,7 @@ curl http://localhost:8000/health
 | Port 8000 đã dùng | Đổi port trong .env hoặc dừng process khác |
 | SQLite bị khóa | Chờ vài giây, hoặc khởi động lại dịch vụ |
 | CORS error | Kiểm tra FRONTEND_URL trong .env |
-| Import failed | Kiểm tra định dạng Excel, xem logs |
+| Import failed | Kiểm tra dữ liệu template/Excel, xem logs |
 | Timeout xuất | Tăng timeout trong cấu hình uvicorn |
 | Job xuất bị treo | Kiểm tra dịch vụ/logs của worker |
 
@@ -2737,7 +2746,7 @@ network-sketcher-web/
 │   ├── tests/
 │   ├── data/                    # SQLite database file
 │   ├── exports/                 # Tệp PPTX/Excel đã sinh
-│   ├── uploads/                 # Uploaded Excel templates
+│   ├── uploads/                 # Uploaded data templates (Excel/CSV tùy chọn)
 │   ├── requirements.txt
 │   └── .env.example
 │
@@ -3381,6 +3390,30 @@ class ImportService:
 
         return result
 ```
+
+#### 13.8.2 Nhập liệu trực tiếp & template dữ liệu (JSON)
+
+**Nguyên tắc:** Luồng chính là nhập liệu trực tiếp theo schema chuẩn; Excel/CSV chỉ là tùy chọn chuyển đổi dữ liệu cũ.
+
+**Template payload (gợi ý tối giản):**
+```json
+{
+  "schema_version": "1.0",
+  "template_version": "1.0",
+  "areas": [],
+  "devices": [],
+  "l1_links": [],
+  "port_channels": [],
+  "virtual_ports": [],
+  "l2_segments": [],
+  "l3_addresses": []
+}
+```
+
+**Áp dụng template vào project:**
+- Validate schema_version
+- Import theo đúng thứ tự phụ thuộc (giống Excel)
+- Log lỗi theo dòng/thực thể để trả về UI
 
 ### 13.9 Tham chiếu theme từ CLI gốc (không triển khai CLI)
 

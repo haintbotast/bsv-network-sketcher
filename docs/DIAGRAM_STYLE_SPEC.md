@@ -1,0 +1,133 @@
+# Đặc tả Style sơ đồ (Diagram Style Spec)
+
+> **Phiên bản:** 1.0  
+> **Tạo:** 2026-01-23  
+> **Cập nhật:** 2026-01-23  
+> **Mục tiêu:** Chuẩn hóa hình khối, nét vẽ, màu sắc, chữ và nền cho toàn hệ thống (UI + Konva + export).
+
+---
+
+## 1. Phạm vi
+
+- Áp dụng cho **UI/Konva** và **xuất PPTX**.
+- Không áp dụng cho Excel (chỉ dữ liệu).
+- **Ưu tiên chính xác** theo Network Sketcher gốc.
+
+---
+
+## 2. Chế độ style
+
+### 2.1 Strict NS (bắt buộc mặc định)
+- Khóa theo theme chuẩn tương thích NS gốc.
+- Không cho phép tùy biến tự do ngoài bộ preset.
+- Dùng khi cần **đầu ra tương đương 1:1**.
+
+### 2.2 Flexible (tùy chọn)
+- Cho phép chọn trong **tập lựa chọn giới hạn** (shape, màu, nét).
+- Phải map được sang PPTX không làm vỡ layout.
+- Cần cảnh báo khi xuất nếu có override không tương thích.
+
+---
+
+## 3. Design Tokens (nguồn chuẩn)
+
+**Nguồn chuẩn:** `frontend/src/styles/diagram-tokens.ts`  
+**CSS map (tùy chọn):** `frontend/src/styles/diagram-tokens.css`
+
+**Nguyên tắc:**
+- Token là **nguồn duy nhất** cho màu/nét/chữ.
+- Konva **không đọc CSS variables**, phải map từ tokens.
+- PPTX dùng cùng token để đảm bảo thống nhất.
+
+---
+
+## 4. Quy ước hình khối theo đối tượng
+
+| Đối tượng | Shape | Ghi chú |
+|----------|-------|--------|
+| Area | Rectangle bo góc | Nền nhạt, label góc trên trái |
+| Device | Rectangle bo góc | Màu theo loại thiết bị |
+| Waypoint | Diamond hoặc Circle | Không hiện label khi zoom out |
+| Link | Line | Màu theo purpose; nét liền/đứt |
+| Interface Tag | Text + background | Offset khỏi link |
+
+---
+
+## 5. Nét vẽ & kiểu đường (line)
+
+- **Primary:** nét liền, strokeWidth chuẩn.
+- **Backup/MGMT:** nét đứt theo preset.
+- **Arrow:** chỉ dùng khi cần hướng; mặc định tắt.
+
+---
+
+## 6. Màu sắc
+
+### 6.1 Màu thiết bị
+- Dùng bảng mapping theo prefix tên (tương thích NS).
+- Không cho phép nhập màu tự do ở Strict NS.
+
+### 6.2 Màu link theo purpose
+- Dùng bảng mapping (WAN/DMZ/LAN/MGMT/HA/STORAGE/BACKUP/VPN).
+
+### 6.3 Bảng preset màu (Strict NS)
+
+**Thiết bị (theo prefix tên):**
+
+| Prefix | Màu (RGB) | Ghi chú |
+|--------|-----------|---------|
+| Router / ISP | 70,130,180 | Steel Blue |
+| FW / Firewall | 220,80,80 | Red |
+| Core-SW / Core | 34,139,34 | Green |
+| Dist | 60,179,113 | Green |
+| Access-SW / Access | 0,139,139 | Cyan |
+| Server / App / Web / DB | 106,90,205 / 138,43,226 / 75,0,130 / 148,0,211 | Server group |
+| NAS / SAN / Storage / Backup | 210,105,30 / 184,134,11 / 205,133,63 / 139,90,43 | Storage |
+| _DEFAULT_ | 128,128,128 | Gray |
+
+**Link (theo purpose):**
+
+| Purpose | Màu (RGB) |
+|---------|-----------|
+| WAN / INTERNET | 0,112,192 |
+| DMZ | 237,125,49 |
+| LAN | 112,173,71 |
+| MGMT | 112,48,160 |
+| STORAGE | 165,105,63 |
+| BACKUP | 127,127,127 |
+| HA | 96,96,96 |
+| VPN | 192,0,0 |
+| DEFAULT | 0,0,0 |
+
+---
+
+## 7. Chữ & nền
+
+- Font mặc định: `Calibri`.
+- Size chữ: theo token (area/device/link).
+- Màu chữ: đen/xám đậm để đảm bảo tương phản.
+- Nền area: màu nhạt trung tính.
+
+---
+
+## 8. Mapping UI → Konva → PPTX
+
+- **UI/Konva:** map trực tiếp từ tokens sang `fill`, `stroke`, `strokeWidth`, `fontSize`, `fontFamily`.
+- **PPTX:** map màu/nét/chữ tương ứng; không dùng giá trị ngoài preset.
+- **Strict NS:** bắt buộc mapping 1:1, không override tự do.
+- **Flexible:** chỉ cho phép override trong danh sách cho phép; log cảnh báo nếu không export được.
+
+---
+
+## 9. Ràng buộc tương thích
+
+- Không được thay đổi preset nếu chưa cập nhật golden files.
+- Mọi thay đổi token phải cập nhật kiểm thử snapshot PPTX.
+- Nếu thay đổi shape/line, phải cập nhật mapping export.
+
+---
+
+## 10. Quy tắc cập nhật
+
+- Mọi thay đổi style phải cập nhật tài liệu này.
+- Đồng bộ với `WEB_APP_DEVELOPMENT_PLAN.md`, `docs/PRD.md`, `docs/SRS.md`.

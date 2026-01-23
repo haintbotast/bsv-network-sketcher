@@ -21,7 +21,8 @@
 
 ## 3. Phạm vi
 
-- Web app quản lý project, nhập dữ liệu, chỉnh sửa sơ đồ L1/L2/L3, xuất PPTX/Excel.
+- Web app quản lý project, **nhập liệu trực tiếp theo mẫu chuẩn**, chỉnh sửa sơ đồ L1/L2/L3, xuất PPTX/Excel.
+- Có thư viện template dữ liệu chuẩn (JSON) để khởi tạo nhanh dự án.
 - Hỗ trợ đa người dùng nội bộ (~5 đồng thời), không yêu cầu scale lớn.
 - Lưu trữ dữ liệu nội bộ bằng SQLite và file system cục bộ.
 
@@ -39,11 +40,14 @@
 
 ## 6. Yêu cầu nghiệp vụ cấp cao
 
-- Nhập dữ liệu từ Excel/CSV đúng chuẩn NS gốc.
+- Nhập liệu trực tiếp theo mẫu chuẩn (form/bảng) với kiểm tra hợp lệ tại chỗ.
+- Thư viện template dữ liệu chuẩn để áp dụng nhanh cho project.
+- (Tùy chọn) Hỗ trợ nhập từ Excel/CSV khi cần đối soát hoặc chuyển đổi dữ liệu cũ.
 - Tạo/sửa sơ đồ trực quan L1/L2/L3 trong UI.
 - Xuất PPTX/Excel với bố cục tương đương CLI gốc.
 - Quản lý dự án và lịch sử xuất.
-- Hệ màu, hình vẽ, nét vẽ thống nhất giữa UI và export.
+- Hệ màu, hình vẽ, nét vẽ thống nhất giữa UI và export theo **Style Spec**.
+- Có **chế độ Strict NS** để khóa style đúng chuẩn, và **Flexible** có kiểm soát khi cần.
 
 ## 7. KPI/tiêu chí thành công
 
@@ -71,3 +75,4 @@
 - `WEB_APP_DEVELOPMENT_PLAN.md`
 - `docs/PRD.md`
 - `docs/SRS.md`
+- `docs/DIAGRAM_STYLE_SPEC.md`

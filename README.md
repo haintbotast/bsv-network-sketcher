@@ -6,3 +6,4 @@ Tài liệu chính:
 - `docs/BRD.md`
 - `docs/PRD.md`
 - `docs/SRS.md`
+- `docs/DIAGRAM_STYLE_SPEC.md`

@@ -17,19 +17,25 @@
 - Tạo/sửa/xóa dự án.
 - Gán theme/mẫu layout.
 
-### 2.2 Nhập dữ liệu
-- Nhập Excel/CSV theo thứ tự phụ thuộc (Areas → Devices → Links → ...).
-- Kiểm tra hợp lệ (port, IP, VLAN, trùng tên).
+### 2.2 Nhập liệu trực tiếp & template dữ liệu
+- Nhập liệu trực tiếp bằng form/bảng theo schema chuẩn.
+- Thư viện template dữ liệu chuẩn (JSON) có version để áp dụng nhanh.
+- Hỗ trợ dán dữ liệu dạng bảng (clipboard CSV) vào grid.
+- Kiểm tra hợp lệ tại chỗ (port, IP, VLAN, trùng tên).
 
-### 2.3 Sơ đồ & đồng bộ lớp
+### 2.3 Nhập dữ liệu từ Excel/CSV (tùy chọn)
+- Hỗ trợ nhập Excel/CSV theo thứ tự phụ thuộc (Areas → Devices → Links → ...).
+- Dùng cho chuyển đổi dữ liệu cũ hoặc đối soát.
+
+### 2.4 Sơ đồ & đồng bộ lớp
 - Sơ đồ L1/L2/L3 hiển thị và chỉnh sửa.
 - Đồng bộ dữ liệu L1→L2→L3 theo quy tắc NS gốc.
 
-### 2.4 Xuất dữ liệu
+### 2.5 Xuất dữ liệu
 - Sinh PPTX/Excel theo bố cục NS gốc.
 - Quản lý job, trạng thái, retry giới hạn.
 
-### 2.5 Thời gian thực
+### 2.6 Thời gian thực
 - WebSocket cập nhật khi có thay đổi.
 
 ## 3. Yêu cầu dữ liệu
@@ -37,12 +43,16 @@
 - UUID v4 sinh ở tầng ứng dụng, lưu TEXT.
 - JSON lưu TEXT.
 - FK bắt buộc, unique constraint theo project.
+- Template dữ liệu lưu dạng JSON có `schema_version` và `template_version`.
 
 ## 4. Yêu cầu giao diện
 
 - UI web responsive cơ bản.
 - Canvas Konva có zoom/pan, selection, drag.
+- Grid nhập liệu có validate tại chỗ và báo lỗi theo dòng/cột.
 - Hiển thị lỗi nhập liệu rõ ràng.
+- Hệ style phải tuân theo `docs/DIAGRAM_STYLE_SPEC.md`.
+- Cần hỗ trợ **Strict NS** (mặc định) và **Flexible** (giới hạn).
 
 ## 5. Ràng buộc kỹ thuật
 
@@ -70,3 +80,4 @@
 - `WEB_APP_DEVELOPMENT_PLAN.md`
 - `docs/BRD.md`
 - `docs/PRD.md`
+- `docs/DIAGRAM_STYLE_SPEC.md`

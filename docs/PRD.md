@@ -18,17 +18,19 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 
 ## 3. Hành trình người dùng (user journey)
 
-1) Tạo project → 2) Nhập Excel/CSV → 3) Kiểm tra/Chỉnh sửa sơ đồ → 4) Xuất PPTX/Excel → 5) Tải file
+1) Tạo project → 2) Chọn template hoặc nhập liệu trực tiếp → 3) Kiểm tra/Chỉnh sửa sơ đồ → 4) Xuất PPTX/Excel → 5) Tải file
 
 ## 4. Yêu cầu chức năng (FR)
 
 - **FR-01:** Quản lý project (tạo/sửa/xóa/nhân bản).
-- **FR-02:** Nhập dữ liệu Excel/CSV theo chuẩn NS gốc.
-- **FR-03:** Hiển thị và chỉnh sửa sơ đồ L1/L2/L3 bằng canvas.
-- **FR-04:** Đồng bộ dữ liệu giữa các lớp L1→L2→L3 theo quy tắc NS.
-- **FR-05:** Xuất PPTX/Excel theo layout tương đương NS gốc.
-- **FR-06:** Lưu/khôi phục trạng thái, lịch sử xuất.
-- **FR-07:** Tìm kiếm nhanh thiết bị/kết nối trong project.
+- **FR-02:** Nhập liệu trực tiếp bằng form/bảng theo schema chuẩn, có kiểm tra hợp lệ tức thì.
+- **FR-03:** Thư viện template dữ liệu chuẩn (tạo/sửa/áp dụng phiên bản).
+- **FR-04:** Hiển thị và chỉnh sửa sơ đồ L1/L2/L3 bằng canvas.
+- **FR-05:** Đồng bộ dữ liệu giữa các lớp L1→L2→L3 theo quy tắc NS.
+- **FR-06:** Xuất PPTX/Excel theo layout tương đương NS gốc.
+- **FR-07:** Lưu/khôi phục trạng thái, lịch sử xuất.
+- **FR-08:** Tìm kiếm nhanh thiết bị/kết nối trong project.
+- **FR-09:** Quản lý style theo **Style Spec** (Strict NS mặc định, Flexible có kiểm soát).
 
 ## 5. Yêu cầu phi chức năng (NFR)
 
@@ -42,6 +44,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - Luồng thao tác ngắn (≤ 3 bước chính).
 - Hiển thị trạng thái rõ ràng (loading/success/fail).
 - Hệ màu, hình vẽ, nét vẽ thống nhất (design tokens).
+- Có chế độ **Strict NS** để khóa style tương thích 1:1 khi xuất.
 
 ## 7. Ngoài phạm vi
 
@@ -62,3 +65,4 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - `WEB_APP_DEVELOPMENT_PLAN.md`
 - `docs/BRD.md`
 - `docs/SRS.md`
+- `docs/DIAGRAM_STYLE_SPEC.md`

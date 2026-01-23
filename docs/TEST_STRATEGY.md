@@ -203,6 +203,14 @@ test.describe('Diagram Editor', () => {
 | RB-141..RB-143 | Integration | Cảnh báo khoảng cách tối thiểu |
 | RB-201..RB-202 | Unit/Integration | Kiểm tra hướng layout & fallback custom |
 
+**Checklist regression bắt buộc (rule-based):**
+- [ ] RB-001..RB-005: dữ liệu liên lớp hợp lệ, không tạo interface ảo sai.
+- [ ] RB-006: số lượng node/link trước & sau layout không đổi.
+- [ ] RB-101..RB-104: không chồng lấn; device nằm trong area; link không xuyên node.
+- [ ] RB-121..RB-122: nhãn không đè lên node/link; interface tag hợp lệ.
+- [ ] RB-141..RB-143: cảnh báo khoảng cách hiển thị đúng khi vi phạm ngưỡng.
+- [ ] RB-201..RB-202: hướng layout đúng mode; custom thiếu tham số -> fallback ISO + cảnh báo.
+
 **Bộ dữ liệu:**
 - **Small:** ~10 devices, 10–20 links → `templates/samples/small.json`
 - **Medium:** ~100 devices, 150–200 links (tạo sau)

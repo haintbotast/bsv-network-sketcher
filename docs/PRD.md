@@ -38,7 +38,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 
 ## 5. Yêu cầu phi chức năng (NFR)
 
-- **Chính xác:** Đầu ra đúng logic và layout mode (golden files theo mode).
+- **Chính xác:** Đầu ra đúng logic và layout mode (golden files hoặc rule-based).
 - **UX:** Thao tác tối giản, lỗi hiển thị rõ ràng.
 - **Hiệu năng:** Chấp nhận thấp hơn để đổi lấy độ đúng; vẫn cần phản hồi hợp lý cho ~5 người dùng.
 - **Ổn định:** Job xuất không chạy trùng, có retry giới hạn.
@@ -59,7 +59,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 
 ## 8. Tiêu chí chấp nhận (Acceptance)
 
-- Import/export đúng chuẩn, so sánh được với golden files theo layout mode.
+- Import/export đúng chuẩn, kiểm tra bằng golden files hoặc rule-based.
 - UI cho phép chỉnh sửa sơ đồ mà không cần thao tác thủ công ngoài.
 - Xử lý lỗi nhập liệu rõ ràng, không mất dữ liệu.
 - Có thể khôi phục phiên bản topology trước đó.

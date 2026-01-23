@@ -120,7 +120,7 @@ CREATE TABLE config_versions (
 
 ## 6. Thuộc tính chất lượng
 
-- **Chính xác:** Ưu tiên số 1, so sánh output theo layout mode (golden files).
+- **Chính xác:** Ưu tiên số 1, so sánh output theo layout mode (golden files hoặc rule-based).
 - **Tối giản:** Giảm phụ thuộc, giảm thành phần.
 - **Ổn định:** Job queue an toàn, idempotent.
 - **An toàn tối thiểu:** Kiểm soát upload, phân quyền theo project, log lỗi đầy đủ.

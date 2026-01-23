@@ -78,7 +78,7 @@ Chi tiết topology xem `PROJECT_TOPOLOGY.md`.
 
 | Rủi ro | Giảm thiểu |
 |---|---|
-| Sai khác xuất PPTX/Excel | Golden files + regression test |
+| Sai khác xuất PPTX/Excel | Golden files hoặc rule-based checks |
 | Toàn vẹn dữ liệu | FK + validation matrix + transaction ngắn |
 | Job queue treo/trùng | Claim job + heartbeat + retry giới hạn |
 | UX rối | Layout mode chuẩn + UI tối giản |
@@ -88,19 +88,7 @@ Chi tiết topology xem `PROJECT_TOPOLOGY.md`.
 
 ## 7. Tài liệu liên quan (nguồn chuẩn)
 
-- `PROJECT_TOPOLOGY.md`
-- `docs/BRD.md`
-- `docs/PRD.md`
-- `docs/SRS.md`
-- `docs/DIAGRAM_STYLE_SPEC.md`
-- `docs/API_SPEC.md`
-- `docs/TEMPLATE_SCHEMA.md`
-- `docs/TEST_STRATEGY.md`
-- `docs/NS_REFERENCE.md`
-- `docs/SECURITY_SPEC.md`
-- `docs/TRACEABILITY_MATRIX.md`
-- `docs/DEPLOYMENT_GUIDE.md`
-- `docs/APPENDIX.md`
+- Xem danh mục: `docs/DOCS_INDEX.md`
 - `docs/ADMIN_CONFIG_SCHEMA.md`
 - `docs/ADMIN_UI_FLOW.md`
 

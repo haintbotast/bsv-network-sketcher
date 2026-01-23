@@ -57,7 +57,7 @@
 
 ## 7. KPI/tiêu chí thành công
 
-- Đầu ra đúng chuẩn layout đã chọn (golden files theo mode).
+- Đầu ra đúng chuẩn layout đã chọn (golden files theo mode hoặc rule-based).
 - 100% nghiệp vụ lõi thực thi qua UI (không cần CLI).
 - Người dùng hoàn tất quy trình tạo sơ đồ trong ≤ 3 bước chính.
 - Có thể khôi phục phiên bản topology trước đó trong ≤ 2 thao tác.

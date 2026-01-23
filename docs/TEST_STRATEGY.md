@@ -186,6 +186,12 @@ test.describe('Diagram Editor', () => {
 - Tạo expected output **theo từng layout mode** (cisco/iso/custom) làm baseline.
 - Script so sánh: kiểm tra cấu trúc slide/shape + bảng Excel.
 
+**Nếu bỏ golden files (chỉ kiểm tra rule-based):**
+- Không chồng lấn node/link.
+- Khoảng cách tối thiểu giữa node.
+- Nhãn không đè lên node/link.
+- Đúng số lượng node/link và quan hệ logic L1→L2→L3.
+
 **Bộ dữ liệu:**
 - **Small:** ~10 devices, 10–20 links → `templates/samples/small.json`
 - **Medium:** ~100 devices, 150–200 links (tạo sau)

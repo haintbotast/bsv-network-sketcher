@@ -147,6 +147,16 @@
 
 ---
 
+## 7.3 Quy ước đơn vị & làm tròn
+
+- **Đơn vị chuẩn:** inch cho toàn bộ kích thước/tọa độ logic.
+- **Lưu DB:** số thực (REAL) theo inch, làm tròn **2 chữ số thập phân**.
+- **Render UI:** nhân với `SCALE` để ra pixel; không làm tròn sớm.
+- **Export PPTX:** giữ inch, làm tròn **2 chữ số** cho kích thước, **3 chữ số** cho tọa độ để tránh lệch.
+- **Text size:** số nguyên theo preset, không làm tròn.
+
+---
+
 ## 8. Mapping UI → Konva → PPTX
 
 - **UI/Konva:** map trực tiếp từ tokens sang `fill`, `stroke`, `strokeWidth`, `fontSize`, `fontFamily`.

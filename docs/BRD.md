@@ -48,6 +48,7 @@
 - Quản lý dự án và lịch sử xuất.
 - Hệ màu, hình vẽ, nét vẽ thống nhất giữa UI và export theo **Style Spec**.
 - Có **chế độ Strict NS** để khóa style đúng chuẩn, và **Flexible** có kiểm soát khi cần.
+- Bảo vệ dữ liệu dự án (phân quyền theo project, kiểm soát upload/download).
 
 ## 7. KPI/tiêu chí thành công
 
@@ -76,3 +77,5 @@
 - `docs/PRD.md`
 - `docs/SRS.md`
 - `docs/DIAGRAM_STYLE_SPEC.md`
+- `docs/API_SPEC.md`
+- `docs/TEMPLATE_SCHEMA.md`

@@ -38,6 +38,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **UX:** Thao tác tối giản, lỗi hiển thị rõ ràng.
 - **Hiệu năng:** Chấp nhận thấp hơn để đổi lấy độ đúng; vẫn cần phản hồi hợp lý cho ~5 người dùng.
 - **Ổn định:** Job xuất không chạy trùng, có retry giới hạn.
+- **An toàn tối thiểu:** Phân quyền project, kiểm soát upload/download.
 
 ## 6. Nguyên tắc UX/UI
 
@@ -66,3 +67,5 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - `docs/BRD.md`
 - `docs/SRS.md`
 - `docs/DIAGRAM_STYLE_SPEC.md`
+- `docs/API_SPEC.md`
+- `docs/TEMPLATE_SCHEMA.md`

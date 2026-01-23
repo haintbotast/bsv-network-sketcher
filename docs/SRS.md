@@ -22,6 +22,7 @@
 - Thư viện template dữ liệu chuẩn (JSON) có version để áp dụng nhanh.
 - Hỗ trợ dán dữ liệu dạng bảng (clipboard CSV) vào grid.
 - Kiểm tra hợp lệ tại chỗ (port, IP, VLAN, trùng tên).
+ - Hỗ trợ validate-only (không ghi DB) để trả lỗi theo dòng/cột.
 
 ### 2.3 Nhập dữ liệu từ Excel/CSV (tùy chọn)
 - Hỗ trợ nhập Excel/CSV theo thứ tự phụ thuộc (Areas → Devices → Links → ...).
@@ -38,12 +39,19 @@
 ### 2.6 Thời gian thực
 - WebSocket cập nhật khi có thay đổi.
 
+### 2.7 API nhập liệu trực tiếp (tóm tắt yêu cầu)
+- Hỗ trợ `bulk` cho từng thực thể (areas/devices/links/…).
+- Hỗ trợ nhập template JSON hoặc áp dụng template lưu sẵn.
+- Trả lỗi theo dòng/cột với mã lỗi ổn định để UI hiển thị.
+ - Chi tiết endpoint xem `docs/API_SPEC.md`.
+
 ## 3. Yêu cầu dữ liệu
 
 - UUID v4 sinh ở tầng ứng dụng, lưu TEXT.
 - JSON lưu TEXT.
 - FK bắt buộc, unique constraint theo project.
 - Template dữ liệu lưu dạng JSON có `schema_version` và `template_version`.
+ - Chi tiết schema/validation xem `docs/TEMPLATE_SCHEMA.md`.
 
 ## 4. Yêu cầu giao diện
 
@@ -66,6 +74,8 @@
 - **Chính xác:** Ưu tiên số 1, so sánh output với NS gốc.
 - **Tối giản:** Giảm phụ thuộc, giảm thành phần.
 - **Ổn định:** Job queue an toàn, idempotent.
+- **An toàn tối thiểu:** Kiểm soát upload, phân quyền theo project, log lỗi đầy đủ.
+- **Phục hồi:** Có quy trình backup/restore cho DB và exports.
 
 ## 7. Giả định
 
@@ -81,3 +91,5 @@
 - `docs/BRD.md`
 - `docs/PRD.md`
 - `docs/DIAGRAM_STYLE_SPEC.md`
+- `docs/API_SPEC.md`
+- `docs/TEMPLATE_SCHEMA.md`

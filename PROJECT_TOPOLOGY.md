@@ -126,6 +126,7 @@ UI đọc trạng thái → tải file
 - Không dùng CLI trong dự án web.
 - Dữ liệu/logic/đầu ra phải tương đương NS gốc.
 - Bắt buộc có bộ “golden files” để đối chiếu PPTX/Excel.
+- Style sơ đồ phải tuân theo `docs/DIAGRAM_STYLE_SPEC.md`.
 
 ---
 
@@ -133,4 +134,3 @@ UI đọc trạng thái → tải file
 
 - Mỗi thay đổi kiến trúc/topology/triển khai **phải cập nhật** file này.
 - Mọi tác vụ liên quan luồng dữ liệu, worker, storage, export/import **phải đối chiếu** với file này.
-

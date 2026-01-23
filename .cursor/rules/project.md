@@ -41,6 +41,8 @@ globs:
 - WEB_APP_DEVELOPMENT_PLAN.md là nguồn chuẩn về kiến trúc và giai đoạn.
 - `docs/BRD.md`, `docs/PRD.md`, `docs/SRS.md` là nguồn chuẩn về yêu cầu nghiệp vụ/sản phẩm/kỹ thuật.
 - `docs/DIAGRAM_STYLE_SPEC.md` là nguồn chuẩn về style sơ đồ và mapping UI/Konva/PPTX.
+- `docs/API_SPEC.md` là nguồn chuẩn về đặc tả API.
+- `docs/TEMPLATE_SCHEMA.md` là nguồn chuẩn về schema template và validation.
 - Dự án tham chiếu repo gốc để đảm bảo logic tương đương:
   https://github.com/cisco-open/network-sketcher
   Dùng để đối chiếu logic nghiệp vụ và độ tương thích đầu ra.
@@ -53,6 +55,7 @@ globs:
 - Mọi thay đổi về topology/triển khai/luồng dữ liệu phải cập nhật PROJECT_TOPOLOGY.md.
 - Mọi thay đổi về yêu cầu nghiệp vụ/sản phẩm/kỹ thuật phải cập nhật BRD/PRD/SRS tương ứng.
 - Mọi thay đổi về hình khối/màu/nét/chữ phải cập nhật DIAGRAM_STYLE_SPEC.md.
+- Mọi thay đổi về API hoặc schema template phải cập nhật API_SPEC/TEMPLATE_SCHEMA.
 
 ## Biên soạn hướng dẫn (thực hành tốt)
 - Giữ hướng dẫn ngắn gọn, tập trung, có kiểm soát phiên bản; coi file này là README cho tác tử.

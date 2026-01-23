@@ -25,6 +25,8 @@
 - `docs/PRD.md`
 - `docs/SRS.md`
 - `docs/DIAGRAM_STYLE_SPEC.md`
+- `docs/API_SPEC.md`
+- `docs/TEMPLATE_SCHEMA.md`
 
 ---
 
@@ -585,7 +587,10 @@ class DiagramData(BaseModel):
 │
 ├── /templates
 │   ├── GET    /                  # List template dữ liệu
+│   ├── POST   /                  # Tạo template dữ liệu
 │   ├── GET    /{id}              # Get template details (JSON)
+│   ├── PUT    /{id}              # Cập nhật template
+│   ├── DELETE /{id}              # Xóa template
 │   └── POST   /{id}/apply        # Apply template to project
 │
 └── /uploads
@@ -805,6 +810,13 @@ export const diagramTokens = {
   }
 }
 ```
+
+### 5.4 API spec (tham chiếu)
+
+Chi tiết endpoint và format lỗi xem `docs/API_SPEC.md`.
+
+- Import tổng hợp hỗ trợ `template/json/excel/csv`.
+- Bulk grid cho từng thực thể (areas/devices/links).
 
 ```css
 /* styles/diagram-tokens.css (tùy chọn) */
@@ -2009,6 +2021,7 @@ Tuần 2:
 - API địa chỉ L3
 - Endpoint nhập liệu (template JSON; Excel/CSV tùy chọn)
 - Chuẩn hóa tên cổng
+- Ma trận validation + mã lỗi chuẩn cho nhập liệu
 
 **Công việc:**
 ```
@@ -2020,7 +2033,7 @@ Tuần 3:
 Tuần 4:
 ├── Ngày 1-2: Schema template dữ liệu + API nhập liệu
 ├── Ngày 3-4: (Tùy chọn) parser Excel/CSV
-└── Ngày 5: Dịch vụ kiểm tra hợp lệ + đồng bộ
+└── Ngày 5: Ma trận validation + dịch vụ kiểm tra hợp lệ + đồng bộ
 ```
 
 ---
@@ -2591,7 +2604,30 @@ echo "Sao lưu hoàn tất: $DATE"
 0 2 * * * /opt/network-sketcher-web/backup.sh >> /var/log/ns-backup.log 2>&1
 ```
 
-### 11.8 Kiểm tra sức khỏe
+### 11.8 Quy trình khôi phục (restore)
+
+```bash
+# 1) Dừng dịch vụ
+sudo systemctl stop network-sketcher
+
+# 2) Khôi phục DB
+cp /backup/network-sketcher/db_YYYYMMDD_HHMMSS.sqlite /opt/network-sketcher-web/backend/data/network_sketcher.db
+
+# 3) Khôi phục exports (nếu cần)
+tar -xzf /backup/network-sketcher/exports_YYYYMMDD_HHMMSS.tar.gz -C /opt/network-sketcher-web/backend/exports/
+
+# 4) Khởi động lại dịch vụ
+sudo systemctl start network-sketcher
+```
+
+### 11.9 Bảo mật tối thiểu (bắt buộc)
+
+- JWT + phân quyền theo project (chặn IDOR).
+- Giới hạn upload (đuôi file/size), chống path traversal.
+- Xác thực download theo quyền truy cập project.
+- Log lỗi/hoạt động nhạy cảm (import/export/delete).
+
+### 11.10 Kiểm tra sức khỏe
 
 Backend có sẵn endpoint `/health`:
 
@@ -2608,7 +2644,7 @@ curl http://localhost:8000/health
 }
 ```
 
-### 11.9 Khắc phục sự cố
+### 11.11 Khắc phục sự cố
 
 | Vấn đề | Giải pháp |
 |-------|----------|
@@ -3391,29 +3427,25 @@ class ImportService:
         return result
 ```
 
+### 10.4 Golden files & regression (bắt buộc)
+
+**Mục tiêu:** đảm bảo đầu ra PPTX/Excel tương đương Network Sketcher gốc.
+
+**Thiết lập:**
+- Tạo bộ input chuẩn (small/medium/large) và output chuẩn (golden).
+- Script so sánh: hash + kiểm tra cấu trúc slide/shape + bảng Excel.
+- Ngưỡng chấp nhận: **không chênh lệch** về số lượng shape, vị trí, màu, text.
+
+**Quy trình:**
+1) Chạy export từ web app.
+2) So sánh với golden files.
+3) Bất kỳ chênh lệch nào đều phải cập nhật spec hoặc sửa logic.
+
 #### 13.8.2 Nhập liệu trực tiếp & template dữ liệu (JSON)
 
 **Nguyên tắc:** Luồng chính là nhập liệu trực tiếp theo schema chuẩn; Excel/CSV chỉ là tùy chọn chuyển đổi dữ liệu cũ.
 
-**Template payload (gợi ý tối giản):**
-```json
-{
-  "schema_version": "1.0",
-  "template_version": "1.0",
-  "areas": [],
-  "devices": [],
-  "l1_links": [],
-  "port_channels": [],
-  "virtual_ports": [],
-  "l2_segments": [],
-  "l3_addresses": []
-}
-```
-
-**Áp dụng template vào project:**
-- Validate schema_version
-- Import theo đúng thứ tự phụ thuộc (giống Excel)
-- Log lỗi theo dòng/thực thể để trả về UI
+**Chi tiết schema/validation:** xem `docs/TEMPLATE_SCHEMA.md`.
 
 ### 13.9 Tham chiếu theme từ CLI gốc (không triển khai CLI)
 

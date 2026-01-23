@@ -7,3 +7,5 @@ Tài liệu chính:
 - `docs/PRD.md`
 - `docs/SRS.md`
 - `docs/DIAGRAM_STYLE_SPEC.md`
+- `docs/API_SPEC.md`
+- `docs/TEMPLATE_SCHEMA.md`

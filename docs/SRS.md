@@ -53,6 +53,7 @@
 ### 2.8 Cấu hình hệ thống (admin)
 - Preset layout/style/validation có thể cấu hình qua trang quản trị.
 - Không hardcode danh sách preset trong UI/Backend.
+- Schema cấu hình xem `docs/ADMIN_CONFIG_SCHEMA.md`.
 
 ## 3. Yêu cầu dữ liệu
 
@@ -109,3 +110,5 @@
 - `docs/TEMPLATE_SCHEMA.md`
 - `docs/TEST_STRATEGY.md`
 - `docs/NS_REFERENCE.md`
+- `docs/ADMIN_CONFIG_SCHEMA.md`
+- `docs/ADMIN_UI_FLOW.md`

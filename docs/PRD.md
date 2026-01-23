@@ -77,3 +77,5 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - `docs/TEMPLATE_SCHEMA.md`
 - `docs/TEST_STRATEGY.md`
 - `docs/NS_REFERENCE.md`
+- `docs/ADMIN_CONFIG_SCHEMA.md`
+- `docs/ADMIN_UI_FLOW.md`

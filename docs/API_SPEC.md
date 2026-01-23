@@ -162,6 +162,7 @@ PUT  /admin/config
 ```
 
 **Phạm vi cấu hình:** preset layout/style, validation rules, export defaults.
+**Schema:** xem `docs/ADMIN_CONFIG_SCHEMA.md`.
 
 ---
 

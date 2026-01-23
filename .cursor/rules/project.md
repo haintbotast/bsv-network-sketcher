@@ -47,6 +47,8 @@ globs:
 - `docs/NS_REFERENCE.md` là nguồn chuẩn về tham chiếu logic NS gốc.
 - `docs/DEPLOYMENT_GUIDE.md` là nguồn chuẩn về triển khai tối giản.
 - `docs/APPENDIX.md` là nguồn chuẩn về phụ lục tham chiếu.
+- `docs/ADMIN_CONFIG_SCHEMA.md` là nguồn chuẩn về cấu hình admin.
+- `docs/ADMIN_UI_FLOW.md` là nguồn chuẩn về luồng UI quản trị.
 - Dự án tham chiếu repo gốc để đảm bảo logic tương đương:
   https://github.com/cisco-open/network-sketcher
   Dùng để đối chiếu logic nghiệp vụ và độ tương thích đầu ra.
@@ -63,6 +65,7 @@ globs:
 - Mọi thay đổi về kiểm thử phải cập nhật TEST_STRATEGY.md.
 - Mọi thay đổi tham chiếu NS gốc phải cập nhật NS_REFERENCE.md.
 - Mọi thay đổi về triển khai phải cập nhật DEPLOYMENT_GUIDE.md.
+- Mọi thay đổi về cấu hình admin phải cập nhật ADMIN_CONFIG_SCHEMA.md/ADMIN_UI_FLOW.md.
 
 ## Biên soạn hướng dẫn (thực hành tốt)
 - Giữ hướng dẫn ngắn gọn, tập trung, có kiểm soát phiên bản; coi file này là README cho tác tử.

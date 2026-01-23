@@ -87,3 +87,5 @@
 - `docs/TEMPLATE_SCHEMA.md`
 - `docs/TEST_STRATEGY.md`
 - `docs/NS_REFERENCE.md`
+- `docs/ADMIN_CONFIG_SCHEMA.md`
+- `docs/ADMIN_UI_FLOW.md`

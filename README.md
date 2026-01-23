@@ -14,3 +14,5 @@ Tài liệu chính:
 - `docs/NS_REFERENCE.md`
 - `docs/DEPLOYMENT_GUIDE.md`
 - `docs/APPENDIX.md`
+- `docs/ADMIN_CONFIG_SCHEMA.md`
+- `docs/ADMIN_UI_FLOW.md`

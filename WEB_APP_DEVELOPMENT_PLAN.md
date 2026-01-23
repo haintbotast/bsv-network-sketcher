@@ -101,6 +101,8 @@ Chi tiết topology xem `PROJECT_TOPOLOGY.md`.
 - `docs/TRACEABILITY_MATRIX.md`
 - `docs/DEPLOYMENT_GUIDE.md`
 - `docs/APPENDIX.md`
+- `docs/ADMIN_CONFIG_SCHEMA.md`
+- `docs/ADMIN_UI_FLOW.md`
 
 ---
 

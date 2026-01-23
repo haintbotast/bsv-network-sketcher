@@ -10,13 +10,13 @@
 
 ## 1. Mục tiêu & tiêu chí thành công
 
-- Thay thế Network Sketcher CLI/GUI bằng web app nội bộ.
-- Đảm bảo **đầu ra tương thích** với NS gốc (PPTX/Excel/sơ đồ).
+- Xây dựng web app vẽ sơ đồ mạng (lấy cảm hứng từ Network Sketcher).
+- Tự định nghĩa output spec riêng, không yêu cầu tương thích 1:1 với NS gốc.
 - UX tối giản, thao tác nhanh, lỗi hiển thị rõ.
 
 **Tiêu chí thành công:**
 - Tạo L1/L2/L3 từ dữ liệu nhập trực tiếp hoặc template chuẩn (Excel/CSV tùy chọn).
-- Xuất PPTX/Excel **tương đương NS gốc** (golden files).
+- Xuất PPTX/Excel theo spec riêng của dự án.
 - Hỗ trợ 1000+ thiết bị/project (ưu tiên đúng logic, hiệu năng chấp nhận thấp hơn).
 
 ---
@@ -28,7 +28,7 @@
 - Multi-user nội bộ (~5 đồng thời), hạ tầng single host.
 
 **Nguyên tắc cốt lõi:**
-- **Strict NS** mặc định để đảm bảo tương thích 1:1.
+- Tự định nghĩa style/layout spec (xem `docs/DIAGRAM_STYLE_SPEC.md`).
 - Nhập liệu **template-first** (Excel/CSV tùy chọn cho dữ liệu cũ).
 - **Không CLI**, không Docker/Redis/Celery.
 

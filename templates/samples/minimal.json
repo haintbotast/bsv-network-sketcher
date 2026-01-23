@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "template_version": "1.0",
+  "metadata": {
+    "name": "Minimal Test",
+    "description": "Template tối thiểu để test validation",
+    "created_at": "2026-01-23T00:00:00Z",
+    "author": "test"
+  },
+  "areas": [
+    {
+      "name": "Core",
+      "grid_row": 1,
+      "grid_col": 1
+    }
+  ],
+  "devices": [
+    {
+      "name": "SW-1",
+      "area_name": "Core",
+      "device_type": "Switch"
+    },
+    {
+      "name": "SW-2",
+      "area_name": "Core",
+      "device_type": "Switch"
+    }
+  ],
+  "l1_links": [
+    {
+      "from_device": "SW-1",
+      "from_port": "Gi 0/1",
+      "to_device": "SW-2",
+      "to_port": "Gi 0/1",
+      "purpose": "LAN"
+    }
+  ],
+  "l2_segments": [],
+  "interface_l2_assignments": [],
+  "l3_addresses": []
+}

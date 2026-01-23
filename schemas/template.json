@@ -1,0 +1,382 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bsv.local/schemas/template.json",
+  "title": "Network Sketcher Template",
+  "description": "Schema chuẩn cho template dữ liệu nhập liệu",
+  "type": "object",
+  "required": ["schema_version", "template_version", "metadata"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Phiên bản schema (vd: 1.0)"
+    },
+    "template_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Phiên bản template"
+    },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "areas": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/area" },
+      "default": []
+    },
+    "devices": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/device" },
+      "default": []
+    },
+    "l1_links": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/l1_link" },
+      "default": []
+    },
+    "port_channels": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/port_channel" },
+      "default": []
+    },
+    "virtual_ports": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/virtual_port" },
+      "default": []
+    },
+    "l2_segments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/l2_segment" },
+      "default": []
+    },
+    "interface_l2_assignments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/interface_l2_assignment" },
+      "default": []
+    },
+    "l3_addresses": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/l3_address" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "author": {
+          "type": "string",
+          "maxLength": 100
+        }
+      }
+    },
+    "area": {
+      "type": "object",
+      "required": ["name", "grid_row", "grid_col"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[A-Za-z0-9_\\-\\s]+$"
+        },
+        "grid_row": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "grid_col": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "position_x": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Tọa độ X (inch)"
+        },
+        "position_y": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Tọa độ Y (inch)"
+        },
+        "width": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 50,
+          "default": 3.0
+        },
+        "height": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 50,
+          "default": 1.5
+        },
+        "style": {
+          "$ref": "#/$defs/area_style"
+        }
+      }
+    },
+    "area_style": {
+      "type": "object",
+      "properties": {
+        "fill_color_rgb": {
+          "$ref": "#/$defs/rgb_color"
+        },
+        "stroke_color_rgb": {
+          "$ref": "#/$defs/rgb_color"
+        },
+        "stroke_width": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 5,
+          "default": 1
+        }
+      }
+    },
+    "device": {
+      "type": "object",
+      "required": ["name", "area_name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[A-Za-z0-9_\\-\\s]+$"
+        },
+        "area_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "device_type": {
+          "type": "string",
+          "enum": ["Router", "Switch", "Firewall", "Server", "AP", "PC", "Storage", "Unknown"],
+          "default": "Unknown"
+        },
+        "position_x": {
+          "type": "number",
+          "minimum": 0
+        },
+        "position_y": {
+          "type": "number",
+          "minimum": 0
+        },
+        "width": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 10,
+          "default": 1.2
+        },
+        "height": {
+          "type": "number",
+          "minimum": 0.2,
+          "maximum": 5,
+          "default": 0.5
+        },
+        "color_rgb": {
+          "$ref": "#/$defs/rgb_color"
+        }
+      }
+    },
+    "l1_link": {
+      "type": "object",
+      "required": ["from_device", "from_port", "to_device", "to_port"],
+      "properties": {
+        "from_device": {
+          "type": "string",
+          "minLength": 1
+        },
+        "from_port": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z\\-]+\\s+.+$",
+          "description": "Phải có khoảng trắng giữa loại và số (vd: Gi 0/1)"
+        },
+        "to_device": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to_port": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z\\-]+\\s+.+$"
+        },
+        "purpose": {
+          "type": "string",
+          "enum": ["WAN", "INTERNET", "DMZ", "LAN", "MGMT", "HA", "STORAGE", "BACKUP", "VPN", "DEFAULT"],
+          "default": "DEFAULT"
+        },
+        "line_style": {
+          "type": "string",
+          "enum": ["solid", "dashed", "dotted"],
+          "default": "solid"
+        }
+      }
+    },
+    "port_channel": {
+      "type": "object",
+      "required": ["device_name", "name", "members"],
+      "properties": {
+        "device_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^Port-[Cc]hannel\\s*\\d+$"
+        },
+        "channel_number": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["LACP", "static"],
+          "default": "LACP"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z\\-]+\\s+.+$"
+          },
+          "minItems": 1,
+          "maxItems": 16
+        }
+      }
+    },
+    "virtual_port": {
+      "type": "object",
+      "required": ["device_name", "name", "interface_type"],
+      "properties": {
+        "device_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(Vlan|Loopback|Port-[Cc]hannel)\\s*\\d+$"
+        },
+        "interface_type": {
+          "type": "string",
+          "enum": ["Vlan", "Loopback", "Port-Channel"]
+        }
+      }
+    },
+    "l2_segment": {
+      "type": "object",
+      "required": ["name", "vlan_id"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "vlan_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4094
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 255
+        }
+      }
+    },
+    "interface_l2_assignment": {
+      "type": "object",
+      "required": ["device_name", "interface_name", "l2_segment", "port_mode"],
+      "properties": {
+        "device_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "interface_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "l2_segment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port_mode": {
+          "type": "string",
+          "enum": ["access", "trunk"]
+        },
+        "native_vlan": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4094,
+          "description": "Chỉ áp dụng cho trunk"
+        },
+        "allowed_vlans": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4094
+          },
+          "description": "Chỉ áp dụng cho trunk"
+        }
+      }
+    },
+    "l3_address": {
+      "type": "object",
+      "required": ["device_name", "interface_name", "ip_address", "prefix_length"],
+      "properties": {
+        "device_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "interface_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ip_address": {
+          "type": "string",
+          "pattern": "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",
+          "description": "IPv4 address"
+        },
+        "prefix_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "is_secondary": {
+          "type": "boolean",
+          "default": false
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 255
+        }
+      }
+    },
+    "rgb_color": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "[R, G, B]"
+    }
+  }
+}

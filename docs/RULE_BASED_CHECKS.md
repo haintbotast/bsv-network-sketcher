@@ -28,6 +28,18 @@
 
 **Nguồn override:** preset theo layout mode hoặc cấu hình admin (xem `docs/ADMIN_CONFIG_SCHEMA.md`).
 
+### 2.1 Khuyến nghị tinh chỉnh (khi cần)
+
+- Ưu tiên giữ tỉ lệ khoảng cách **ổn định theo inch** để không làm lệch export PPTX.
+- Chỉ thay đổi từng tham số và chạy lại regression trước khi áp dụng rộng.
+- Khung giá trị gợi ý (để tránh bố cục quá chật hoặc quá thưa):
+  - `area_padding`: 0.10 – 0.40
+  - `device_gap`: 0.15 – 0.60
+  - `label_gap`: 0.03 – 0.20
+  - `link_gap`: 0.03 – 0.20
+  - `overlap_epsilon`: 0.005 – 0.02
+  - `min_link_segment`: 0.08 – 0.50
+
 ---
 
 ## 3. Quy tắc logic bắt buộc (ERROR)

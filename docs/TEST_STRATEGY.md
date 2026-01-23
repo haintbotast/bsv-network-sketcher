@@ -192,6 +192,17 @@ test.describe('Diagram Editor', () => {
 - Nhãn không đè lên node/link.
 - Đúng số lượng node/link và quan hệ logic L1→L2→L3.
 
+**Ma trận kiểm thử tối thiểu (rule-based):**
+
+| Rule | Loại test | Mô tả tối thiểu |
+|---|---|---|
+| RB-001..RB-005 | Unit | Validate liên kết/port/interface tồn tại, L1/L2/L3 hợp lệ |
+| RB-006 | Integration | So sánh số lượng node/link trước & sau layout |
+| RB-101..RB-104 | Integration | Kiểm tra chồng lấn, nằm trong area, link xuyên node |
+| RB-121..RB-122 | Integration | Kiểm tra va chạm nhãn/nhãn lên node/link |
+| RB-141..RB-143 | Integration | Cảnh báo khoảng cách tối thiểu |
+| RB-201..RB-202 | Unit/Integration | Kiểm tra hướng layout & fallback custom |
+
 **Bộ dữ liệu:**
 - **Small:** ~10 devices, 10–20 links → `templates/samples/small.json`
 - **Medium:** ~100 devices, 150–200 links (tạo sau)

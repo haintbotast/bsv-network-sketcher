@@ -12,8 +12,9 @@ globs:
 ## Thứ tự đọc
 1) File này
 2) AGENTS.md
-3) WEB_APP_DEVELOPMENT_PLAN.md
-4) Tài liệu khác do người dùng chỉ định
+3) PROJECT_TOPOLOGY.md
+4) WEB_APP_DEVELOPMENT_PLAN.md
+5) Tài liệu khác do người dùng chỉ định
 
 ## Ngôn ngữ tài liệu (bắt buộc)
 - Tất cả tài liệu/hướng dẫn trong repo phải viết bằng tiếng Việt có dấu.
@@ -25,6 +26,7 @@ globs:
 - Job: worker nền dựa trên DB (poller) + ProcessPool cho tác vụ PPTX/Excel nặng.
 - MVP không dùng Redis, Celery hoặc Docker.
 - WebSocket: WebSocket gốc (không dùng Socket.IO).
+- Không triển khai CLI/CLI wrapper trong dự án web; CLI chỉ là nguồn tham chiếu logic từ repo gốc.
 
 ## Quy ước Vue 3 + Konva.js
 - Dùng `vue-konva` cho tích hợp chính; hạn chế thao tác DOM trực tiếp với Konva trừ khi bắt buộc.
@@ -35,7 +37,9 @@ globs:
 - Xử lý resize container để cập nhật kích thước `Stage` nhất quán.
 
 ## Nguồn tham chiếu
+- PROJECT_TOPOLOGY.md là nguồn chuẩn về topology hệ thống.
 - WEB_APP_DEVELOPMENT_PLAN.md là nguồn chuẩn về kiến trúc và giai đoạn.
+- `docs/BRD.md`, `docs/PRD.md`, `docs/SRS.md` là nguồn chuẩn về yêu cầu nghiệp vụ/sản phẩm/kỹ thuật.
 - Dự án tham chiếu repo gốc để đảm bảo logic tương đương:
   https://github.com/cisco-open/network-sketcher
   Dùng để đối chiếu logic nghiệp vụ và độ tương thích đầu ra.
@@ -45,6 +49,8 @@ globs:
 - Nếu yêu cầu mới xung đột với file này hoặc kế hoạch, hỏi người dùng và cập nhật cả hai.
 - Khi người dùng cung cấp chỉ thị mới, cập nhật file này và các file hướng dẫn theo công cụ
   (AGENTS.md, CLAUDE.md) để đồng bộ.
+- Mọi thay đổi về topology/triển khai/luồng dữ liệu phải cập nhật PROJECT_TOPOLOGY.md.
+- Mọi thay đổi về yêu cầu nghiệp vụ/sản phẩm/kỹ thuật phải cập nhật BRD/PRD/SRS tương ứng.
 
 ## Biên soạn hướng dẫn (thực hành tốt)
 - Giữ hướng dẫn ngắn gọn, tập trung, có kiểm soát phiên bản; coi file này là README cho tác tử.

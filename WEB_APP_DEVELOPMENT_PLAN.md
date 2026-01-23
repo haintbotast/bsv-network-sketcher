@@ -18,6 +18,13 @@
 | **Triển khai** | systemd (Linux) / NSSM (Windows) | Dịch vụ hệ điều hành gốc |
 | **Sao lưu** | sqlite3 .backup + cron | Sao lưu SQLite an toàn hằng ngày |
 
+### 📎 Tài liệu liên quan
+
+- `PROJECT_TOPOLOGY.md`
+- `docs/BRD.md`
+- `docs/PRD.md`
+- `docs/SRS.md`
+
 ---
 
 ## Mục lục
@@ -48,6 +55,7 @@ Xây dựng Web Application mới hoàn toàn để thay thế Network Sketcher 
 - ✅ Xuất PPTX/Excel đầy đủ chức năng
 - ✅ Multi-user support với project management
 - ✅ Modern, responsive UI
+- ✅ Không phát triển CLI/CLI wrapper trong dự án web; CLI chỉ là nguồn tham chiếu logic từ repo gốc
 
 ### 1.2 Sản phẩm bàn giao chính
 
@@ -62,7 +70,7 @@ Xây dựng Web Application mới hoàn toàn để thay thế Network Sketcher 
 ### 1.3 Tiêu chí thành công
 
 - [ ] Tạo được diagram L1/L2/L3 từ Excel input
-- [ ] Xuất PPTX với bố cục tương tự phiên bản CLI
+- [ ] Xuất PPTX với bố cục tương tự phiên bản gốc Network Sketcher
 - [ ] Xuất file thiết bị Excel với đầy đủ bảng L1/L2/L3
 - [ ] Xem trước sơ đồ thời gian thực trên trình duyệt
 - [ ] Support 1000+ devices per project
@@ -759,149 +767,58 @@ src/
     └── layout.ts                   # Layout algorithms
 ```
 
-### 6.3 Triển khai canvas sơ đồ
+### 6.3 Hệ thống style sơ đồ (design tokens)
+
+Mục tiêu: gom **hình vẽ + màu sắc + nét vẽ** vào một nguồn chuẩn, dùng chung cho UI (HTML/CSS), Konva canvas và xuất file.
+
+**Khuyến nghị cấu trúc:**
+- `frontend/src/styles/diagram-tokens.ts`: nguồn chuẩn (TS object).
+- `frontend/src/styles/diagram-tokens.css`: (tùy chọn) map tokens sang CSS variables để các component UI dùng được.
+- Không phụ thuộc framework; PrimeVue/Naive chỉ cần đọc CSS variables.
 
 ```typescript
-// composables/useDiagram.ts
-import { ref, computed, watch } from 'vue'
-import Konva from 'konva'
-import { useProjectStore } from '@/stores/project'
-import { getDeviceColor } from '@/utils/colors'
-
-export function useDiagram() {
-  const store = useProjectStore()
-  const stage = ref<Konva.Stage | null>(null)
-  const layer = ref<Konva.Layer | null>(null)
-  const selectedId = ref<string | null>(null)
-
-  // Initialize canvas
-  function initCanvas(container: HTMLDivElement) {
-    stage.value = new Konva.Stage({
-      container,
-      width: container.clientWidth,
-      height: container.clientHeight,
-      draggable: true
-    })
-
-    layer.value = new Konva.Layer()
-    stage.value.add(layer.value)
-  }
-
-  // Render areas
-  function renderAreas(areas: Area[]) {
-    areas.forEach(area => {
-      const group = new Konva.Group({
-        x: area.position_x * SCALE,
-        y: area.position_y * SCALE,
-        id: `area-${area.id}`,
-        draggable: true
-      })
-
-      // Area background
-      const rect = new Konva.Rect({
-        width: area.width * SCALE,
-        height: area.height * SCALE,
-        fill: '#f0f0f0',
-        stroke: '#333',
-        strokeWidth: 1,
-        cornerRadius: 5
-      })
-
-      // Area label
-      const text = new Konva.Text({
-        text: area.name,
-        fontSize: 14,
-        fontFamily: 'Calibri',
-        fill: '#333',
-        padding: 5
-      })
-
-      group.add(rect, text)
-      layer.value?.add(group)
-    })
-  }
-
-  // Render devices
-  function renderDevices(devices: Device[]) {
-    devices.forEach(device => {
-      const color = getDeviceColor(device.name, device.device_type)
-
-      const group = new Konva.Group({
-        x: device.position_x * SCALE,
-        y: device.position_y * SCALE,
-        id: `device-${device.id}`,
-        draggable: true
-      })
-
-      // Device shape
-      const rect = new Konva.Rect({
-        width: device.width * SCALE,
-        height: device.height * SCALE,
-        fill: `rgb(${color.join(',')})`,
-        stroke: '#333',
-        strokeWidth: 1,
-        cornerRadius: 3
-      })
-
-      // Device label
-      const text = new Konva.Text({
-        text: device.name,
-        fontSize: 10,
-        fontFamily: 'Calibri',
-        fill: '#000',
-        width: device.width * SCALE,
-        align: 'center',
-        verticalAlign: 'middle'
-      })
-
-      group.add(rect, text)
-
-      // Click handler
-      group.on('click', () => {
-        selectedId.value = device.id
-        store.selectDevice(device.id)
-      })
-
-      layer.value?.add(group)
-    })
-  }
-
-  // Render connections
-  function renderLinks(links: L1Link[]) {
-    links.forEach(link => {
-      const fromDevice = store.getDevice(link.from_device_id)
-      const toDevice = store.getDevice(link.to_device_id)
-
-      if (!fromDevice || !toDevice) return
-
-      const [fromPoint, toPoint] = calculateConnectionPoints(
-        fromDevice, toDevice
-      )
-
-      const line = new Konva.Line({
-        points: [fromPoint.x, fromPoint.y, toPoint.x, toPoint.y],
-        stroke: getLinkColor(link.purpose),
-        strokeWidth: 1.5,
-        id: `link-${link.id}`
-      })
-
-      layer.value?.add(line)
-    })
-  }
-
-  return {
-    stage,
-    layer,
-    selectedId,
-    initCanvas,
-    renderAreas,
-    renderDevices,
-    renderLinks
+// styles/diagram-tokens.ts
+export const diagramTokens = {
+  font: {
+    family: 'Calibri',
+    size: { area: 14, device: 10, link: 9 }
+  },
+  stroke: {
+    area: { color: '#333333', width: 1 },
+    device: { color: '#333333', width: 1 },
+    link: { width: 1.5 }
+  },
+  radius: { area: 6, device: 3 },
+  line: {
+    dash: {
+      backup: [4, 2],
+      mgmt: [6, 3]
+    }
   }
 }
 ```
 
-### 6.4 Triển khai hệ màu
+```css
+/* styles/diagram-tokens.css (tùy chọn) */
+:root {
+  --diagram-area-stroke: #333333;
+  --diagram-device-stroke: #333333;
+  --diagram-link-width: 1.5;
+}
+```
+
+> **Lưu ý:** Konva không đọc CSS variables trực tiếp, cần map từ `diagramTokens` khi tạo node.
+
+### 6.4 Quy ước hình vẽ & nét vẽ
+
+- **Area:** hình chữ nhật bo góc, nền nhạt, label nằm góc trên trái; stroke mỏng.
+- **Device:** hình chữ nhật/bo góc, màu theo loại thiết bị; label căn giữa; tùy chọn icon.
+- **Waypoint:** hình tròn nhỏ hoặc diamond, màu trung tính; không hiển thị label khi zoom out.
+- **Link:** nét liền cho kết nối chính; nét đứt cho backup/mgmt; màu theo purpose; tùy chọn mũi tên nếu cần hướng.
+- **Interface tag:** nền bán trong suốt, viền mỏng, offset khỏi đường link để tránh chồng lấn.
+- **Quy ước zoom:** giữ độ dày nét và cỡ chữ ổn định theo mức zoom (hoặc scale theo ngưỡng).
+
+### 6.5 Triển khai hệ màu
 
 ```typescript
 // utils/colors.ts
@@ -1003,7 +920,152 @@ function normalizePurpose(purpose: string): string {
 }
 ```
 
-### 6.5 Lưu ý khi kết hợp Vue 3 + Konva.js
+### 6.6 Triển khai canvas sơ đồ
+
+```typescript
+// composables/useDiagram.ts
+import { ref } from 'vue'
+import Konva from 'konva'
+import { useProjectStore } from '@/stores/project'
+import { getDeviceColor, getLinkColor } from '@/utils/colors'
+import { diagramTokens } from '@/styles/diagram-tokens'
+
+export function useDiagram() {
+  const store = useProjectStore()
+  const stage = ref<Konva.Stage | null>(null)
+  const layer = ref<Konva.Layer | null>(null)
+  const selectedId = ref<string | null>(null)
+
+  function initCanvas(container: HTMLDivElement) {
+    stage.value = new Konva.Stage({
+      container,
+      width: container.clientWidth,
+      height: container.clientHeight,
+      draggable: true
+    })
+
+    layer.value = new Konva.Layer()
+    stage.value.add(layer.value)
+  }
+
+  function renderAreas(areas: Area[]) {
+    areas.forEach(area => {
+      const group = new Konva.Group({
+        x: area.position_x * SCALE,
+        y: area.position_y * SCALE,
+        id: `area-${area.id}`,
+        draggable: true
+      })
+
+      const rect = new Konva.Rect({
+        width: area.width * SCALE,
+        height: area.height * SCALE,
+        fill: '#f0f0f0',
+        stroke: diagramTokens.stroke.area.color,
+        strokeWidth: diagramTokens.stroke.area.width,
+        cornerRadius: diagramTokens.radius.area
+      })
+
+      const text = new Konva.Text({
+        text: area.name,
+        fontSize: diagramTokens.font.size.area,
+        fontFamily: diagramTokens.font.family,
+        fill: '#333',
+        padding: 5
+      })
+
+      group.add(rect, text)
+      layer.value?.add(group)
+    })
+  }
+
+  function renderDevices(devices: Device[]) {
+    devices.forEach(device => {
+      const color = getDeviceColor(device.name, device.device_type)
+
+      const group = new Konva.Group({
+        x: device.position_x * SCALE,
+        y: device.position_y * SCALE,
+        id: `device-${device.id}`,
+        draggable: true
+      })
+
+      const rect = new Konva.Rect({
+        width: device.width * SCALE,
+        height: device.height * SCALE,
+        fill: `rgb(${color.join(',')})`,
+        stroke: diagramTokens.stroke.device.color,
+        strokeWidth: diagramTokens.stroke.device.width,
+        cornerRadius: diagramTokens.radius.device
+      })
+
+      const text = new Konva.Text({
+        text: device.name,
+        fontSize: diagramTokens.font.size.device,
+        fontFamily: diagramTokens.font.family,
+        fill: '#000',
+        width: device.width * SCALE,
+        align: 'center',
+        verticalAlign: 'middle'
+      })
+
+      group.add(rect, text)
+
+      group.on('click', () => {
+        selectedId.value = device.id
+        store.selectDevice(device.id)
+      })
+
+      layer.value?.add(group)
+    })
+  }
+
+  function renderLinks(links: L1Link[]) {
+    links.forEach(link => {
+      const fromDevice = store.getDevice(link.from_device_id)
+      const toDevice = store.getDevice(link.to_device_id)
+      if (!fromDevice || !toDevice) return
+
+      const [fromPoint, toPoint] = calculateConnectionPoints(
+        fromDevice, toDevice
+      )
+
+      const line = new Konva.Line({
+        points: [fromPoint.x, fromPoint.y, toPoint.x, toPoint.y],
+        stroke: getLinkColor(link.purpose),
+        strokeWidth: diagramTokens.stroke.link.width,
+        dash: link.purpose?.toUpperCase().includes('BACKUP')
+          ? diagramTokens.line.dash.backup
+          : undefined,
+        id: `link-${link.id}`
+      })
+
+      layer.value?.add(line)
+    })
+  }
+
+  return {
+    stage,
+    layer,
+    selectedId,
+    initCanvas,
+    renderAreas,
+    renderDevices,
+    renderLinks
+  }
+}
+```
+
+### 6.7 Chiến lược hiệu năng cho sơ đồ lớn
+
+- **Cắt vùng hiển thị (culling/virtualization):** chỉ render node nằm trong viewport.
+- **Chia lô render:** render theo batch 100–300 node/frame để tránh giật.
+- **Layer hóa rõ ràng:** layer tĩnh (area, nền) và layer động (device, link) để giảm redraw.
+- **Giảm chi tiết khi zoom out (LOD):** ẩn label, icon, tag khi zoom nhỏ.
+- **Tối ưu hit-test:** dùng spatial index (grid/quadtree) để chọn node nhanh.
+- **Giới hạn sự kiện:** throttle pan/zoom/drag, debounce render, ưu tiên `batchDraw()`.
+
+### 6.8 Lưu ý khi kết hợp Vue 3 + Konva.js
 
 - Dùng `vue-konva` làm lớp tích hợp chính; hạn chế thao tác DOM trực tiếp với Konva.
 - Dữ liệu logic và dữ liệu hiển thị phải tách riêng để hỗ trợ zoom/pan nhất quán.
@@ -2564,9 +2626,11 @@ sudo systemctl restart network-sketcher
 
 | Rủi ro | Tác động | Xác suất | Giảm thiểu |
 |------|--------|-------------|------------|
-| Khác biệt kết xuất PPTX | Cao | Trung bình | Kiểm thử thị giác kỹ, so sánh với đầu ra CLI |
+| Khác biệt kết xuất PPTX | Cao | Trung bình | Kiểm thử thị giác kỹ, so sánh với đầu ra bản gốc Network Sketcher |
 | Hiệu năng sơ đồ lớn | Trung bình | Cao | Virtualization canvas, phân trang, lazy loading |
-| Ghi đồng thời SQLite | Thấp | Thấp | WAL mode, ~5 người dùng không vấn đề |
+| Đồng thời & hàng đợi job | Cao | Trung bình | Claim job nguyên tử, retry có giới hạn, heartbeat, giới hạn worker |
+| Toàn vẹn dữ liệu | Cao | Trung bình | FK bật, transaction ngắn, unique constraint, validate trước khi ghi |
+| Ghi đồng thời SQLite | Thấp | Thấp | WAL mode, timeout hợp lý, ~5 người dùng không vấn đề |
 | Quản lý lưu trữ tệp | Thấp | Trung bình | Job dọn dẹp hằng ngày, giám sát đĩa |
 
 ### 12.2 Rủi ro dự án
@@ -2582,13 +2646,18 @@ sudo systemctl restart network-sketcher
 
 **PPTX Rendering:**
 - Create automated visual regression tests
-- So sánh PPTX xuất với phiên bản CLI theo từng cặp
+- So sánh PPTX xuất với phiên bản gốc Network Sketcher theo từng cặp
 - Duy trì bộ PPTX tham chiếu để đối chiếu
 
 **Performance:**
 - Triển khai virtualization canvas (chỉ render phần nhìn thấy)
 - Dùng WebWorkers cho tính toán nặng
 - Triển khai debounce và cache cho request
+
+**Data Integrity & Concurrency:**
+- Bật `PRAGMA foreign_keys=ON` cho mọi kết nối SQLite
+- Dùng transaction ngắn, khóa theo project khi import/export
+- Thiết kế idempotent cho các thao tác ghi (đặc biệt là job)
 
 **Scalability:**
 - Thiết kế cho mở rộng ngang ngay từ đầu
@@ -2599,7 +2668,8 @@ sudo systemctl restart network-sketcher
 
 - **Ma trận tương thích logic:** lập bảng “input → xử lý → output” đối chiếu từng chức năng với repo gốc; cập nhật khi có thay đổi.
 - **Golden files cho xuất:** tạo bộ Excel/PPTX chuẩn, chạy so sánh tự động (snapshot/regression) sau mỗi thay đổi.
-- **Job queue an toàn:** thêm cơ chế “claim job” (status + locked_at), retry có giới hạn, idempotency theo `job_id`, và quy tắc phát hiện job treo.
+- **Job queue an toàn:** cơ chế “claim job” (status + locked_at), retry có giới hạn, idempotency theo `job_id`, heartbeat phát hiện job treo, giới hạn worker/ProcessPool.
+- **Toàn vẹn dữ liệu:** bật FK, transaction theo lô, kiểm tra unique trước khi ghi; log rõ lỗi vi phạm ràng buộc.
 - **Theo dõi chất lượng:** đặt ngưỡng hiệu năng (thời gian render/xuất), benchmark định kỳ trên bộ dữ liệu lớn.
 - **Khả năng phục hồi:** quy trình backup/restore thử nghiệm định kỳ, kiểm tra tính toàn vẹn file xuất.
 - **Tài liệu hóa thay đổi:** mọi khác biệt so với repo gốc phải ghi rõ trong plan + changelog nội bộ.
@@ -2813,6 +2883,8 @@ network-sketcher-web/
 
 Section này cung cấp mapping chi tiết giữa source code gốc của Network Sketcher và các component tương ứng trong Web App, giúp developers dễ dàng tham chiếu logic nghiệp vụ.
 
+**Lưu ý phạm vi:** Dự án web **không triển khai CLI/CLI wrapper**; các tệp/luồng CLI bên dưới chỉ dùng để đối chiếu logic và kết quả đầu ra.
+
 ### 13.0 Kho mã nguồn tham chiếu
 
 Dự án này dựa trên source gốc của Network Sketcher để tham chiếu tính năng/chức năng/logic.
@@ -2826,14 +2898,14 @@ https://github.com/cisco-open/network-sketcher
 ```
 network-sketcher/
 ├── ns_def.py                    # Core definitions, utilities, colors
-├── ns_cli.py                    # CLI commands, validation
+├── ns_cli.py                    # CLI commands, validation (tham chiếu)
 ├── ns_ddx_figure.py             # PPTX generation engine
 ├── ns_l1_master_create.py       # L1 diagram data creation
 ├── ns_l2_diagram_create.py      # L2 diagram generation
 ├── ns_l3_diagram_create.py      # L3 diagram generation
 ├── ns_sync_between_layers.py    # L1↔L2↔L3 synchronization
 └── scripts/
-    ├── ns_cli_wrapper.py        # CLI wrapper with themes
+    ├── ns_cli_wrapper.py        # CLI wrapper with themes (tham chiếu)
     ├── import_from_excel.py     # Excel import logic
     └── create_excel_template.py # Template generation
 ```
@@ -2872,7 +2944,7 @@ class ValidationService:
 
 #### 13.2.2 Định nghĩa màu theo ngành
 
-**Original Location:** `ns_def.py` (line ~50-100) và CLI theme system
+**Original Location:** `ns_def.py` (line ~50-100) và hệ theme gốc (CLI)
 
 ```python
 # Ánh xạ INDUSTRY_COLORS - màu thiết bị theo tiền tố tên
@@ -2912,7 +2984,7 @@ DEVICE_COLORS = {
     '_DEFAULT_': [235, 241, 222],
 }
 
-# Màu mục đích liên kết (theme tương phản CLI)
+# Màu mục đích liên kết (theme tương phản gốc)
 LINK_PURPOSE_COLORS = {
     'WAN': [70, 130, 180],       # Blue
     'INTERNET': [70, 130, 180],
@@ -2942,11 +3014,11 @@ def get_link_color(purpose: str) -> list[int]:
     return LINK_PURPOSE_COLORS.get(purpose.upper(), [0, 0, 0])
 ```
 
-### 13.3 Lệnh CLI (`ns_cli.py`)
+### 13.3 Lệnh gốc (CLI) → API (tham chiếu)
 
 #### 13.3.1 Ánh xạ lệnh → API
 
-| CLI Command | Original Function | Web API Endpoint |
+| Lệnh gốc (CLI) | Original Function | Web API Endpoint |
 |-------------|-------------------|------------------|
 | `add area_location` | `add_area_location()` | `POST /api/v1/projects/{id}/areas` |
 | `add device_location` | `add_device_location()` | `POST /api/v1/projects/{id}/devices` |
@@ -3310,7 +3382,7 @@ class ImportService:
         return result
 ```
 
-### 13.9 Hỗ trợ theme cho CLI wrapper (`scripts/ns_cli_wrapper.py`)
+### 13.9 Tham chiếu theme từ CLI gốc (không triển khai CLI)
 
 #### 13.9.1 Áp dụng theme
 
@@ -3366,4 +3438,4 @@ class ThemeService:
 
 ---
 
-*Document Version: 1.1 | Last Updated: 2026-01-23*
+*Document Version: 1.2 | Last Updated: 2026-01-23*

@@ -1,3 +1,8 @@
 # bsv-network-sketcher
 
-Tài liệu kế hoạch và hướng dẫn triển khai xem trong `WEB_APP_DEVELOPMENT_PLAN.md`.
+Tài liệu chính:
+- `PROJECT_TOPOLOGY.md`
+- `WEB_APP_DEVELOPMENT_PLAN.md`
+- `docs/BRD.md`
+- `docs/PRD.md`
+- `docs/SRS.md`

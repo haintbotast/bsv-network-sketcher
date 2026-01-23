@@ -1,84 +1,84 @@
-# Network Sketcher Web Application - Development Plan
+# Kế hoạch phát triển Ứng dụng Web Network Sketcher
 
-> **Version:** 1.2
-> **Created:** 2026-01-23
-> **Updated:** 2026-01-23
-> **Status:** Planning
-> **Estimated Duration:** 10-14 weeks (MVP + Full features)
-> **Target Users:** ~5 concurrent users (internal team)
+> **Phiên bản:** 1.2
+> **Tạo:** 2026-01-23
+> **Cập nhật:** 2026-01-23
+> **Trạng thái:** Lập kế hoạch
+> **Thời lượng ước tính:** 10-14 tuần (MVP + đầy đủ tính năng)
+> **Người dùng mục tiêu:** ~5 người dùng đồng thời (nội bộ)
 
-### 📋 Architecture Summary (Simplified)
+### 📋 Tóm tắt kiến trúc (đơn giản hóa)
 
-| Component | Technology | Notes |
+| Thành phần | Công nghệ | Ghi chú |
 |-----------|------------|-------|
 | **Backend** | FastAPI + Python 3.11+ | Chạy trực tiếp, không Docker |
-| **Frontend** | Vue 3 + Vite | Static files served by Nginx hoặc backend |
+| **Frontend** | Vue 3 + Vite | File tĩnh phục vụ bởi Nginx hoặc backend |
 | **Database** | SQLite | Single file, không cần DB server |
-| **Task Queue** | FastAPI BackgroundTasks | In-process, không cần Redis/Celery |
-| **Deployment** | systemd (Linux) / NSSM (Windows) | Native OS service |
-| **Backup** | rsync + cron | Copy SQLite file hàng ngày |
+| **Job Worker** | Worker nhẹ dựa trên DB | Poller async + ProcessPool (không Redis/Celery) |
+| **Triển khai** | systemd (Linux) / NSSM (Windows) | Dịch vụ hệ điều hành gốc |
+| **Sao lưu** | sqlite3 .backup + cron | Sao lưu SQLite an toàn hằng ngày |
 
 ---
 
-## Table of Contents
+## Mục lục
 
-1. [Executive Summary](#1-executive-summary)
-2. [Architecture Overview](#2-architecture-overview)
-3. [Technology Stack](#3-technology-stack)
-4. [Data Models](#4-data-models)
-5. [Backend API Design](#5-backend-api-design)
-6. [Frontend Design](#6-frontend-design)
-7. [Core Business Logic Implementation](#7-core-business-logic-implementation)
-8. [Export Engine](#8-export-engine)
-9. [Development Phases](#9-development-phases)
-10. [Testing Strategy](#10-testing-strategy)
-11. [Deployment](#11-deployment)
-12. [Risk Assessment](#12-risk-assessment)
-13. [**Original NS Logic Reference**](#13-original-ns-logic-reference) ← NEW
+1. [Tóm tắt điều hành](#1-tom-tat-dieu-hanh)
+2. [Tổng quan kiến trúc](#2-tong-quan-kien-truc)
+3. [Ngăn xếp công nghệ](#3-ngan-xep-cong-nghe)
+4. [Mô hình dữ liệu](#4-mo-hinh-du-lieu)
+5. [Thiết kế API backend](#5-thiet-ke-api-backend)
+6. [Thiết kế frontend](#6-thiet-ke-frontend)
+7. [Triển khai logic nghiệp vụ cốt lõi](#7-trien-khai-logic-nghiep-vu-cot-loi)
+8. [Bộ máy xuất](#8-bo-may-xuat)
+9. [Các giai đoạn phát triển](#9-cac-giai-doan-phat-trien)
+10. [Chiến lược kiểm thử](#10-chien-luoc-kiem-thu)
+11. [Triển khai](#11-trien-khai)
+12. [Đánh giá rủi ro](#12-danh-gia-rui-ro)
+13. [**Tham chiếu logic NS gốc**](#13-tham-chieu-logic-ns-goc) ← MỚI
 
 ---
 
-## 1. Executive Summary
+## 1. Tóm tắt điều hành
 
-### 1.1 Project Goal
+### 1.1 Mục tiêu dự án
 
 Xây dựng Web Application mới hoàn toàn để thay thế Network Sketcher CLI/GUI, đảm bảo:
 - ✅ 100% business logic compatibility
-- ✅ Real-time diagram preview trên browser
-- ✅ Export PPTX/Excel đầy đủ chức năng
+- ✅ Xem trước sơ đồ thời gian thực trên trình duyệt
+- ✅ Xuất PPTX/Excel đầy đủ chức năng
 - ✅ Multi-user support với project management
 - ✅ Modern, responsive UI
 
-### 1.2 Key Deliverables
+### 1.2 Sản phẩm bàn giao chính
 
 | Deliverable | Description |
 |-------------|-------------|
-| **Web Dashboard** | Project management, template gallery |
-| **Diagram Editor** | Interactive network topology editor |
-| **Live Preview** | Real-time SVG/Canvas rendering |
-| **Export Engine** | PPTX/Excel generation via API |
-| **Data Import** | Excel/CSV upload và parsing |
+| **Bảng điều khiển web** | Quản lý dự án, thư viện mẫu |
+| **Trình biên tập sơ đồ** | Trình biên tập topo mạng tương tác |
+| **Xem trước trực tiếp** | Kết xuất SVG/Canvas thời gian thực |
+| **Bộ máy xuất** | Sinh PPTX/Excel qua API |
+| **Nhập dữ liệu** | Tải lên và phân tích Excel/CSV |
 
-### 1.3 Success Criteria
+### 1.3 Tiêu chí thành công
 
 - [ ] Tạo được diagram L1/L2/L3 từ Excel input
-- [ ] Export PPTX với layout identical với CLI version
-- [ ] Export Excel device file với đầy đủ L1/L2/L3 tables
-- [ ] Preview diagram real-time trên browser
+- [ ] Xuất PPTX với bố cục tương tự phiên bản CLI
+- [ ] Xuất file thiết bị Excel với đầy đủ bảng L1/L2/L3
+- [ ] Xem trước sơ đồ thời gian thực trên trình duyệt
 - [ ] Support 1000+ devices per project
-- [ ] Response time < 3s cho diagram generation
+- [ ] Thời gian phản hồi < 3s cho tạo sơ đồ
 
 ---
 
-## 2. Architecture Overview
+## 2. Tổng quan kiến trúc
 
-### 2.1 High-Level Architecture
+### 2.1 Kiến trúc cấp cao
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                           FRONTEND                                   │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐  │
-│  │   Vue 3 SPA     │  │  Diagram Canvas │  │   Export Preview    │  │
+│  │   Vue 3 SPA     │  │  Canvas sơ đồ   │  │   Xem trước xuất    │  │
 │  │   (Vite)        │  │  (Konva.js)     │  │   (PDF.js)          │  │
 │  └────────┬────────┘  └────────┬────────┘  └──────────┬──────────┘  │
 └───────────┼─────────────────────┼─────────────────────┼─────────────┘
@@ -93,7 +93,7 @@ Xây dựng Web Application mới hoàn toàn để thay thế Network Sketcher 
         ▼                       ▼                       ▼
 ┌───────────────┐     ┌─────────────────┐     ┌─────────────────────┐
 │   REST API    │     │   WebSocket     │     │   Background Jobs   │
-│   Endpoints   │     │   (real-time)   │     │   (Celery/ARQ)      │
+│   Endpoints   │     │ (thời gian thực)│     │   (worker DB)       │
 └───────┬───────┘     └────────┬────────┘     └──────────┬──────────┘
         │                      │                         │
         ▼                      ▼                         ▼
@@ -107,134 +107,135 @@ Xây dựng Web Application mới hoàn toàn để thay thế Network Sketcher 
 ┌───────────────────────────────┼───────────────────────┐
 ▼                               ▼                       ▼
 ┌───────────────┐     ┌─────────────────┐     ┌─────────────────────┐
-│   SQLite      │     │   In-Process    │     │   File Storage      │
-│   (data)      │     │   Task Queue    │     │   (Local FS)        │
+│   SQLite      │     │   Job Worker    │     │   File Storage      │
+│   (data)      │     │   (DB poller)   │     │   (Local FS)        │
 └───────────────┘     └─────────────────┘     └─────────────────────┘
 ```
 
-> **Note:** Architecture đơn giản hóa cho ~5 concurrent users. Không cần Redis/PostgreSQL.
-> Nếu scale lên 20+ users, có thể upgrade lên PostgreSQL + Redis.
+> **Lưu ý:** Kiến trúc đơn giản hóa cho ~5 người dùng đồng thời. Không cần Redis/PostgreSQL.
+> Nếu scale lên 20+ người dùng, có thể nâng cấp lên PostgreSQL + Redis.
 
-### 2.2 Component Responsibilities
+### 2.2 Trách nhiệm thành phần
 
-| Component | Responsibility |
+| Thành phần | Trách nhiệm |
 |-----------|----------------|
-| **Vue 3 SPA** | UI rendering, state management, routing |
-| **Konva.js Canvas** | Interactive diagram editing, real-time preview |
-| **FastAPI Backend** | REST API, WebSocket, business logic |
-| **Background Tasks** | Heavy tasks: PPTX/Excel generation (FastAPI BackgroundTasks hoặc ARQ) |
-| **SQLite** | Persistent data storage (đơn giản, không cần DB server) |
-| **File Storage** | Generated files, uploaded templates (local filesystem) |
+| **Vue 3 SPA** | Kết xuất UI, quản lý trạng thái, định tuyến |
+| **Canvas Konva.js** | Chỉnh sửa sơ đồ tương tác, xem trước thời gian thực |
+| **Backend FastAPI** | REST API, WebSocket, logic nghiệp vụ |
+| **Job nền** | Sinh PPTX/Excel (worker dựa trên DB, async + ProcessPool) |
+| **SQLite** | Lưu trữ dữ liệu bền vững (đơn giản, không cần máy chủ DB) |
+| **Lưu trữ tệp** | Tệp sinh ra, template tải lên (hệ thống tệp cục bộ) |
 
-### 2.3 Data Flow
+### 2.3 Luồng dữ liệu
 
 ```
-User Action → Frontend → API → Service → Repository → Database
+Thao tác người dùng → Giao diện → API → Dịch vụ → Kho dữ liệu → Cơ sở dữ liệu
                                   ↓
-                          Export Worker → File Storage → Download URL
+                          Worker xuất → Lưu trữ tệp → URL tải về
 ```
 
 ---
 
-## 3. Technology Stack
+## 3. Ngăn xếp công nghệ
 
-### 3.1 Backend
+### 3.1 Backend (máy chủ)
 
-| Category | Technology | Rationale |
+| Hạng mục | Công nghệ | Lý do |
 |----------|------------|-----------|
-| **Framework** | FastAPI 0.110+ | Async native, OpenAPI, Python ecosystem |
-| **ORM** | SQLAlchemy 2.0 | Async support, mature |
-| **Database** | **SQLite 3** | Đơn giản, không cần DB server, phù hợp cho ~5 users |
-| **Task Queue** | FastAPI BackgroundTasks / ARQ | Background job processing (in-process) |
-| **PPTX Generation** | python-pptx | Industry standard |
-| **Excel I/O** | openpyxl | Full Excel support |
-| **PDF Preview** | WeasyPrint / reportlab | Optional preview generation |
+| **Khung** | FastAPI 0.110+ | Hỗ trợ async gốc, OpenAPI, hệ sinh thái Python |
+| **ORM** | SQLAlchemy 2.0 | Hỗ trợ async, trưởng thành |
+| **Cơ sở dữ liệu** | **SQLite 3 + aiosqlite** | Đơn giản, thân thiện async, phù hợp cho ~5 người dùng |
+| **Job Worker** | Worker nhẹ dựa trên DB | Poller async + ProcessPool (không Redis) |
+| **Sinh PPTX** | python-pptx | Chuẩn phổ biến |
+| **Nhập/Xuất Excel** | openpyxl | Hỗ trợ Excel đầy đủ |
+| **Xem trước PDF** | WeasyPrint / reportlab | Sinh bản xem trước (tùy chọn) |
 
-#### 📌 Về việc sử dụng SQLite cho ~5 users
+#### 📌 Về việc sử dụng SQLite cho ~5 người dùng
 
-**Kết luận: SQLite là lựa chọn phù hợp cho ~5 concurrent users.**
+**Kết luận: SQLite là lựa chọn phù hợp cho ~5 người dùng đồng thời.**
 
 | Tiêu chí | SQLite | PostgreSQL |
 |----------|--------|------------|
-| **Setup** | Zero config, 1 file | Cần install DB server |
-| **Concurrent writes** | 1 writer tại 1 thời điểm | Unlimited |
-| **Read concurrency** | Unlimited | Unlimited |
-| **Performance (5 users)** | Đủ tốt | Overkill |
-| **Backup** | Copy 1 file | pg_dump |
-| **Deployment** | Đơn giản (1 container) | 2+ containers |
+| **Thiết lập** | Không cần cấu hình, 1 tệp | Cần cài máy chủ DB |
+| **Ghi đồng thời** | 1 tiến trình ghi tại một thời điểm | Không giới hạn |
+| **Đọc đồng thời** | Không giới hạn | Không giới hạn |
+| **Hiệu năng (5 người dùng)** | Đủ tốt | Dư thừa |
+| **Sao lưu** | Sao chép 1 tệp | pg_dump |
+| **Triển khai** | Đơn giản (1 container) | 2+ container |
 
-**Khi nào cần upgrade lên PostgreSQL:**
-- Hơn 20 concurrent users
-- Cần full-text search phức tạp
-- Cần real-time collaboration (nhiều users edit cùng project)
-- Cần horizontal scaling
+**Khi nào cần nâng cấp lên PostgreSQL:**
+- Hơn 20 người dùng đồng thời
+- Cần tìm kiếm toàn văn phức tạp
+- Cần cộng tác thời gian thực (nhiều người dùng chỉnh cùng dự án)
+- Cần mở rộng ngang
 
 **SQLite configuration tối ưu:**
 ```python
 # database.py
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import text
 
-engine = create_engine(
-    "sqlite:///./network_sketcher.db",
+engine = create_async_engine(
+    "sqlite+aiosqlite:///./network_sketcher.db",
     connect_args={
         "check_same_thread": False,  # Cho phép multi-thread
-        "timeout": 30,               # Wait 30s for write lock
+        "timeout": 30,               # Chờ 30s để lấy khóa ghi
     },
     pool_pre_ping=True,
 )
 
-# Enable WAL mode for better concurrency
-with engine.connect() as conn:
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=30000")
+# Bật chế độ WAL để tăng khả năng đồng thời
+async with engine.begin() as conn:
+    await conn.execute(text("PRAGMA journal_mode=WAL"))
+    await conn.execute(text("PRAGMA busy_timeout=30000"))
 ```
 
-### 3.2 Frontend
+### 3.2 Frontend (giao diện)
 
-| Category | Technology | Rationale |
+| Hạng mục | Công nghệ | Lý do |
 |----------|------------|-----------|
-| **Framework** | Vue 3 + Composition API | Lightweight, reactive |
-| **Build Tool** | Vite 5 | Fast HMR, modern bundling |
-| **State Management** | Pinia | Vue 3 official, type-safe |
-| **UI Library** | PrimeVue / Naive UI | Enterprise components |
-| **Diagram Canvas** | Konva.js + vue-konva | Fast 2D canvas rendering |
-| **Icons** | Heroicons / Lucide | Modern icon sets |
-| **HTTP Client** | Axios / ofetch | Request handling |
-| **WebSocket** | Socket.io-client | Real-time updates |
+| **Khung** | Vue 3 + Composition API | Nhẹ, phản ứng tốt |
+| **Công cụ build** | Vite 5 | HMR nhanh, bundling hiện đại |
+| **Quản lý trạng thái** | Pinia | Chính thức cho Vue 3, an toàn kiểu |
+| **Thư viện UI** | PrimeVue / Naive UI | Thành phần doanh nghiệp |
+| **Canvas sơ đồ** | Konva.js + vue-konva | Kết xuất canvas 2D nhanh |
+| **Biểu tượng** | Heroicons / Lucide | Bộ icon hiện đại |
+| **HTTP client** | Axios / ofetch | Xử lý request |
+| **WebSocket** | Native WebSocket | Cập nhật thời gian thực (không Socket.IO) |
 
-### 3.3 DevOps (Đơn giản hóa cho ~5 users)
+### 3.3 DevOps (đơn giản hóa cho ~5 người dùng)
 
 > **Triết lý:** Không sử dụng Docker. Chạy trực tiếp trên máy chủ với Python + Node.js.
 
-| Category | Technology | Lý do |
+| Hạng mục | Công nghệ | Lý do |
 |----------|------------|-------|
-| **Process Manager** | systemd / PM2 | Native OS, không cần container |
-| **Reverse Proxy** | Nginx (optional) | Chỉ cần nếu public internet |
-| **Backup** | rsync / cron job | Copy SQLite file + exports folder |
-| **Logging** | Python logging → file | Simple, đủ cho small team |
-| **Monitoring** | Health check endpoint | `/health` API endpoint |
+| **Trình quản lý tiến trình** | systemd / NSSM | Dịch vụ backend + worker |
+| **Reverse proxy** | Nginx (tùy chọn) | Chỉ cần nếu internet công khai |
+| **Sao lưu** | sqlite3 .backup + cron | Sao lưu an toàn cho SQLite + exports |
+| **Ghi log** | Python logging → file | Đơn giản, đủ cho nhóm nhỏ |
+| **Giám sát** | Endpoint health check | Endpoint API `/health` |
 
 #### Tại sao không dùng Docker?
 
-| Aspect | Docker | Native |
+| Khía cạnh | Docker | Thuần hệ điều hành |
 |--------|--------|--------|
-| **Learning curve** | Cần học Docker, compose | Không cần |
-| **Debugging** | Phức tạp hơn | Trực tiếp |
-| **Resource overhead** | ~200MB+ RAM/container | Minimal |
-| **Setup time** | 30+ phút | 10 phút |
-| **Phù hợp cho** | Production scale, CI/CD | Internal tools, ~5 users |
+| **Độ dốc học** | Cần học Docker, compose | Không cần |
+| **Gỡ lỗi** | Phức tạp hơn | Trực tiếp |
+| **Chi phí tài nguyên** | ~200MB+ RAM/container | Tối thiểu |
+| **Thời gian cài đặt** | 30+ phút | 10 phút |
+| **Phù hợp cho** | Quy mô production, CI/CD | Công cụ nội bộ, ~5 người dùng |
 
 **Khi nào nên dùng Docker:**
-- Cần deploy trên nhiều servers
+- Cần triển khai trên nhiều máy chủ
 - Cần CI/CD tự động
 - Team có kinh nghiệm Docker
-- Scale lên 50+ users
+- Scale lên 50+ người dùng
 
 ---
 
-## 4. Data Models
+## 4. Mô hình dữ liệu
 
-### 4.1 Entity Relationship Diagram
+### 4.1 Sơ đồ quan hệ thực thể
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
@@ -264,162 +265,165 @@ with engine.connect() as conn:
        └───────────┘ └───────────┘ └───────────┘
 ```
 
-### 4.2 Database Schema
+### 4.2 Lược đồ cơ sở dữ liệu (SQLite)
+
+> UUID v4 được generate ở tầng ứng dụng (Python) và lưu dưới dạng TEXT.  
+> Các cột JSON lưu dạng TEXT (dùng JSON1 nếu cần query).
 
 ```sql
 -- Users & Authentication
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    name VARCHAR(100),
-    role VARCHAR(20) DEFAULT 'user',
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    name TEXT,
+    role TEXT DEFAULT 'user',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Projects
 CREATE TABLE projects (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id UUID REFERENCES users(id),
-    name VARCHAR(255) NOT NULL,
+    id TEXT PRIMARY KEY,
+    owner_id TEXT REFERENCES users(id),
+    name TEXT NOT NULL,
     description TEXT,
-    settings JSONB DEFAULT '{}',
-    theme VARCHAR(50) DEFAULT 'default',
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    settings TEXT DEFAULT '{}',
+    theme TEXT DEFAULT 'default',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Areas (Network Zones)
 CREATE TABLE areas (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    name VARCHAR(100) NOT NULL,
+    id TEXT PRIMARY KEY,
+    project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
     grid_row INTEGER NOT NULL,
     grid_col INTEGER NOT NULL,
     description TEXT,
-    position_x DECIMAL(10,4),
-    position_y DECIMAL(10,4),
-    width DECIMAL(10,4),
-    height DECIMAL(10,4),
-    style JSONB DEFAULT '{}',
-    is_waypoint_area BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT NOW(),
+    position_x REAL,
+    position_y REAL,
+    width REAL,
+    height REAL,
+    style TEXT DEFAULT '{}',
+    is_waypoint_area INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(project_id, name)
 );
 
 -- Devices
 CREATE TABLE devices (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    area_id UUID REFERENCES areas(id) ON DELETE SET NULL,
-    name VARCHAR(100) NOT NULL,
-    device_type VARCHAR(50),
-    model VARCHAR(100),
+    id TEXT PRIMARY KEY,
+    project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+    area_id TEXT REFERENCES areas(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    device_type TEXT,
+    model TEXT,
     grid_row INTEGER,
     grid_col INTEGER,
-    position_x DECIMAL(10,4),
-    position_y DECIMAL(10,4),
-    width DECIMAL(10,4),
-    height DECIMAL(10,4),
-    color_rgb INTEGER[3],
-    is_waypoint BOOLEAN DEFAULT FALSE,
-    attributes JSONB DEFAULT '{}',
-    created_at TIMESTAMP DEFAULT NOW(),
+    position_x REAL,
+    position_y REAL,
+    width REAL,
+    height REAL,
+    color_rgb TEXT, -- JSON array, e.g. [255,0,0]
+    is_waypoint INTEGER DEFAULT 0,
+    attributes TEXT DEFAULT '{}',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(project_id, name)
 );
 
 -- Interfaces (Physical + Virtual)
 CREATE TABLE interfaces (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    device_id UUID REFERENCES devices(id) ON DELETE CASCADE,
-    name VARCHAR(100) NOT NULL,
-    interface_type VARCHAR(50), -- physical, virtual, loopback, svi, port-channel
-    normalized_name VARCHAR(100),
+    id TEXT PRIMARY KEY,
+    device_id TEXT REFERENCES devices(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    interface_type TEXT, -- physical, virtual, loopback, svi, port-channel
+    normalized_name TEXT,
     slot INTEGER,
     port INTEGER,
-    is_virtual BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT NOW(),
+    is_virtual INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(device_id, name)
 );
 
 -- L1 Links (Physical Connections)
 CREATE TABLE l1_links (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    from_interface_id UUID REFERENCES interfaces(id) ON DELETE CASCADE,
-    to_interface_id UUID REFERENCES interfaces(id) ON DELETE CASCADE,
-    purpose VARCHAR(50), -- WAN, LAN, DMZ, MGMT, HA, STORAGE, BACKUP, VPN
-    cable_type VARCHAR(50),
-    speed VARCHAR(20),
+    id TEXT PRIMARY KEY,
+    project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+    from_interface_id TEXT REFERENCES interfaces(id) ON DELETE CASCADE,
+    to_interface_id TEXT REFERENCES interfaces(id) ON DELETE CASCADE,
+    purpose TEXT, -- WAN, LAN, DMZ, MGMT, HA, STORAGE, BACKUP, VPN
+    cable_type TEXT,
+    speed TEXT,
     notes TEXT,
-    created_at TIMESTAMP DEFAULT NOW(),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(from_interface_id, to_interface_id)
 );
 
 -- L2 Segments (VLANs)
 CREATE TABLE l2_segments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    name VARCHAR(100) NOT NULL,
+    id TEXT PRIMARY KEY,
+    project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
     vlan_id INTEGER,
     description TEXT,
-    created_at TIMESTAMP DEFAULT NOW(),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(project_id, name)
 );
 
 -- Interface L2 Assignment
 CREATE TABLE interface_l2_assignments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    interface_id UUID REFERENCES interfaces(id) ON DELETE CASCADE,
-    l2_segment_id UUID REFERENCES l2_segments(id) ON DELETE CASCADE,
-    port_mode VARCHAR(20), -- access, trunk
-    created_at TIMESTAMP DEFAULT NOW(),
+    id TEXT PRIMARY KEY,
+    interface_id TEXT REFERENCES interfaces(id) ON DELETE CASCADE,
+    l2_segment_id TEXT REFERENCES l2_segments(id) ON DELETE CASCADE,
+    port_mode TEXT, -- access, trunk
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(interface_id, l2_segment_id)
 );
 
 -- L3 Addresses
 CREATE TABLE l3_addresses (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    interface_id UUID REFERENCES interfaces(id) ON DELETE CASCADE,
-    ip_address INET NOT NULL,
+    id TEXT PRIMARY KEY,
+    interface_id TEXT REFERENCES interfaces(id) ON DELETE CASCADE,
+    ip_address TEXT NOT NULL,
     prefix_length INTEGER NOT NULL,
-    vrf_name VARCHAR(100),
+    vrf_name TEXT,
     description TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Port Channels
 CREATE TABLE port_channels (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    device_id UUID REFERENCES devices(id) ON DELETE CASCADE,
-    name VARCHAR(100) NOT NULL,
+    id TEXT PRIMARY KEY,
+    device_id TEXT REFERENCES devices(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
     channel_number INTEGER,
-    mode VARCHAR(20), -- LACP, static
-    created_at TIMESTAMP DEFAULT NOW(),
+    mode TEXT, -- LACP, static
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(device_id, name)
 );
 
 -- Port Channel Members
 CREATE TABLE port_channel_members (
-    port_channel_id UUID REFERENCES port_channels(id) ON DELETE CASCADE,
-    interface_id UUID REFERENCES interfaces(id) ON DELETE CASCADE,
+    port_channel_id TEXT REFERENCES port_channels(id) ON DELETE CASCADE,
+    interface_id TEXT REFERENCES interfaces(id) ON DELETE CASCADE,
     PRIMARY KEY (port_channel_id, interface_id)
 );
 
 -- Export Jobs
 CREATE TABLE export_jobs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES users(id),
-    job_type VARCHAR(50) NOT NULL, -- l1_diagram, l2_diagram, l3_diagram, device_file
-    status VARCHAR(20) DEFAULT 'pending', -- pending, processing, completed, failed
-    options JSONB DEFAULT '{}',
-    result_file_path VARCHAR(500),
+    id TEXT PRIMARY KEY,
+    project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+    user_id TEXT REFERENCES users(id),
+    job_type TEXT NOT NULL, -- l1_diagram, l2_diagram, l3_diagram, device_file
+    status TEXT DEFAULT 'pending', -- pending, processing, completed, failed
+    options TEXT DEFAULT '{}',
+    result_file_path TEXT,
     error_message TEXT,
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW()
+    started_at DATETIME,
+    completed_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Indexes
@@ -431,7 +435,7 @@ CREATE INDEX idx_export_jobs_project ON export_jobs(project_id);
 CREATE INDEX idx_export_jobs_status ON export_jobs(status);
 ```
 
-### 4.3 Pydantic Models (API)
+### 4.3 Mô hình Pydantic (API)
 
 ```python
 # schemas/project.py
@@ -491,9 +495,9 @@ class DiagramData(BaseModel):
 
 ---
 
-## 5. Backend API Design
+## 5. Thiết kế API backend
 
-### 5.1 API Endpoints Overview
+### 5.1 Tổng quan endpoint API
 
 ```
 /api/v1
@@ -562,12 +566,12 @@ class DiagramData(BaseModel):
 │   │   └── GET    /l3            # L3 diagram data
 │   │
 │   └── /export
-│       ├── POST   /l1-diagram    # Export L1 PPTX (async job)
-│       ├── POST   /l2-diagram    # Export L2 PPTX (async job)
-│       ├── POST   /l3-diagram    # Export L3 PPTX (async job)
-│       ├── POST   /device-file   # Export Excel device file
-│       ├── POST   /master-file   # Export master Excel
-│       ├── GET    /jobs          # List export jobs
+│       ├── POST   /l1-diagram    # Xuất PPTX L1 (job async)
+│       ├── POST   /l2-diagram    # Xuất PPTX L2 (job async)
+│       ├── POST   /l3-diagram    # Xuất PPTX L3 (job async)
+│       ├── POST   /device-file   # Xuất file thiết bị Excel
+│       ├── POST   /master-file   # Xuất Excel master
+│       ├── GET    /jobs          # Liệt kê job xuất
 │       └── GET    /jobs/{id}     # Job status + download URL
 │
 ├── /templates
@@ -580,16 +584,16 @@ class DiagramData(BaseModel):
     └── POST   /csv               # Upload CSV for import
 ```
 
-### 5.2 WebSocket Events
+### 5.2 Sự kiện WebSocket
 
 ```
 WS /ws/projects/{project_id}
 
 Events (Server → Client):
 ├── diagram.updated           # Diagram data changed
-├── export.progress           # Export job progress (0-100%)
-├── export.completed          # Export finished, download ready
-├── export.failed             # Export error
+├── export.progress           # Tiến độ job xuất (0-100%)
+├── export.completed          # Xuất hoàn tất, sẵn sàng tải về
+├── export.failed             # Lỗi xuất
 ├── user.joined               # Another user opened project
 └── user.left                 # User left project
 
@@ -599,11 +603,11 @@ Events (Client → Server):
 └── cursor.move               # Share cursor position (collaboration)
 ```
 
-### 5.3 API Implementation Example
+### 5.3 Ví dụ triển khai API
 
 ```python
 # api/v1/endpoints/projects.py
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
@@ -647,12 +651,11 @@ async def get_diagram_data(
 @router.post("/{project_id}/export/l1-diagram")
 async def export_l1_diagram(
     project_id: UUID,
-    background_tasks: BackgroundTasks,
     options: dict = {},
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Queue L1 diagram export job"""
+    """Xếp hàng job xuất sơ đồ L1 (worker DB sẽ xử lý)"""
     from app.services.export_service import ExportService
 
     service = ExportService(db)
@@ -668,9 +671,9 @@ async def export_l1_diagram(
 
 ---
 
-## 6. Frontend Design
+## 6. Thiết kế frontend
 
-### 6.1 Page Structure
+### 6.1 Cấu trúc trang
 
 ```
 /
@@ -684,12 +687,12 @@ async def export_l1_diagram(
 │       ├── /editor           # Main diagram editor
 │       ├── /data             # Data tables (devices, links, IPs)
 │       ├── /import           # Import wizard
-│       ├── /export           # Export options
+│       ├── /export           # Tùy chọn xuất
 │       └── /settings         # Project settings
 └── /templates                # Template gallery
 ```
 
-### 6.2 Component Architecture
+### 6.2 Kiến trúc component
 
 ```
 src/
@@ -707,9 +710,9 @@ src/
 │   │   ├── DeviceShape.vue         # Device shape component
 │   │   ├── ConnectionLine.vue      # Link line component
 │   │   ├── InterfaceTag.vue        # Interface label
-│   │   ├── DiagramToolbar.vue      # Zoom, pan, export controls
+│   │   ├── DiagramToolbar.vue      # Điều khiển zoom, kéo, xuất
 │   │   ├── PropertyPanel.vue       # Selected item properties
-│   │   └── MiniMap.vue             # Overview minimap
+│   │   └── MiniMap.vue             # Minimap tổng quan
 │   │
 │   ├── editor/
 │   │   ├── AreaEditor.vue          # Area CRUD form
@@ -720,15 +723,15 @@ src/
 │   │   └── L3AddressEditor.vue     # IP address management
 │   │
 │   ├── import/
-│   │   ├── ExcelImporter.vue       # Excel upload + preview
+│   │   ├── ExcelImporter.vue       # Tải lên Excel + xem trước
 │   │   ├── CSVImporter.vue         # CSV upload + mapping
-│   │   ├── ImportPreview.vue       # Preview before import
+│   │   ├── ImportPreview.vue       # Xem trước khi nhập
 │   │   └── ImportProgress.vue      # Import status
 │   │
 │   └── export/
-│       ├── ExportDialog.vue        # Export options modal
+│       ├── ExportDialog.vue        # Tùy chọn xuất modal
 │       ├── ExportProgress.vue      # Job progress
-│       └── ExportHistory.vue       # Past exports
+│       └── ExportHistory.vue       # Lịch sử xuất
 │
 ├── views/
 │   ├── LoginView.vue
@@ -741,11 +744,11 @@ src/
 │   ├── auth.ts                     # Authentication state
 │   ├── project.ts                  # Current project state
 │   ├── diagram.ts                  # Diagram data & selection
-│   └── export.ts                   # Export jobs state
+│   └── export.ts                   # Trạng thái job xuất
 │
 ├── composables/
 │   ├── useDiagram.ts               # Diagram manipulation
-│   ├── useExport.ts                # Export operations
+│   ├── useExport.ts                # Thao tác xuất
 │   ├── useWebSocket.ts             # Real-time updates
 │   └── useDeviceColors.ts          # Industry color mapping
 │
@@ -756,7 +759,7 @@ src/
     └── layout.ts                   # Layout algorithms
 ```
 
-### 6.3 Diagram Canvas Implementation
+### 6.3 Triển khai canvas sơ đồ
 
 ```typescript
 // composables/useDiagram.ts
@@ -898,7 +901,7 @@ export function useDiagram() {
 }
 ```
 
-### 6.4 Color System Implementation
+### 6.4 Triển khai hệ màu
 
 ```typescript
 // utils/colors.ts
@@ -1000,11 +1003,20 @@ function normalizePurpose(purpose: string): string {
 }
 ```
 
+### 6.5 Lưu ý khi kết hợp Vue 3 + Konva.js
+
+- Dùng `vue-konva` làm lớp tích hợp chính; hạn chế thao tác DOM trực tiếp với Konva.
+- Dữ liệu logic và dữ liệu hiển thị phải tách riêng để hỗ trợ zoom/pan nhất quán.
+- Tránh tạo lại node Konva khi dữ liệu đổi nhỏ; cập nhật thuộc tính và gọi `batchDraw()`.
+- Tách layer tĩnh/động, chỉ bật `draggable` khi cần để giảm chi phí render.
+- Với sơ đồ lớn, áp dụng cắt giảm hiển thị/virtualization (chỉ render phần đang thấy).
+- Luôn xử lý resize container để cập nhật kích thước `Stage` nhất quán.
+
 ---
 
-## 7. Core Business Logic Implementation
+## 7. Triển khai logic nghiệp vụ cốt lõi
 
-### 7.1 Validation Service
+### 7.1 Dịch vụ kiểm tra hợp lệ
 
 ```python
 # services/validation_service.py
@@ -1110,7 +1122,7 @@ class ValidationService:
         return False
 ```
 
-### 7.2 Layout Algorithm Service
+### 7.2 Dịch vụ thuật toán bố trí
 
 ```python
 # services/layout_service.py
@@ -1262,7 +1274,7 @@ class LayoutService:
         return (from_point, to_point)
 ```
 
-### 7.3 Synchronization Service
+### 7.3 Dịch vụ đồng bộ
 
 ```python
 # services/sync_service.py
@@ -1353,9 +1365,9 @@ class SyncService:
 
 ---
 
-## 8. Export Engine
+## 8. Bộ máy xuất
 
-### 8.1 PPTX Generator Service
+### 8.1 Dịch vụ sinh PPTX
 
 ```python
 # services/pptx_generator.py
@@ -1581,7 +1593,7 @@ class PPTXGenerator:
         connector.line.color.rgb = RGBColor(*color)
 ```
 
-### 8.2 Excel Generator Service
+### 8.2 Dịch vụ sinh Excel
 
 ```python
 # services/excel_generator.py
@@ -1825,333 +1837,277 @@ class ExcelGenerator:
             ws.column_dimensions[column].width = adjusted_width
 ```
 
-### 8.3 Background Job Worker
+### 8.3 Trình xử lý job nền (dựa trên DB, nhẹ)
 
 ```python
 # workers/export_worker.py
-from celery import Celery
-from sqlalchemy.ext.asyncio import AsyncSession
 import asyncio
+from datetime import datetime
+from sqlalchemy import select
 
-from app.core.config import settings
 from app.db.session import async_session_maker
-from app.services.pptx_generator import PPTXGenerator
-from app.services.excel_generator import ExcelGenerator
-from app.services.diagram_service import DiagramService
 from app.models.export_job import ExportJob
+from app.services.export_service import ExportService
 
-celery_app = Celery(
-    "export_worker",
-    broker=settings.CELERY_BROKER_URL,
-    backend=settings.CELERY_RESULT_BACKEND
-)
+POLL_INTERVAL_SEC = 2
 
-@celery_app.task(bind=True)
-def export_l1_diagram(self, job_id: str, project_id: str, options: dict):
-    """Background task to generate L1 PPTX diagram"""
-    async def _run():
+async def run_worker():
+    """
+    Tiến trình worker đơn (Option A).
+    Polls SQLite for pending jobs and processes them sequentially.
+    Tác vụ PPTX/Excel nặng nên chạy qua ProcessPool bên trong ExportService.
+    """
+    while True:
         async with async_session_maker() as db:
+            job = await db.scalar(
+                select(ExportJob)
+                .where(ExportJob.status == "pending")
+                .order_by(ExportJob.created_at)
+                .limit(1)
+            )
+
+            if not job:
+                await asyncio.sleep(POLL_INTERVAL_SEC)
+                continue
+
+            job.status = "processing"
+            job.started_at = datetime.utcnow()
+            await db.commit()
+
+            service = ExportService(db)
             try:
-                # Update job status
-                job = await db.get(ExportJob, job_id)
-                job.status = "processing"
-                job.started_at = datetime.utcnow()
-                await db.commit()
-
-                # Get diagram data
-                diagram_service = DiagramService(db)
-                data = await diagram_service.get_l1_diagram_data(project_id)
-
-                # Generate PPTX
-                generator = PPTXGenerator(theme=options.get('theme', 'default'))
-                pptx_bytes = generator.generate_l1_diagram(
-                    areas=data['areas'],
-                    devices=data['devices'],
-                    links=data['links'],
-                    settings=options
-                )
-
-                # Save file
-                output_path = f"exports/{project_id}/L1_Diagram_{job_id}.pptx"
-                await save_file(output_path, pptx_bytes)
-
-                # Update job
+                await service.process_export_job(job)
                 job.status = "completed"
                 job.completed_at = datetime.utcnow()
-                job.result_file_path = output_path
-                await db.commit()
-
-                return {"status": "success", "file_path": output_path}
-
-            except Exception as e:
+            except Exception as exc:
                 job.status = "failed"
-                job.error_message = str(e)
-                await db.commit()
-                raise
-
-    return asyncio.get_event_loop().run_until_complete(_run())
-
-@celery_app.task(bind=True)
-def export_device_file(self, job_id: str, project_id: str, options: dict):
-    """Background task to generate Excel device file"""
-    async def _run():
-        async with async_session_maker() as db:
-            try:
-                job = await db.get(ExportJob, job_id)
-                job.status = "processing"
+                job.error_message = str(exc)
+            finally:
                 await db.commit()
 
-                # Get all data
-                diagram_service = DiagramService(db)
-                data = await diagram_service.get_complete_diagram_data(project_id)
+        await asyncio.sleep(0)  # yield to event loop
 
-                # Generate Excel
-                generator = ExcelGenerator()
-                excel_bytes = generator.generate_device_file(
-                    project_name=data['project_name'],
-                    devices=data['devices'],
-                    interfaces=data['interfaces'],
-                    links=data['links'],
-                    l2_assignments=data['l2_assignments'],
-                    l3_addresses=data['l3_addresses']
-                )
-
-                # Save
-                output_path = f"exports/{project_id}/DEVICE_{job_id}.xlsx"
-                await save_file(output_path, excel_bytes)
-
-                job.status = "completed"
-                job.result_file_path = output_path
-                await db.commit()
-
-                return {"status": "success", "file_path": output_path}
-
-            except Exception as e:
-                job.status = "failed"
-                job.error_message = str(e)
-                await db.commit()
-                raise
-
-    return asyncio.get_event_loop().run_until_complete(_run())
+if __name__ == "__main__":
+    asyncio.run(run_worker())
 ```
 
 ---
 
-## 9. Development Phases
+## 9. Các giai đoạn phát triển
 
-### Phase 1: Foundation (Week 1-2)
+### Giai đoạn 1: Nền tảng (Tuần 1-2)
 
-**Goals:**
-- [ ] Project setup (monorepo structure)
-- [ ] Database schema + migrations
-- [ ] Authentication system
-- [ ] Basic CRUD API for projects/areas/devices
+**Mục tiêu:**
+- [ ] Thiết lập dự án (cấu trúc monorepo)
+- [ ] Lược đồ CSDL + migration
+- [ ] Hệ thống xác thực
+- [ ] API CRUD cơ bản cho dự án/khu vực/thiết bị
 
-**Deliverables:**
-- Backend skeleton with FastAPI
-- PostgreSQL + Redis setup
-- User registration/login
-- Project CRUD endpoints
-- Pydantic schemas
+**Sản phẩm bàn giao:**
+- Khung backend với FastAPI
+- Thiết lập SQLite + SQLAlchemy async
+- Đăng ký/đăng nhập người dùng
+- Endpoint CRUD dự án
+- Lược đồ Pydantic
 
-**Tasks:**
+**Công việc:**
 ```
-Week 1:
-├── Day 1-2: Project scaffolding, venv setup, requirements.txt
-├── Day 3-4: Database models (SQLite + SQLAlchemy)
-└── Day 5: Auth endpoints (JWT)
+Tuần 1:
+├── Ngày 1-2: Dựng khung dự án, thiết lập venv, requirements.txt
+├── Ngày 3-4: Mô hình CSDL (SQLite + SQLAlchemy)
+└── Ngày 5: Endpoint xác thực (JWT)
 
-Week 2:
-├── Day 1-2: Project/Area CRUD APIs
-├── Day 3-4: Device/Interface CRUD APIs
-└── Day 5: API testing, documentation
-```
-
----
-
-### Phase 2: Data Layer (Week 3-4)
-
-**Goals:**
-- [ ] Complete CRUD for all entities
-- [ ] Import from Excel/CSV
-- [ ] Validation service
-- [ ] Sync between layers
-
-**Deliverables:**
-- L1 Link management
-- L2 Segment/Assignment APIs
-- L3 Address APIs
-- Excel import endpoint
-- Port name normalization
-
-**Tasks:**
-```
-Week 3:
-├── Day 1-2: L1 Link CRUD + validation
-├── Day 3-4: L2 Segment + Assignment APIs
-└── Day 5: L3 Address APIs
-
-Week 4:
-├── Day 1-2: Excel import parser
-├── Day 3-4: CSV import parser
-└── Day 5: Validation + sync services
+Tuần 2:
+├── Ngày 1-2: API CRUD Dự án/Khu vực
+├── Ngày 3-4: API CRUD Thiết bị/Giao diện
+└── Ngày 5: Kiểm thử API, tài liệu hóa
 ```
 
 ---
 
-### Phase 3: Frontend Base (Week 5-6)
+### Giai đoạn 2: Tầng dữ liệu (Tuần 3-4)
 
-**Goals:**
-- [ ] Vue 3 project setup
-- [ ] Auth pages (login/register)
-- [ ] Dashboard with project list
-- [ ] Project detail page
+**Mục tiêu:**
+- [ ] Hoàn thiện CRUD cho tất cả thực thể
+- [ ] Nhập từ Excel/CSV
+- [ ] Dịch vụ kiểm tra hợp lệ
+- [ ] Đồng bộ giữa các lớp
 
-**Deliverables:**
-- Vue 3 + Vite + Pinia setup
-- PrimeVue components
-- Authentication flow
-- Project management UI
-- Responsive layout
+**Sản phẩm bàn giao:**
+- Quản lý liên kết L1
+- API phân đoạn L2/gán cổng
+- API địa chỉ L3
+- Endpoint nhập Excel
+- Chuẩn hóa tên cổng
 
-**Tasks:**
+**Công việc:**
 ```
-Week 5:
-├── Day 1-2: Vue project setup, routing
-├── Day 3-4: Auth pages, API client
-└── Day 5: Dashboard layout
+Tuần 3:
+├── Ngày 1-2: CRUD liên kết L1 + kiểm tra hợp lệ
+├── Ngày 3-4: API phân đoạn L2 + gán cổng
+└── Ngày 5: API địa chỉ L3
 
-Week 6:
-├── Day 1-2: Project list/create UI
-├── Day 3-4: Project detail page
-└── Day 5: Data tables (devices, links)
-```
-
----
-
-### Phase 4: Diagram Canvas (Week 7-8)
-
-**Goals:**
-- [ ] Interactive diagram canvas
-- [ ] Render areas, devices, links
-- [ ] Selection and editing
-- [ ] Pan/zoom controls
-
-**Deliverables:**
-- Konva.js integration
-- Area rendering
-- Device rendering with colors
-- Connection line rendering
-- Selection state management
-
-**Tasks:**
-```
-Week 7:
-├── Day 1-2: Konva canvas setup
-├── Day 3-4: Area + device rendering
-└── Day 5: Industry color system
-
-Week 8:
-├── Day 1-2: Connection lines
-├── Day 3-4: Selection + property panel
-└── Day 5: Pan/zoom, minimap
+Tuần 4:
+├── Ngày 1-2: Parser nhập Excel
+├── Ngày 3-4: Parser nhập CSV
+└── Ngày 5: Dịch vụ kiểm tra hợp lệ + đồng bộ
 ```
 
 ---
 
-### Phase 5: Export Engine (Week 9-10)
+### Giai đoạn 3: Nền frontend (Tuần 5-6)
 
-**Goals:**
-- [ ] PPTX generation (L1/L2/L3)
-- [ ] Excel device file export
-- [ ] Background job processing
-- [ ] Download management
+**Mục tiêu:**
+- [ ] Thiết lập dự án Vue 3
+- [ ] Trang xác thực (đăng nhập/đăng ký)
+- [ ] Dashboard với danh sách dự án
+- [ ] Trang chi tiết dự án
 
-**Deliverables:**
-- PPTXGenerator service
-- ExcelGenerator service
-- Celery workers
-- Export job tracking
-- File download endpoints
+**Sản phẩm bàn giao:**
+- Thiết lập Vue 3 + Vite + Pinia
+- Thành phần PrimeVue
+- Luồng xác thực
+- UI quản lý dự án
+- Bố cục đáp ứng
 
-**Tasks:**
+**Công việc:**
 ```
-Week 9:
-├── Day 1-2: PPTX generator (shapes, colors)
-├── Day 3-4: PPTX connections, tags
-└── Day 5: L2/L3 diagram variants
+Tuần 5:
+├── Ngày 1-2: Thiết lập dự án Vue, routing
+├── Ngày 3-4: Trang xác thực, client API
+└── Ngày 5: Bố cục dashboard
 
-Week 10:
-├── Day 1-2: Excel generator
-├── Day 3-4: Celery setup, workers
-└── Day 5: Job status UI, downloads
-```
-
----
-
-### Phase 6: Import & Polish (Week 11-12)
-
-**Goals:**
-- [ ] Excel template import
-- [ ] Import preview/validation
-- [ ] Error handling
-- [ ] Performance optimization
-
-**Deliverables:**
-- Import wizard UI
-- Preview before import
-- Validation feedback
-- Bulk operations
-- Loading states
-
-**Tasks:**
-```
-Week 11:
-├── Day 1-2: Excel parser improvements
-├── Day 3-4: Import wizard UI
-└── Day 5: Validation feedback
-
-Week 12:
-├── Day 1-2: Error handling, edge cases
-├── Day 3-4: Performance tuning
-└── Day 5: Code cleanup, refactoring
+Tuần 6:
+├── Ngày 1-2: UI danh sách/tạo dự án
+├── Ngày 3-4: Trang chi tiết dự án
+└── Ngày 5: Bảng dữ liệu (thiết bị, liên kết)
 ```
 
 ---
 
-### Phase 7: Testing & Deployment (Week 13-14)
+### Giai đoạn 4: Canvas sơ đồ (Tuần 7-8)
 
-**Goals:**
-- [ ] Unit tests (80%+ coverage)
-- [ ] Integration tests
-- [ ] E2E tests
-- [ ] Production deployment (no Docker)
+**Mục tiêu:**
+- [ ] Canvas sơ đồ tương tác
+- [ ] Kết xuất khu vực, thiết bị, liên kết
+- [ ] Chọn lựa và chỉnh sửa
+- [ ] Điều khiển kéo/thu phóng
 
-**Deliverables:**
-- pytest test suite
-- Playwright E2E tests
-- systemd service config (Linux) / NSSM config (Windows)
-- Backup scripts
-- Deployment documentation
+**Sản phẩm bàn giao:**
+- Tích hợp Konva.js
+- Kết xuất khu vực
+- Kết xuất thiết bị theo màu
+- Kết xuất đường kết nối
+- Quản lý trạng thái chọn
 
-**Tasks:**
+**Công việc:**
 ```
-Week 13:
-├── Day 1-2: Backend unit tests
-├── Day 3-4: API integration tests
-└── Day 5: Frontend component tests
+Tuần 7:
+├── Ngày 1-2: Thiết lập canvas Konva
+├── Ngày 3-4: Kết xuất khu vực + thiết bị
+└── Ngày 5: Hệ màu theo ngành
 
-Week 14:
-├── Day 1-2: E2E tests (Playwright)
-├── Day 3-4: Service config (systemd/NSSM), backup scripts
-└── Day 5: Deployment docs, user guide
+Tuần 8:
+├── Ngày 1-2: Đường kết nối
+├── Ngày 3-4: Chọn lựa + bảng thuộc tính
+└── Ngày 5: Kéo/thu phóng, bản đồ nhỏ
 ```
 
 ---
 
-## 10. Testing Strategy
+### Giai đoạn 5: Bộ máy xuất (Tuần 9-10)
 
-### 10.1 Backend Testing
+**Mục tiêu:**
+- [ ] Sinh PPTX (L1/L2/L3)
+- [ ] Xuất file thiết bị Excel
+- [ ] Xử lý job nền
+- [ ] Quản lý tải về
+
+**Sản phẩm bàn giao:**
+- Dịch vụ PPTXGenerator
+- Dịch vụ ExcelGenerator
+- Worker xuất dựa trên DB (poller)
+- Theo dõi job xuất
+- Endpoint tải file
+
+**Công việc:**
+```
+Tuần 9:
+├── Ngày 1-2: PPTX generator (hình, màu)
+├── Ngày 3-4: Kết nối PPTX, nhãn
+└── Ngày 5: Biến thể sơ đồ L2/L3
+
+Tuần 10:
+├── Ngày 1-2: Excel generator
+├── Ngày 3-4: Worker xuất (DB poller + ProcessPool)
+└── Ngày 5: UI trạng thái job, tải về
+```
+
+---
+
+### Giai đoạn 6: Nhập liệu & hoàn thiện (Tuần 11-12)
+
+**Mục tiêu:**
+- [ ] Nhập template Excel
+- [ ] Xem trước/kiểm tra hợp lệ nhập liệu
+- [ ] Xử lý lỗi
+- [ ] Tối ưu hiệu năng
+
+**Sản phẩm bàn giao:**
+- UI wizard nhập liệu
+- Xem trước khi nhập
+- Phản hồi kiểm tra hợp lệ
+- Thao tác hàng loạt
+- Trạng thái tải
+
+**Công việc:**
+```
+Tuần 11:
+├── Ngày 1-2: Cải thiện parser Excel
+├── Ngày 3-4: UI wizard nhập liệu
+└── Ngày 5: Phản hồi kiểm tra hợp lệ
+
+Tuần 12:
+├── Ngày 1-2: Xử lý lỗi, trường hợp biên
+├── Ngày 3-4: Tinh chỉnh hiệu năng
+└── Ngày 5: Dọn dẹp code, refactor
+```
+
+---
+
+### Giai đoạn 7: Kiểm thử & triển khai (Tuần 13-14)
+
+**Mục tiêu:**
+- [ ] Unit test (coverage 80%+)
+- [ ] Kiểm thử tích hợp
+- [ ] Kiểm thử E2E
+- [ ] Triển khai production (không Docker)
+
+**Sản phẩm bàn giao:**
+- Bộ test pytest
+- Kiểm thử E2E Playwright
+- Cấu hình dịch vụ systemd (Linux) / cấu hình NSSM (Windows)
+- Script sao lưu
+- Tài liệu triển khai
+
+**Công việc:**
+```
+Tuần 13:
+├── Ngày 1-2: Unit test backend
+├── Ngày 3-4: Kiểm thử tích hợp API
+└── Ngày 5: Kiểm thử component frontend
+
+Tuần 14:
+├── Ngày 1-2: Kiểm thử E2E (Playwright)
+├── Ngày 3-4: Cấu hình dịch vụ (systemd/NSSM), script sao lưu
+└── Ngày 5: Tài liệu triển khai, hướng dẫn người dùng
+```
+
+---
+
+## 10. Chiến lược kiểm thử
+
+### 10.1 Kiểm thử backend
 
 ```python
 # tests/test_validation_service.py
@@ -2198,7 +2154,7 @@ class TestIPValidation:
         assert "octet" in msg.lower()
 ```
 
-### 10.2 API Integration Tests
+### 10.2 Kiểm thử tích hợp API
 
 ```python
 # tests/test_api_projects.py
@@ -2257,7 +2213,7 @@ async def test_add_device():
         assert response.json()["name"] == "Core-SW-1"
 ```
 
-### 10.3 E2E Tests
+### 10.3 Kiểm thử E2E
 
 ```typescript
 // tests/e2e/diagram-editor.spec.ts
@@ -2319,28 +2275,28 @@ test.describe('Diagram Editor', () => {
 
 ---
 
-## 11. Deployment (Đơn giản - Không Docker)
+## 11. Triển khai (đơn giản - không Docker)
 
-> **Mục tiêu:** Deploy đơn giản nhất có thể cho internal team ~5 users.
+> **Mục tiêu:** Triển khai đơn giản nhất có thể cho đội nội bộ ~5 người dùng.
 
 ### 11.1 Yêu cầu hệ thống
 
-| Component | Requirement |
+| Thành phần | Yêu cầu |
 |-----------|-------------|
 | **OS** | Windows 10/11, Ubuntu 20.04+, hoặc macOS |
 | **Python** | 3.11+ |
 | **Node.js** | 20 LTS |
 | **RAM** | 4GB minimum |
-| **Disk** | 10GB (app + exports) |
+| **Đĩa** | 10GB (ứng dụng + exports) |
 
 ### 11.2 Cài đặt Backend
 
 ```bash
-# 1. Clone repository
+# 1. Sao chép repository
 git clone https://github.com/your-org/network-sketcher-web.git
 cd network-sketcher-web
 
-# 2. Tạo virtual environment
+# 2. Tạo môi trường ảo
 cd backend
 python -m venv venv
 
@@ -2350,21 +2306,24 @@ venv\Scripts\activate
 # Linux/Mac
 source venv/bin/activate
 
-# 3. Cài đặt dependencies
+# 3. Cài đặt phụ thuộc
 pip install -r requirements.txt
 
-# 4. Tạo file config
+# 4. Tạo file cấu hình
 cp .env.example .env
 # Chỉnh sửa .env nếu cần
 
-# 5. Khởi tạo database (SQLite auto-created)
+# 5. Khởi tạo CSDL (SQLite tự tạo)
 python -c "from app.database import init_db; init_db()"
 
 # 6. Chạy server
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 
-# Hoặc với reload cho development
+# Hoặc với reload cho phát triển
 uvicorn app.main:app --reload --port 8000
+
+# 7. Chạy worker xuất (terminal khác)
+python -m app.workers.export_worker
 ```
 
 ### 11.3 Cài đặt Frontend
@@ -2373,13 +2332,13 @@ uvicorn app.main:app --reload --port 8000
 # 1. Di chuyển vào thư mục frontend
 cd frontend
 
-# 2. Cài đặt dependencies
+# 2. Cài đặt phụ thuộc
 npm install
 
-# 3. Build production
+# 3. Build bản production
 npm run build
 
-# 4. Serve với preview server (optional)
+# 4. Serve với preview server (tùy chọn)
 npm run preview
 ```
 
@@ -2388,25 +2347,25 @@ npm run preview
 ```bash
 # backend/.env
 
-# Database (SQLite - tự động tạo file)
-DATABASE_URL=sqlite:///./data/network_sketcher.db
+# CSDL (SQLite - tự động tạo file)
+DATABASE_URL=sqlite+aiosqlite:///./data/network_sketcher.db
 
-# Security
+# Bảo mật
 SECRET_KEY=your-secret-key-here-change-in-production
 JWT_ALGORITHM=HS256
 JWT_EXPIRE_MINUTES=60
 
-# Paths
+# Đường dẫn
 EXPORTS_DIR=./exports
 UPLOADS_DIR=./uploads
 TEMPLATES_DIR=./templates
 
-# Server
+# Máy chủ
 HOST=0.0.0.0
 PORT=8000
 DEBUG=false
 
-# Frontend URL (for CORS)
+# URL frontend (cho CORS)
 FRONTEND_URL=http://localhost:3000
 ```
 
@@ -2415,15 +2374,23 @@ FRONTEND_URL=http://localhost:3000
 #### Windows - Task Scheduler hoặc NSSM
 
 ```powershell
-# Option 1: Dùng NSSM (Non-Sucking Service Manager)
-# Download: https://nssm.cc/
+# Tùy chọn 1: Dùng NSSM (Non-Sucking Service Manager)
+# Tải về: https://nssm.cc/
 
 nssm install NetworkSketcherBackend
-# Path: C:\path\to\venv\Scripts\uvicorn.exe
-# Arguments: app.main:app --host 0.0.0.0 --port 8000
-# Startup directory: C:\path\to\backend
+# Đường dẫn: C:\path\to\venv\Scripts\uvicorn.exe
+# Tham số: app.main:app --host 0.0.0.0 --port 8000
+# Thư mục khởi động: C:\path\to\backend
 
 nssm start NetworkSketcherBackend
+
+# Dịch vụ worker xuất
+nssm install NetworkSketcherWorker
+# Đường dẫn: C:\path\to\venv\Scripts\python.exe
+# Tham số: -m app.workers.export_worker
+# Thư mục khởi động: C:\path\to\backend
+
+nssm start NetworkSketcherWorker
 ```
 
 #### Linux - systemd
@@ -2456,7 +2423,35 @@ sudo systemctl start network-sketcher
 sudo systemctl status network-sketcher
 ```
 
-### 11.6 Nginx Reverse Proxy (Optional)
+```bash
+# /etc/systemd/system/network-sketcher-worker.service
+
+[Unit]
+Description=Network Sketcher Export Worker
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/network-sketcher-web/backend
+Environment="PATH=/opt/network-sketcher-web/backend/venv/bin"
+ExecStart=/opt/network-sketcher-web/backend/venv/bin/python -m app.workers.export_worker
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+# Kích hoạt worker
+sudo systemctl daemon-reload
+sudo systemctl enable network-sketcher-worker
+sudo systemctl start network-sketcher-worker
+sudo systemctl status network-sketcher-worker
+```
+
+### 11.6 Nginx reverse proxy (tùy chọn)
 
 Chỉ cần nếu expose ra internet hoặc muốn HTTPS.
 
@@ -2488,14 +2483,14 @@ server {
         proxy_set_header Connection "upgrade";
     }
 
-    # Exports download
+    # Tải về exports
     location /exports/ {
         alias /opt/network-sketcher-web/backend/exports/;
     }
 }
 ```
 
-### 11.7 Backup Script
+### 11.7 Script sao lưu
 
 ```bash
 #!/bin/bash
@@ -2508,32 +2503,32 @@ APP_DIR="/opt/network-sketcher-web/backend"
 # Tạo thư mục backup
 mkdir -p $BACKUP_DIR
 
-# Backup SQLite database
-cp $APP_DIR/data/network_sketcher.db $BACKUP_DIR/db_$DATE.sqlite
+# Sao lưu SQLite (an toàn)
+sqlite3 $APP_DIR/data/network_sketcher.db ".backup $BACKUP_DIR/db_$DATE.sqlite"
 
-# Backup exports folder
+# Sao lưu thư mục exports
 tar -czf $BACKUP_DIR/exports_$DATE.tar.gz $APP_DIR/exports/
 
 # Giữ lại 7 ngày backup
 find $BACKUP_DIR -type f -mtime +7 -delete
 
-echo "Backup completed: $DATE"
+echo "Sao lưu hoàn tất: $DATE"
 ```
 
 ```bash
-# Thêm vào crontab (chạy 2AM mỗi ngày)
+# Thêm vào crontab (chạy 2 giờ sáng mỗi ngày)
 0 2 * * * /opt/network-sketcher-web/backup.sh >> /var/log/ns-backup.log 2>&1
 ```
 
-### 11.8 Health Check
+### 11.8 Kiểm tra sức khỏe
 
 Backend có sẵn endpoint `/health`:
 
 ```bash
-# Check health
+# Kiểm tra sức khỏe
 curl http://localhost:8000/health
 
-# Response
+# Phản hồi
 {
   "status": "healthy",
   "database": "connected",
@@ -2542,66 +2537,76 @@ curl http://localhost:8000/health
 }
 ```
 
-### 11.9 Troubleshooting
+### 11.9 Khắc phục sự cố
 
-| Issue | Solution |
+| Vấn đề | Giải pháp |
 |-------|----------|
 | Port 8000 đã dùng | Đổi port trong .env hoặc dừng process khác |
-| SQLite locked | Chờ vài giây, hoặc restart service |
+| SQLite bị khóa | Chờ vài giây, hoặc khởi động lại dịch vụ |
 | CORS error | Kiểm tra FRONTEND_URL trong .env |
 | Import failed | Kiểm tra định dạng Excel, xem logs |
-| Export timeout | Tăng timeout trong uvicorn config |
+| Timeout xuất | Tăng timeout trong cấu hình uvicorn |
+| Job xuất bị treo | Kiểm tra dịch vụ/logs của worker |
 
 ```bash
 # Xem logs
 tail -f /var/log/network-sketcher.log
 
-# Restart service
+# Khởi động lại dịch vụ
 sudo systemctl restart network-sketcher
 ```
 
 ---
 
-## 12. Risk Assessment
+## 12. Đánh giá rủi ro
 
-### 12.1 Technical Risks
+### 12.1 Rủi ro kỹ thuật
 
-| Risk | Impact | Probability | Mitigation |
+| Rủi ro | Tác động | Xác suất | Giảm thiểu |
 |------|--------|-------------|------------|
-| PPTX rendering differences | High | Medium | Extensive visual testing, compare with CLI output |
-| Large diagram performance | Medium | High | Canvas virtualization, pagination, lazy loading |
-| SQLite concurrent writes | Low | Low | WAL mode, ~5 users không vấn đề |
-| File storage management | Low | Medium | Daily cleanup job, disk monitoring |
+| Khác biệt kết xuất PPTX | Cao | Trung bình | Kiểm thử thị giác kỹ, so sánh với đầu ra CLI |
+| Hiệu năng sơ đồ lớn | Trung bình | Cao | Virtualization canvas, phân trang, lazy loading |
+| Ghi đồng thời SQLite | Thấp | Thấp | WAL mode, ~5 người dùng không vấn đề |
+| Quản lý lưu trữ tệp | Thấp | Trung bình | Job dọn dẹp hằng ngày, giám sát đĩa |
 
-### 12.2 Project Risks
+### 12.2 Rủi ro dự án
 
-| Risk | Impact | Probability | Mitigation |
+| Rủi ro | Tác động | Xác suất | Giảm thiểu |
 |------|--------|-------------|------------|
-| Scope creep | High | High | Strict MVP definition, phase-based delivery |
-| Skill gaps | Medium | Medium | Training, pair programming, documentation |
-| Timeline slippage | Medium | Medium | Buffer time, priority-based development |
-| Integration issues | Medium | Medium | Early integration testing, API contracts |
+| Trượt phạm vi | Cao | Cao | Định nghĩa MVP chặt chẽ, bàn giao theo giai đoạn |
+| Thiếu kỹ năng | Trung bình | Trung bình | Đào tạo, pair programming, tài liệu |
+| Trễ tiến độ | Trung bình | Trung bình | Dự phòng thời gian, ưu tiên theo mức độ |
+| Vấn đề tích hợp | Trung bình | Trung bình | Kiểm thử tích hợp sớm, hợp đồng API |
 
-### 12.3 Mitigation Strategies
+### 12.3 Chiến lược giảm thiểu
 
 **PPTX Rendering:**
 - Create automated visual regression tests
-- Compare exported PPTX with CLI version side-by-side
-- Maintain reference PPTX files for comparison
+- So sánh PPTX xuất với phiên bản CLI theo từng cặp
+- Duy trì bộ PPTX tham chiếu để đối chiếu
 
 **Performance:**
-- Implement canvas virtualization (only render visible elements)
-- Use WebWorkers for heavy computations
-- Implement request debouncing and caching
+- Triển khai virtualization canvas (chỉ render phần nhìn thấy)
+- Dùng WebWorkers cho tính toán nặng
+- Triển khai debounce và cache cho request
 
 **Scalability:**
-- Design for horizontal scaling from day 1
-- Use Redis for session/cache sharing
-- Implement health checks and graceful degradation
+- Thiết kế cho mở rộng ngang ngay từ đầu
+- Giữ app stateless (JWT) + hàng đợi job dựa trên DB; cân nhắc Redis khi scale
+- Triển khai health check và suy giảm có kiểm soát
+
+### 12.4 Kế hoạch xử lý khác biệt & rủi ro (khuyến nghị)
+
+- **Ma trận tương thích logic:** lập bảng “input → xử lý → output” đối chiếu từng chức năng với repo gốc; cập nhật khi có thay đổi.
+- **Golden files cho xuất:** tạo bộ Excel/PPTX chuẩn, chạy so sánh tự động (snapshot/regression) sau mỗi thay đổi.
+- **Job queue an toàn:** thêm cơ chế “claim job” (status + locked_at), retry có giới hạn, idempotency theo `job_id`, và quy tắc phát hiện job treo.
+- **Theo dõi chất lượng:** đặt ngưỡng hiệu năng (thời gian render/xuất), benchmark định kỳ trên bộ dữ liệu lớn.
+- **Khả năng phục hồi:** quy trình backup/restore thử nghiệm định kỳ, kiểm tra tính toàn vẹn file xuất.
+- **Tài liệu hóa thay đổi:** mọi khác biệt so với repo gốc phải ghi rõ trong plan + changelog nội bộ.
 
 ---
 
-## Appendix A: File Structure
+## Phụ lục A: Cấu trúc thư mục
 
 ```
 network-sketcher-web/
@@ -2661,7 +2666,7 @@ network-sketcher-web/
 │   │   └── main.py
 │   ├── tests/
 │   ├── data/                    # SQLite database file
-│   ├── exports/                 # Generated PPTX/Excel files
+│   ├── exports/                 # Tệp PPTX/Excel đã sinh
 │   ├── uploads/                 # Uploaded Excel templates
 │   ├── requirements.txt
 │   └── .env.example
@@ -2690,8 +2695,8 @@ network-sketcher-web/
 ├── scripts/
 │   ├── install.sh               # Linux install script
 │   ├── install.ps1              # Windows install script
-│   ├── backup.sh                # Backup script
-│   └── start.sh                 # Start all services
+│   ├── backup.sh                # Script sao lưu
+│   └── start.sh                 # Khởi động tất cả dịch vụ
 │
 ├── docs/
 │   ├── INSTALL.md               # Installation guide
@@ -2703,9 +2708,9 @@ network-sketcher-web/
 
 ---
 
-## Appendix B: API Response Examples
+## Phụ lục B: Ví dụ phản hồi API
 
-### Create Project Response
+### Phản hồi tạo dự án
 
 ```json
 {
@@ -2721,7 +2726,7 @@ network-sketcher-web/
 }
 ```
 
-### Diagram Data Response
+### Phản hồi dữ liệu sơ đồ
 
 ```json
 {
@@ -2770,7 +2775,7 @@ network-sketcher-web/
 }
 ```
 
-### Export Job Response
+### Phản hồi job xuất
 
 ```json
 {
@@ -2787,7 +2792,7 @@ network-sketcher-web/
 
 ---
 
-## Appendix C: Glossary
+## Phụ lục C: Thuật ngữ
 
 | Term | Definition |
 |------|------------|
@@ -2800,15 +2805,23 @@ network-sketcher-web/
 | **Port-Channel** | Aggregated link (LACP/static bonding) |
 | **Waypoint** | Routing helper node for diagram line paths |
 | **Master File** | Excel file containing complete network topology data |
-| **Device File** | Excel export with L1/L2/L3 tables |
+| **File thiết bị** | Excel xuất với các bảng L1/L2/L3 |
 
 ---
 
-## 13. Original NS Logic Reference
+## 13. Tham chiếu logic NS gốc
 
 Section này cung cấp mapping chi tiết giữa source code gốc của Network Sketcher và các component tương ứng trong Web App, giúp developers dễ dàng tham chiếu logic nghiệp vụ.
 
-### 13.1 Source File Overview
+### 13.0 Kho mã nguồn tham chiếu
+
+Dự án này dựa trên source gốc của Network Sketcher để tham chiếu tính năng/chức năng/logic.
+
+```
+https://github.com/cisco-open/network-sketcher
+```
+
+### 13.1 Tổng quan tệp nguồn
 
 ```
 network-sketcher/
@@ -2825,14 +2838,14 @@ network-sketcher/
     └── create_excel_template.py # Template generation
 ```
 
-### 13.2 Core Definitions (`ns_def.py`)
+### 13.2 Định nghĩa cốt lõi (`ns_def.py`)
 
-#### 13.2.1 Port Name Validation
+#### 13.2.1 Kiểm tra hợp lệ tên cổng
 
 **Original Function:** `split_portname()` (line ~200-250)
 
 ```python
-# ns_def.py - Phân tách port name thành type và number
+# ns_def.py - Phân tách tên cổng thành loại và số
 def split_portname(portname):
     """
     Tách port name thành (interface_type, number)
@@ -2857,12 +2870,12 @@ class ValidationService:
         return match.groups()
 ```
 
-#### 13.2.2 Industry Color Definitions
+#### 13.2.2 Định nghĩa màu theo ngành
 
 **Original Location:** `ns_def.py` (line ~50-100) và CLI theme system
 
 ```python
-# INDUSTRY_COLORS mapping - Device colors based on name prefix
+# Ánh xạ INDUSTRY_COLORS - màu thiết bị theo tiền tố tên
 DEVICE_COLORS = {
     # Routers
     'Router': [70, 130, 180],    # Steel Blue
@@ -2877,7 +2890,7 @@ DEVICE_COLORS = {
     'Dist': [60, 179, 113],      # Medium Sea Green
     'Access-SW': [0, 139, 139],  # Dark Cyan
 
-    # Servers
+    # Máy chủs
     'Server': [106, 90, 205],    # Slate Blue
     'DB': [148, 0, 211],         # Dark Violet
     'App': [138, 43, 226],       # Blue Violet
@@ -2899,7 +2912,7 @@ DEVICE_COLORS = {
     '_DEFAULT_': [235, 241, 222],
 }
 
-# Link purpose colors (CLI contrast theme)
+# Màu mục đích liên kết (theme tương phản CLI)
 LINK_PURPOSE_COLORS = {
     'WAN': [70, 130, 180],       # Blue
     'INTERNET': [70, 130, 180],
@@ -2929,9 +2942,9 @@ def get_link_color(purpose: str) -> list[int]:
     return LINK_PURPOSE_COLORS.get(purpose.upper(), [0, 0, 0])
 ```
 
-### 13.3 CLI Commands (`ns_cli.py`)
+### 13.3 Lệnh CLI (`ns_cli.py`)
 
-#### 13.3.1 Command → API Mapping
+#### 13.3.1 Ánh xạ lệnh → API
 
 | CLI Command | Original Function | Web API Endpoint |
 |-------------|-------------------|------------------|
@@ -2949,12 +2962,12 @@ def get_link_color(purpose: str) -> list[int]:
 | `show device` | `show_device()` | `GET /api/v1/projects/{id}/devices` |
 | `show l1_link` | `show_l1_link()` | `GET /api/v1/projects/{id}/links` |
 
-#### 13.3.2 Validation Logic
+#### 13.3.2 Logic kiểm tra hợp lệ
 
 **Original:** `ns_cli.py` lines ~100-200
 
 ```python
-# Validation rules from ns_cli.py
+# Quy tắc kiểm tra hợp lệ từ ns_cli.py
 
 def validate_area_exists(area_name, master_data):
     """Area trong devices.csv phải tồn tại trong areas.csv"""
@@ -3004,9 +3017,9 @@ class ValidationService:
         return errors
 ```
 
-### 13.4 PPTX Generation (`ns_ddx_figure.py`)
+### 13.4 Sinh PPTX (`ns_ddx_figure.py`)
 
-#### 13.4.1 Key Classes and Methods
+#### 13.4.1 Lớp và phương thức chính
 
 **File:** `ns_ddx_figure.py` (~1200 lines)
 
@@ -3021,12 +3034,12 @@ class ValidationService:
 | `get_shape_width()` | 1077-1120 | Get shape dimensions | Style cache lookup |
 | `get_shape_hight()` | 1123-1180 | Get shape height | Style cache lookup |
 
-#### 13.4.2 Caching Optimization
+#### 13.4.2 Tối ưu bộ nhớ đệm
 
 **Original Issue:** `ns_ddx_figure.py` scans 50,000 rows repeatedly for each shape lookup.
 
 ```python
-# Original inefficient code (line ~1080)
+# Đoạn code gốc chưa tối ưu (dòng ~1080)
 def get_shape_width(self, shape_name):
     for row in range(1, 50001):
         if str(self.input_ppt_mata_excel.active.cell(row, 1).value) == '<<STYLE_SHAPE>>':
@@ -3071,12 +3084,12 @@ class PPTXGenerator:
         return style['width'], style['height']
 ```
 
-#### 13.4.3 Connection Point Logic
+#### 13.4.3 Logic điểm kết nối
 
 **Original:** `ns_ddx_figure.py` lines 687-714
 
 ```python
-# Simplified connection logic - only considers vertical position
+# Logic kết nối giản lược - chỉ xét vị trí theo chiều dọc
 def add_line(self, from_coords, to_coords):
     fx_left, fx_mid, fx_right = from_coords[1:4]
     fy_top, fy_mid, fy_down = from_coords[4:7]
@@ -3118,11 +3131,11 @@ def _get_best_connection_points(self, from_coords, to_coords):
             return (fx_mid, fy_top), (tx_mid, ty_down)
 ```
 
-### 13.5 L2 Diagram Creation (`ns_l2_diagram_create.py`)
+### 13.5 Tạo sơ đồ L2 (`ns_l2_diagram_create.py`)
 
 **File:** `ns_l2_diagram_create.py` (~500 lines)
 
-#### 13.5.1 Key Functions
+#### 13.5.1 Hàm chính
 
 | Function | Purpose | Web App Mapping |
 |----------|---------|-----------------|
@@ -3130,10 +3143,10 @@ def _get_best_connection_points(self, from_coords, to_coords):
 | `get_l2_segments_for_device()` | Get VLANs for a device | `L2SegmentRepository.get_by_device()` |
 | `calculate_l2_area_layout()` | Layout L2 groups | `LayoutService.calculate_l2_layout()` |
 
-#### 13.5.2 L2 Segment Grouping Logic
+#### 13.5.2 Logic gom nhóm phân đoạn L2
 
 ```python
-# Original logic from ns_l2_diagram_create.py
+# Logic gốc từ ns_l2_diagram_create.py
 
 def group_devices_by_l2_segment(devices, l2_segments):
     """
@@ -3150,16 +3163,16 @@ def group_devices_by_l2_segment(devices, l2_segments):
     return segment_groups
 ```
 
-### 13.6 L3 Diagram Creation (`ns_l3_diagram_create.py`)
+### 13.6 Tạo sơ đồ L3 (`ns_l3_diagram_create.py`)
 
 **File:** `ns_l3_diagram_create.py` (~600 lines)
 
-#### 13.6.1 Text Size Caching
+#### 13.6.1 Bộ nhớ đệm kích thước chữ
 
 **Original Optimization:** Lines 43-60
 
 ```python
-# ns_l3_diagram_create.py - Already has text caching
+# ns_l3_diagram_create.py - Đã có bộ nhớ đệm cho chữ
 _text_size_cache = {}
 
 def get_text_wh_cached(text, font_size=6):
@@ -3188,14 +3201,14 @@ class LayoutService:
         return (bbox[2] - bbox[0], bbox[3] - bbox[1])
 ```
 
-### 13.7 Layer Synchronization (`ns_sync_between_layers.py`)
+### 13.7 Đồng bộ lớp (`ns_sync_between_layers.py`)
 
 **File:** `ns_sync_between_layers.py` (~400 lines)
 
-#### 13.7.1 Sync Rules
+#### 13.7.1 Quy tắc đồng bộ
 
 ```python
-# Layer sync rules from ns_sync_between_layers.py
+# Quy tắc đồng bộ lớp từ ns_sync_between_layers.py
 
 """
 Sync Direction: L1 → L2 → L3
@@ -3249,12 +3262,12 @@ class SyncService:
             )
 ```
 
-### 13.8 Excel Import Logic (`scripts/import_from_excel.py`)
+### 13.8 Logic nhập Excel (`scripts/import_from_excel.py`)
 
-#### 13.8.1 Sheet Processing Order
+#### 13.8.1 Thứ tự xử lý sheet
 
 ```python
-# Import order is critical - dependencies must be satisfied
+# Thứ tự nhập rất quan trọng - cần thỏa các phụ thuộc
 
 IMPORT_ORDER = [
     'Areas',        # 1. Define areas first
@@ -3297,12 +3310,12 @@ class ImportService:
         return result
 ```
 
-### 13.9 CLI Wrapper Theme Support (`scripts/ns_cli_wrapper.py`)
+### 13.9 Hỗ trợ theme cho CLI wrapper (`scripts/ns_cli_wrapper.py`)
 
-#### 13.9.1 Theme Application
+#### 13.9.1 Áp dụng theme
 
 ```python
-# ns_cli_wrapper.py - Theme argument support
+# ns_cli_wrapper.py - Hỗ trợ tham số theme
 
 def cmd_export(args):
     theme = args.theme  # e.g., "contrast"
@@ -3337,7 +3350,7 @@ class ThemeService:
         return self.THEMES.get(name, self.THEMES["default"])
 ```
 
-### 13.10 Quick Reference Table
+### 13.10 Bảng tham chiếu nhanh
 
 | NS Function/File | Location | Web App Service | Web App File |
 |------------------|----------|-----------------|--------------|

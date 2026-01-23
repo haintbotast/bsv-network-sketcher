@@ -170,7 +170,7 @@ POST /admin/config/versions/{version_id}/restore
 
 ---
 
-## 10. Ví dụ Request/Response chi tiết
+## 11. Ví dụ Request/Response chi tiết
 
 ### 10.1 Authentication
 
@@ -592,7 +592,7 @@ Response (200 OK - failed):
 
 ---
 
-## 11. Tài liệu liên quan
+## 12. Tài liệu liên quan
 
 - `docs/SRS.md`
 - `docs/TEMPLATE_SCHEMA.md`

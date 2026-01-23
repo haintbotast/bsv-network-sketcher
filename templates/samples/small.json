@@ -3,59 +3,235 @@
   "template_version": "1.0",
   "metadata": {
     "name": "Small Office Network",
-    "description": "Template mạng văn phòng nhỏ - 10 thiết bị, 10 kết nối",
+    "description": "Template m?ng v?n ph?ng nh? - 10 thi?t b?, 10 k?t n?i",
     "created_at": "2026-01-23T00:00:00Z",
     "author": "test"
   },
   "areas": [
-    {"name": "Core", "grid_row": 1, "grid_col": 1},
-    {"name": "DMZ", "grid_row": 1, "grid_col": 2},
-    {"name": "LAN", "grid_row": 2, "grid_col": 1}
+    {
+      "name": "Core",
+      "grid_row": 1,
+      "grid_col": 1
+    },
+    {
+      "name": "DMZ",
+      "grid_row": 1,
+      "grid_col": 2
+    },
+    {
+      "name": "LAN",
+      "grid_row": 2,
+      "grid_col": 1
+    }
   ],
   "devices": [
-    {"name": "Core-SW-1", "area_name": "Core", "device_type": "Switch"},
-    {"name": "Core-SW-2", "area_name": "Core", "device_type": "Switch"},
-    {"name": "FW-1", "area_name": "DMZ", "device_type": "Firewall"},
-    {"name": "Router-1", "area_name": "Core", "device_type": "Router"},
-    {"name": "Access-SW-1", "area_name": "LAN", "device_type": "Switch"},
-    {"name": "Access-SW-2", "area_name": "LAN", "device_type": "Switch"},
-    {"name": "Server-1", "area_name": "LAN", "device_type": "Server"},
-    {"name": "Server-2", "area_name": "LAN", "device_type": "Server"},
-    {"name": "ISP-Router", "area_name": "DMZ", "device_type": "Router"},
-    {"name": "DB-Server", "area_name": "LAN", "device_type": "Server"}
+    {
+      "name": "Core-SW-1",
+      "area_name": "Core",
+      "device_type": "Switch"
+    },
+    {
+      "name": "Core-SW-2",
+      "area_name": "Core",
+      "device_type": "Switch"
+    },
+    {
+      "name": "FW-1",
+      "area_name": "DMZ",
+      "device_type": "Firewall"
+    },
+    {
+      "name": "Router-1",
+      "area_name": "Core",
+      "device_type": "Router"
+    },
+    {
+      "name": "Access-SW-1",
+      "area_name": "LAN",
+      "device_type": "Switch"
+    },
+    {
+      "name": "Access-SW-2",
+      "area_name": "LAN",
+      "device_type": "Switch"
+    },
+    {
+      "name": "Server-1",
+      "area_name": "LAN",
+      "device_type": "Server"
+    },
+    {
+      "name": "Server-2",
+      "area_name": "LAN",
+      "device_type": "Server"
+    },
+    {
+      "name": "ISP-Router",
+      "area_name": "DMZ",
+      "device_type": "Router"
+    },
+    {
+      "name": "DB-Server",
+      "area_name": "LAN",
+      "device_type": "Server"
+    }
   ],
   "l1_links": [
-    {"from_device": "Core-SW-1", "from_port": "Gi 0/1", "to_device": "Core-SW-2", "to_port": "Gi 0/1", "purpose": "LAN"},
-    {"from_device": "Core-SW-1", "from_port": "Gi 0/2", "to_device": "FW-1", "to_port": "Gi 0/1", "purpose": "DMZ"},
-    {"from_device": "FW-1", "from_port": "Gi 0/2", "to_device": "ISP-Router", "to_port": "Gi 0/1", "purpose": "WAN"},
-    {"from_device": "Core-SW-1", "from_port": "Gi 0/3", "to_device": "Access-SW-1", "to_port": "Gi 0/1", "purpose": "LAN"},
-    {"from_device": "Core-SW-2", "from_port": "Gi 0/2", "to_device": "Access-SW-2", "to_port": "Gi 0/1", "purpose": "LAN"},
-    {"from_device": "Access-SW-1", "from_port": "Gi 0/2", "to_device": "Server-1", "to_port": "Eth 0", "purpose": "LAN"},
-    {"from_device": "Access-SW-1", "from_port": "Gi 0/3", "to_device": "Server-2", "to_port": "Eth 0", "purpose": "LAN"},
-    {"from_device": "Access-SW-2", "from_port": "Gi 0/2", "to_device": "DB-Server", "to_port": "Eth 0", "purpose": "LAN"},
-    {"from_device": "Router-1", "from_port": "Gi 0/1", "to_device": "Core-SW-1", "to_port": "Gi 0/4", "purpose": "LAN"},
-    {"from_device": "Router-1", "from_port": "Gi 0/2", "to_device": "Core-SW-2", "to_port": "Gi 0/3", "purpose": "LAN"}
+    {
+      "from_device": "Core-SW-1",
+      "from_port": "Gi 0/1",
+      "to_device": "Core-SW-2",
+      "to_port": "Gi 0/1",
+      "purpose": "LAN"
+    },
+    {
+      "from_device": "Core-SW-1",
+      "from_port": "Gi 0/2",
+      "to_device": "FW-1",
+      "to_port": "Gi 0/1",
+      "purpose": "DMZ"
+    },
+    {
+      "from_device": "FW-1",
+      "from_port": "Gi 0/2",
+      "to_device": "ISP-Router",
+      "to_port": "Gi 0/1",
+      "purpose": "WAN"
+    },
+    {
+      "from_device": "Core-SW-1",
+      "from_port": "Gi 0/3",
+      "to_device": "Access-SW-1",
+      "to_port": "Gi 0/1",
+      "purpose": "LAN"
+    },
+    {
+      "from_device": "Core-SW-2",
+      "from_port": "Gi 0/2",
+      "to_device": "Access-SW-2",
+      "to_port": "Gi 0/1",
+      "purpose": "LAN"
+    },
+    {
+      "from_device": "Access-SW-1",
+      "from_port": "Gi 0/2",
+      "to_device": "Server-1",
+      "to_port": "Eth 0",
+      "purpose": "LAN"
+    },
+    {
+      "from_device": "Access-SW-1",
+      "from_port": "Gi 0/3",
+      "to_device": "Server-2",
+      "to_port": "Eth 0",
+      "purpose": "LAN"
+    },
+    {
+      "from_device": "Access-SW-2",
+      "from_port": "Gi 0/2",
+      "to_device": "DB-Server",
+      "to_port": "Eth 0",
+      "purpose": "LAN"
+    },
+    {
+      "from_device": "Router-1",
+      "from_port": "Gi 0/1",
+      "to_device": "Core-SW-1",
+      "to_port": "Gi 0/4",
+      "purpose": "LAN"
+    },
+    {
+      "from_device": "Router-1",
+      "from_port": "Gi 0/2",
+      "to_device": "Core-SW-2",
+      "to_port": "Gi 0/3",
+      "purpose": "LAN"
+    }
   ],
   "l2_segments": [
-    {"name": "VLAN10-Servers", "vlan_id": 10, "description": "Server VLAN"},
-    {"name": "VLAN20-Users", "vlan_id": 20, "description": "User VLAN"},
-    {"name": "VLAN30-MGMT", "vlan_id": 30, "description": "Management VLAN"}
+    {
+      "name": "VLAN10-Servers",
+      "vlan_id": 10,
+      "description": "Server VLAN"
+    },
+    {
+      "name": "VLAN20-Users",
+      "vlan_id": 20,
+      "description": "User VLAN"
+    },
+    {
+      "name": "VLAN30-MGMT",
+      "vlan_id": 30,
+      "description": "Management VLAN"
+    }
   ],
   "interface_l2_assignments": [
-    {"device_name": "Access-SW-1", "interface_name": "Gi 0/2", "l2_segment": "VLAN10-Servers", "port_mode": "access"},
-    {"device_name": "Access-SW-1", "interface_name": "Gi 0/3", "l2_segment": "VLAN10-Servers", "port_mode": "access"},
-    {"device_name": "Access-SW-2", "interface_name": "Gi 0/2", "l2_segment": "VLAN10-Servers", "port_mode": "access"}
+    {
+      "device_name": "Access-SW-1",
+      "interface_name": "Gi 0/2",
+      "l2_segment": "VLAN10-Servers",
+      "port_mode": "access"
+    },
+    {
+      "device_name": "Access-SW-1",
+      "interface_name": "Gi 0/3",
+      "l2_segment": "VLAN10-Servers",
+      "port_mode": "access"
+    },
+    {
+      "device_name": "Access-SW-2",
+      "interface_name": "Gi 0/2",
+      "l2_segment": "VLAN10-Servers",
+      "port_mode": "access"
+    }
   ],
   "l3_addresses": [
-    {"device_name": "Router-1", "interface_name": "Loopback 0", "ip_address": "10.0.0.1", "prefix_length": 32},
-    {"device_name": "Core-SW-1", "interface_name": "Vlan 10", "ip_address": "10.10.10.1", "prefix_length": 24},
-    {"device_name": "Core-SW-2", "interface_name": "Vlan 10", "ip_address": "10.10.10.2", "prefix_length": 24},
-    {"device_name": "Server-1", "interface_name": "Eth 0", "ip_address": "10.10.10.11", "prefix_length": 24},
-    {"device_name": "Server-2", "interface_name": "Eth 0", "ip_address": "10.10.10.12", "prefix_length": 24}
+    {
+      "device_name": "Router-1",
+      "interface_name": "Loopback 0",
+      "ip_address": "10.0.0.1",
+      "prefix_length": 32
+    },
+    {
+      "device_name": "Core-SW-1",
+      "interface_name": "Vlan 10",
+      "ip_address": "10.10.10.1",
+      "prefix_length": 24
+    },
+    {
+      "device_name": "Core-SW-2",
+      "interface_name": "Vlan 10",
+      "ip_address": "10.10.10.2",
+      "prefix_length": 24
+    },
+    {
+      "device_name": "Server-1",
+      "interface_name": "Eth 0",
+      "ip_address": "10.10.10.11",
+      "prefix_length": 24
+    },
+    {
+      "device_name": "Server-2",
+      "interface_name": "Eth 0",
+      "ip_address": "10.10.10.12",
+      "prefix_length": 24
+    }
   ],
   "virtual_ports": [
-    {"device_name": "Router-1", "name": "Loopback 0", "interface_type": "Loopback"},
-    {"device_name": "Core-SW-1", "name": "Vlan 10", "interface_type": "Vlan"},
-    {"device_name": "Core-SW-2", "name": "Vlan 10", "interface_type": "Vlan"}
+    {
+      "device_name": "Router-1",
+      "name": "Loopback 0",
+      "interface_type": "Loopback"
+    },
+    {
+      "device_name": "Core-SW-1",
+      "name": "Vlan 10",
+      "interface_type": "Vlan"
+    },
+    {
+      "device_name": "Core-SW-2",
+      "name": "Vlan 10",
+      "interface_type": "Vlan"
+    }
   ]
 }

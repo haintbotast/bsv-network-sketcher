@@ -521,6 +521,8 @@ class AuditLog(Base):
 
 ## 11. Checklist triển khai bảo mật
 
+**MVP nội bộ (tối giản):** vẫn bắt buộc có chính sách mật khẩu, kiểm tra input, phân quyền, audit log; các mục còn lại triển khai trước khi mở rộng production.
+
 - [ ] Cấu hình JWT secret key mạnh (≥ 256 bits)
 - [ ] Thiết lập bcrypt cost factor = 12
 - [ ] Implement password policy validation

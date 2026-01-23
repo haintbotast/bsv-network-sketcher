@@ -34,6 +34,13 @@
 
 ## 2. Định nghĩa tối thiểu theo thực thể
 
+### 2.0 Metadata
+- `name` (string, required)
+- `description` (string)
+- `created_at` (date-time)
+- `author` (string)
+- `layout_mode` (cisco | iso | custom, optional; nếu có sẽ gợi ý layout cho project)
+
 ### 2.1 Areas
 - `name` (string, unique, required)
 - `grid_row`, `grid_col` (int > 0)
@@ -247,6 +254,11 @@
         "author": {
           "type": "string",
           "maxLength": 100
+        },
+        "layout_mode": {
+          "type": "string",
+          "enum": ["cisco", "iso", "custom"],
+          "description": "Gợi ý layout cho project"
         }
       }
     },
@@ -688,5 +700,3 @@ class TemplateValidator:
 - `docs/DIAGRAM_STYLE_SPEC.md`
 - `docs/TEST_STRATEGY.md`
 - `docs/RULE_BASED_CHECKS.md`
-### 2.9 Metadata
-- `layout_mode` (cisco | iso | custom, optional; nếu có sẽ gợi ý layout cho project).

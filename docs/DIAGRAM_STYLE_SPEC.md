@@ -179,7 +179,8 @@
 
 ## 9. Ràng buộc tương thích
 
-- Không được thay đổi preset nếu chưa cập nhật golden files.
+- Nếu dùng **golden files**, chỉ được thay đổi preset khi đã cập nhật golden files tương ứng.
+- Nếu dùng **rule-based**, phải cập nhật `docs/RULE_BASED_CHECKS.md` và chạy lại regression.
 - Mọi thay đổi token phải cập nhật kiểm thử snapshot PPTX.
 - Nếu thay đổi shape/line, phải cập nhật mapping export.
 

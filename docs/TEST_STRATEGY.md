@@ -213,8 +213,8 @@ test.describe('Diagram Editor', () => {
 
 **Bộ dữ liệu:**
 - **Small:** ~10 devices, 10–20 links → `templates/samples/small.json`
-- **Medium:** ~100 devices, 150–200 links (tạo sau)
-- **Large:** ~1000 devices, 1500+ links (chỉ dùng cho regression định kỳ)
+- **Medium:** ~20 devices, 25–40 links → `templates/samples/medium.json`
+- **Large:** ~1000 devices, 1500+ links (tạo bằng script khi cần; chỉ dùng cho regression định kỳ)
 
 **Quy trình:**
 1) Chạy export từ web app.

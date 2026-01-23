@@ -168,3 +168,50 @@
 
 - Mọi thay đổi style phải cập nhật tài liệu này.
 - Đồng bộ với `WEB_APP_DEVELOPMENT_PLAN.md`, `docs/PRD.md`, `docs/SRS.md`.
+
+---
+
+## 11. Bảng mapping chi tiết (UI/Konva ↔ PPTX)
+
+| Đối tượng | Konva Props | PPTX Shape | PPTX Style |
+|----------|-------------|-----------|------------|
+| Area | Rect: `fill`, `stroke`, `strokeWidth`, `cornerRadius` | Rectangle (rounded) | Fill solid, line solid |
+| Area Label | Text: `fontFamily`, `fontSize`, `fill` | TextBox | Font + size + color |
+| Device | Rect: `fill`, `stroke`, `strokeWidth`, `cornerRadius` | Rectangle (rounded) | Fill solid, line solid |
+| Device Label | Text: `fontFamily`, `fontSize`, `fill` | TextBox | Font + size + color |
+| Waypoint | Rect/Circle | Diamond/Ellipse | Fill solid, line solid |
+| Link | Line: `stroke`, `strokeWidth`, `dash` | Line | Line color + width + dash |
+| Link Label | Text: `fontFamily`, `fontSize`, `fill` | TextBox | Font + size + color |
+| Interface Tag | Rect + Text | Rectangle + TextBox | Fill (alpha) + line |
+
+**Lưu ý:**
+- Không dùng gradient trong Strict NS.
+- Mọi color map từ preset RGB → PPTX RGB.
+
+---
+
+## 12. Quy tắc zoom/LOD (giảm rối khi sơ đồ lớn)
+
+| Ngưỡng zoom | Hiển thị |
+|------------|----------|
+| ≥ 1.0 | Hiển thị đầy đủ label + interface tag |
+| 0.7 – 0.99 | Ẩn interface tag, giữ device label |
+| 0.4 – 0.69 | Ẩn device label, giữ area label |
+| < 0.4 | Ẩn tất cả label, chỉ giữ shape + link |
+
+**Nguyên tắc:** LOD chỉ áp dụng UI; export luôn dùng full detail.
+
+---
+
+## 13. Danh sách override hợp lệ (Flexible)
+
+**Chỉ cho phép:**
+- Đổi preset theme (default/contrast/dark/light).
+- Đổi dash style trong danh sách: `primary`, `backup`, `mgmt`.
+- Đổi shape trong danh sách: `rect`, `rounded-rect`, `diamond`, `circle`.
+- Đổi màu trong **bảng preset** đã định nghĩa.
+
+**Không cho phép:**
+- Màu tùy ý ngoài preset.
+- Gradient/opacity tự do (trừ interface tag theo preset).
+- Thay đổi font family ngoài `Calibri` khi xuất PPTX.

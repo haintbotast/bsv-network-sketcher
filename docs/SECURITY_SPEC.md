@@ -494,6 +494,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 | Rate limit exceeded | WARNING | ip, endpoint |
 | Invalid input | WARNING | endpoint, validation_errors |
 | File upload | INFO | user_id, filename, size |
+| Config change | INFO | user_id, config_scope, diff |
+| Version restore | INFO | user_id, project_id, version_id |
 
 ### 10.2 Audit Log Model
 

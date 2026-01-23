@@ -37,7 +37,14 @@ PUT    /projects/{id}
 DELETE /projects/{id}
 POST   /projects/{id}/duplicate
 POST   /projects/{id}/import   # import template/json/excel/csv
+GET    /projects/{id}/versions
+POST   /projects/{id}/versions
+GET    /projects/{id}/versions/{version_id}
+POST   /projects/{id}/versions/{version_id}/restore
 ```
+
+**Trường cấu hình project (gợi ý):**
+- `layout_mode`: `cisco` | `iso` | `custom` (mặc định: `cisco`)
 
 ---
 
@@ -87,6 +94,9 @@ GET  /projects/{project_id}/export/jobs
 GET  /projects/{project_id}/export/jobs/{id}
 ```
 
+**Ghi chú:** export job lưu `version_id` để truy vết.
+**Tùy chọn:** request export có thể nhận `version_id` để xuất theo snapshot.
+
 ---
 
 ## 7. Import dữ liệu (tổng hợp)
@@ -126,9 +136,12 @@ POST /projects/{id}/import
 - `DEVICE_NAME_DUP`, `DEVICE_TYPE_INVALID`, `DEVICE_SIZE_INVALID`, `AREA_NOT_FOUND`
 - `DEVICE_NOT_FOUND`, `PORT_FORMAT_INVALID`, `L1_LINK_DUP`
 - `PORT_CHANNEL_MEMBERS_INVALID`
+- `PORT_CHANNEL_MEMBER_DUP`
 - `VIRTUAL_PORT_TYPE_INVALID`
+- `VIRTUAL_PORT_L1_FORBIDDEN`
 - `VLAN_INVALID`, `PORT_MODE_INVALID`
 - `INTERFACE_NOT_FOUND`, `IP_INVALID`
+- `L2_ASSIGNMENT_INVALID`, `L3_ASSIGNMENT_INVALID`
 
 ---
 
@@ -138,6 +151,17 @@ POST /projects/{id}/import
 WS /ws/projects/{project_id}
 Events: diagram.updated, export.progress, export.completed, export.failed
 ```
+
+---
+
+## 10. Cấu hình hệ thống (admin)
+
+```
+GET  /admin/config
+PUT  /admin/config
+```
+
+**Phạm vi cấu hình:** preset layout/style, validation rules, export defaults.
 
 ---
 

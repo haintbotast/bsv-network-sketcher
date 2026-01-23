@@ -10,13 +10,14 @@
 
 ## 1. Mục tiêu & tiêu chí thành công
 
-- Xây dựng web app vẽ sơ đồ mạng (lấy cảm hứng từ Network Sketcher).
-- Tự định nghĩa output spec riêng, không yêu cầu tương thích 1:1 với NS gốc.
+- Xây dựng web app vẽ sơ đồ mạng (tham chiếu Network Sketcher về logic).
+- Layout/output **theo chuẩn layout network phổ biến** với chế độ lựa chọn (Cisco-style / ISO/IEC generic / custom).
 - UX tối giản, thao tác nhanh, lỗi hiển thị rõ.
+- Cho phép lưu vết phiên bản topology và cấu hình preset qua trang quản trị.
 
 **Tiêu chí thành công:**
 - Tạo L1/L2/L3 từ dữ liệu nhập trực tiếp hoặc template chuẩn (Excel/CSV tùy chọn).
-- Xuất PPTX/Excel theo spec riêng của dự án.
+- Xuất PPTX/Excel theo **layout mode đã chọn** và quy chuẩn style.
 - Hỗ trợ 1000+ thiết bị/project (ưu tiên đúng logic, hiệu năng chấp nhận thấp hơn).
 
 ---
@@ -28,9 +29,11 @@
 - Multi-user nội bộ (~5 đồng thời), hạ tầng single host.
 
 **Nguyên tắc cốt lõi:**
-- Tự định nghĩa style/layout spec (xem `docs/DIAGRAM_STYLE_SPEC.md`).
+- **Layout mode có thể chọn** (Cisco-style / ISO/IEC generic / custom) và tuân theo `docs/DIAGRAM_STYLE_SPEC.md`.
 - Nhập liệu **template-first** (Excel/CSV tùy chọn cho dữ liệu cũ).
 - **Không CLI**, không Docker/Redis/Celery.
+- Logic L1→L2→L3 giữ nguyên, **validation chặt chẽ hơn**.
+ - Cấu hình preset/layout/validation không hardcode.
 
 ---
 
@@ -65,8 +68,8 @@ Chi tiết topology xem `PROJECT_TOPOLOGY.md`.
 
 - **GĐ1-2:** Nền tảng + CRUD + nhập liệu trực tiếp + validation.
 - **GĐ3-4:** Frontend core + editor + data grid.
-- **GĐ5:** Render sơ đồ + style strict.
-- **GĐ6:** Nhập liệu + template + (tùy chọn) Excel/CSV.
+- **GĐ5:** Render sơ đồ + layout mode + style preset.
+- **GĐ6:** Nhập liệu + template + versioning + (tùy chọn) Excel/CSV.
 - **GĐ7:** Kiểm thử + triển khai tối giản.
 
 ---
@@ -78,7 +81,8 @@ Chi tiết topology xem `PROJECT_TOPOLOGY.md`.
 | Sai khác xuất PPTX/Excel | Golden files + regression test |
 | Toàn vẹn dữ liệu | FK + validation matrix + transaction ngắn |
 | Job queue treo/trùng | Claim job + heartbeat + retry giới hạn |
-| UX rối | Strict NS + UI tối giản |
+| UX rối | Layout mode chuẩn + UI tối giản |
+| Cấu hình sai | Audit log + restore version |
 
 ---
 

@@ -5,9 +5,9 @@
 > **Cập nhật:** 2026-01-23
 > **Nguồn:** Trích từ `WEB_APP_DEVELOPMENT_PLAN.md`.
 
-Section này cung cấp mapping chi tiết giữa source code gốc của Network Sketcher và các component tương ứng trong Web App, giúp developers dễ dàng tham chiếu logic nghiệp vụ.
+Section này cung cấp mapping chi tiết giữa source code gốc của Network Sketcher và các component tương ứng trong Web App, **chỉ để tham chiếu** logic nghiệp vụ.
 
-**Lưu ý phạm vi:** Dự án web **không triển khai CLI/CLI wrapper**; các tệp/luồng CLI bên dưới chỉ dùng để đối chiếu logic và kết quả đầu ra.
+**Lưu ý phạm vi:** Dự án web **không triển khai CLI/CLI wrapper**; các tệp/luồng CLI bên dưới chỉ dùng để đối chiếu logic, **không làm tiêu chí 1:1** cho layout/output.
 
 ### 13.0 Kho mã nguồn tham chiếu
 

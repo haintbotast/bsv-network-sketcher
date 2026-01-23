@@ -9,7 +9,7 @@
 
 ## 1. Tầm nhìn sản phẩm
 
-Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đồ mạng L1/L2/L3 từ dữ liệu chuẩn, đảm bảo đầu ra tương thích Network Sketcher gốc.
+Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đồ mạng L1/L2/L3 từ dữ liệu chuẩn, đảm bảo đầu ra theo **layout mode** đã chọn (Cisco/ISO/custom).
 
 ## 2. Đối tượng người dùng (personas)
 
@@ -26,26 +26,31 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-02:** Nhập liệu trực tiếp bằng form/bảng theo schema chuẩn, có kiểm tra hợp lệ tức thì.
 - **FR-03:** Thư viện template dữ liệu chuẩn (tạo/sửa/áp dụng phiên bản).
 - **FR-04:** Hiển thị và chỉnh sửa sơ đồ L1/L2/L3 bằng canvas.
-- **FR-05:** Đồng bộ dữ liệu giữa các lớp L1→L2→L3 theo quy tắc NS.
-- **FR-06:** Xuất PPTX/Excel theo layout tương đương NS gốc.
+- **FR-05:** Đồng bộ dữ liệu giữa các lớp L1→L2→L3 theo quy tắc logic chuẩn.
+- **FR-06:** Xuất PPTX/Excel theo layout mode đã chọn.
 - **FR-07:** Lưu/khôi phục trạng thái, lịch sử xuất.
 - **FR-08:** Tìm kiếm nhanh thiết bị/kết nối trong project.
-- **FR-09:** Quản lý style theo **Style Spec** (Strict NS mặc định, Flexible có kiểm soát).
+- **FR-09:** Quản lý style theo **Style Spec** (layout mode + preset; Flexible có kiểm soát).
+- **FR-10:** Cho phép chọn layout mode (Cisco/ISO/custom) theo project.
+- **FR-11:** Quản lý phiên bản topology (snapshot, xem, khôi phục).
+- **FR-12:** Trang cấu hình quản trị preset/layout/validation (không hardcode).
+- **FR-13:** Export/preview gắn metadata phiên bản (version label, time, user).
 
 ## 5. Yêu cầu phi chức năng (NFR)
 
-- **Chính xác:** Đầu ra phải tương thích NS gốc (golden files).
+- **Chính xác:** Đầu ra đúng logic và layout mode (golden files theo mode).
 - **UX:** Thao tác tối giản, lỗi hiển thị rõ ràng.
 - **Hiệu năng:** Chấp nhận thấp hơn để đổi lấy độ đúng; vẫn cần phản hồi hợp lý cho ~5 người dùng.
 - **Ổn định:** Job xuất không chạy trùng, có retry giới hạn.
 - **An toàn tối thiểu:** Phân quyền project, kiểm soát upload/download.
+- **Truy vết:** Có audit log cho thao tác thay đổi topology/cấu hình.
 
 ## 6. Nguyên tắc UX/UI
 
 - Luồng thao tác ngắn (≤ 3 bước chính).
 - Hiển thị trạng thái rõ ràng (loading/success/fail).
 - Hệ màu, hình vẽ, nét vẽ thống nhất (design tokens).
-- Có chế độ **Strict NS** để khóa style tương thích 1:1 khi xuất.
+- Cho phép chọn layout mode (Cisco/ISO/custom) và preset để đảm bảo nhất quán.
 
 ## 7. Ngoài phạm vi
 
@@ -54,9 +59,10 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 
 ## 8. Tiêu chí chấp nhận (Acceptance)
 
-- Import/export đúng chuẩn, so sánh được với output của NS gốc.
+- Import/export đúng chuẩn, so sánh được với golden files theo layout mode.
 - UI cho phép chỉnh sửa sơ đồ mà không cần thao tác thủ công ngoài.
 - Xử lý lỗi nhập liệu rõ ràng, không mất dữ liệu.
+- Có thể khôi phục phiên bản topology trước đó.
 
 ---
 

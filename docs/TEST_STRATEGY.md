@@ -7,6 +7,8 @@
 
 ## 1. Kiểm thử backend
 
+- Bao phủ kiểm tra liên lớp L1→L2→L3 (interface tồn tại, port-channel, virtual port).
+
 ```python
 # tests/test_validation_service.py
 import pytest
@@ -175,13 +177,13 @@ test.describe('Diagram Editor', () => {
 
 ## 4. Regression testing
 
-**Mục tiêu:** đảm bảo đầu ra PPTX/Excel đúng logic theo spec riêng của dự án.
+**Mục tiêu:** đảm bảo đầu ra PPTX/Excel đúng logic và layout mode đã chọn.
 
 > **Lưu ý:** Dự án không yêu cầu tương thích 1:1 với Network Sketcher gốc. Thay vào đó, tự định nghĩa expected output dựa trên `docs/DIAGRAM_STYLE_SPEC.md`.
 
 **Thiết lập:**
 - Tạo bộ input chuẩn (small/medium/large) trong `templates/samples/`.
-- Khi có PPTX generator, tạo expected output samples làm baseline.
+- Tạo expected output **theo từng layout mode** (cisco/iso/custom) làm baseline.
 - Script so sánh: kiểm tra cấu trúc slide/shape + bảng Excel.
 
 **Bộ dữ liệu:**

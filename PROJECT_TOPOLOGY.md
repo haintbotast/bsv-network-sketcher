@@ -4,7 +4,7 @@
 > **Tạo:** 2026-01-23  
 > **Cập nhật:** 2026-01-23  
 > **Trạng thái:** Tài liệu kiến trúc vận hành  
-> **Nguyên tắc:** Dự án web port từ Network Sketcher gốc, **không triển khai CLI**; ưu tiên chính xác logic và UX tối giản nhưng dùng được ngay.
+> **Nguyên tắc:** Dự án web tham chiếu Network Sketcher gốc (logic), **không triển khai CLI**; ưu tiên đúng logic và UX tối giản nhưng dùng được ngay.
 
 ---
 
@@ -12,7 +12,7 @@
 
 Tài liệu này mô tả **topology tổng thể** của hệ thống (thành phần, luồng dữ liệu, triển khai tối giản) để:
 - Làm nguồn chuẩn khi thiết kế/triển khai.
-- Dễ kiểm tra tính tương thích với Network Sketcher gốc.
+- Dễ kiểm tra tính đúng logic và layout theo chuẩn đã chọn.
 - Giữ hệ thống gọn nhẹ nhưng **đúng logic** và **UX tiện dụng**.
 
 ---
@@ -53,10 +53,11 @@ Service Layer (Project/Diagram/Export/Import/Auth)
 |-----------|---------|---------|
 | Frontend SPA | UI/UX, canvas sơ đồ, nhập/xuất | Vue 3 + Konva |
 | API Gateway | REST + WebSocket | FastAPI |
-| Service Layer | Logic nghiệp vụ | Tương thích NS gốc |
+| Service Layer | Logic nghiệp vụ | Giữ logic L1→L2→L3 |
 | SQLite | Lưu trữ bền vững | WAL + FK bắt buộc |
 | File Storage | Tệp upload/xuất | Local FS |
 | Job Worker | Sinh PPTX/Excel | Poller + ProcessPool |
+| Versioning | Snapshot topology | Lưu JSON theo project |
 
 ---
 
@@ -108,6 +109,7 @@ UI đọc trạng thái → tải file
 | Exports | PPTX/Excel đã sinh | `exports/` |
 | Templates | Mẫu đầu vào chuẩn | `templates/` |
 | Logs | Nhật ký vận hành | `logs/` (tùy chọn) |
+| Versions | Snapshot topology | `data/project_versions` |
 
 ---
 
@@ -121,11 +123,12 @@ UI đọc trạng thái → tải file
 
 ---
 
-## 8. Chuẩn tương thích Network Sketcher gốc
+## 8. Chuẩn layout & logic (tham chiếu NS)
 
 - Không dùng CLI trong dự án web.
-- Dữ liệu/logic/đầu ra phải tương đương NS gốc.
-- Bắt buộc có bộ “golden files” để đối chiếu PPTX/Excel.
+- Logic L1→L2→L3 giữ nguyên; validation chặt chẽ hơn.
+- Output theo **layout mode** đã chọn (Cisco/ISO/custom); NS chỉ tham chiếu.
+- Bắt buộc có bộ “golden files” theo layout mode để đối chiếu PPTX/Excel.
 - Style sơ đồ phải tuân theo `docs/DIAGRAM_STYLE_SPEC.md`.
 
 ---

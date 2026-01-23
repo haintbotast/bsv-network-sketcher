@@ -16,7 +16,8 @@
   "metadata": {
     "name": "Default Template",
     "description": "Template chuẩn",
-    "created_at": "2026-01-23T00:00:00Z"
+    "created_at": "2026-01-23T00:00:00Z",
+    "layout_mode": "cisco"
   },
   "areas": [],
   "devices": [],
@@ -102,12 +103,16 @@
 | L1 Link | from_port/to_port | Định dạng có khoảng trắng | `PORT_FORMAT_INVALID` |
 | L1 Link | from/to | Không trùng cặp | `L1_LINK_DUP` |
 | Port Channel | members | Không rỗng, cổng hợp lệ | `PORT_CHANNEL_MEMBERS_INVALID` |
+| Port Channel | members | Không trùng lặp | `PORT_CHANNEL_MEMBER_DUP` |
 | Virtual Port | interface_type | Thuộc tập cho phép | `VIRTUAL_PORT_TYPE_INVALID` |
+| Virtual Port | name | Không dùng trong L1 links | `VIRTUAL_PORT_L1_FORBIDDEN` |
 | L2 Segment | vlan_id | 1–4094 | `VLAN_INVALID` |
 | L2 Assign | interface_name | Phải tồn tại | `INTERFACE_NOT_FOUND` |
 | L2 Assign | port_mode | access/trunk | `PORT_MODE_INVALID` |
+| L2 Assign | interface/l2 | Không vi phạm liên lớp | `L2_ASSIGNMENT_INVALID` |
 | L3 Address | ip_address/prefix | IPv4 CIDR hợp lệ | `IP_INVALID` |
 | L3 Address | interface_name | Phải tồn tại | `INTERFACE_NOT_FOUND` |
+| L3 Address | interface | Không vi phạm liên lớp | `L3_ASSIGNMENT_INVALID` |
 
 ---
 
@@ -121,7 +126,16 @@
 
 ---
 
-## 6. Giá trị mặc định
+## 6. Ràng buộc liên lớp (bắt buộc)
+
+- **L1 → L2:** chỉ cho phép gán L2 trên interface đã tồn tại (physical/virtual/port-channel).
+- **L2 → L3:** IP chỉ gán trên interface đã tồn tại; không tự tạo interface mới ở L3.
+- **Virtual ports:** chỉ tồn tại ở L2/L3; không xuất hiện trong L1 links.
+- **Port-channel:** member ports phải tồn tại và thuộc cùng thiết bị; không cho member trùng lặp.
+
+---
+
+## 7. Giá trị mặc định
 
 - `position_x`, `position_y`: mặc định theo layout tự động nếu thiếu.
 - `width`, `height`: dùng preset trong `docs/DIAGRAM_STYLE_SPEC.md`.
@@ -131,7 +145,7 @@
 
 ---
 
-## 7. Format lỗi trả về (gợi ý)
+## 8. Format lỗi trả về (gợi ý)
 
 ```json
 {
@@ -145,9 +159,9 @@
 
 ---
 
-## 8. JSON Schema chính thức (cho auto-validation)
+## 9. JSON Schema chính thức (cho auto-validation)
 
-### 8.1 Root Schema
+### 9.1 Root Schema
 
 ```json
 {
@@ -671,3 +685,5 @@ class TemplateValidator:
 - `docs/API_SPEC.md`
 - `docs/DIAGRAM_STYLE_SPEC.md`
 - `docs/TEST_STRATEGY.md`
+### 2.9 Metadata
+- `layout_mode` (cisco | iso | custom, optional; nếu có sẽ gợi ý layout cho project).

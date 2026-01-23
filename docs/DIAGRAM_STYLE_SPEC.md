@@ -11,21 +11,31 @@
 
 - Áp dụng cho **UI/Konva** và **xuất PPTX**.
 - Không áp dụng cho Excel (chỉ dữ liệu).
-- **Ưu tiên chính xác** theo Network Sketcher gốc.
+- Ưu tiên **chuẩn layout network phổ biến**; NS gốc chỉ là tham chiếu.
 
 ---
 
-## 2. Chế độ style
+## 2. Chế độ layout & style
 
-### 2.1 Strict NS (bắt buộc mặc định)
-- Khóa theo theme chuẩn tương thích NS gốc.
+### 2.1 Layout mode (bắt buộc chọn)
+- `cisco`: bố cục core–distribution–access, trái → phải.
+- `iso`: bố cục phân tầng trung tính (top → down hoặc left → right).
+- `custom`: cho phép định nghĩa quy tắc bố cục riêng (có kiểm soát).
+
+### 2.2 Preset (mặc định)
+- Dùng preset màu/nét/chữ/shape theo layout mode đã chọn.
 - Không cho phép tùy biến tự do ngoài bộ preset.
-- Dùng khi cần **đầu ra tương đương 1:1**.
 
-### 2.2 Flexible (tùy chọn)
+### 2.3 Flexible (tùy chọn)
 - Cho phép chọn trong **tập lựa chọn giới hạn** (shape, màu, nét).
 - Phải map được sang PPTX không làm vỡ layout.
 - Cần cảnh báo khi xuất nếu có override không tương thích.
+
+### 2.4 Quy tắc bố cục theo mode (tối thiểu)
+
+- **Cisco-style:** core → distribution → access theo trục ngang (left → right); link ưu tiên ngang.
+- **ISO/IEC generic:** phân tầng top → down (hoặc left → right), trung tính về màu/nhãn.
+- **Custom:** phải khai báo hướng bố cục, khoảng cách tối thiểu, và quy tắc nhóm; nếu thiếu thì fallback về ISO.
 
 ---
 
@@ -38,6 +48,7 @@
 - Token là **nguồn duy nhất** cho màu/nét/chữ.
 - Konva **không đọc CSS variables**, phải map từ tokens.
 - PPTX dùng cùng token để đảm bảo thống nhất.
+- Preset có thể cấu hình qua trang quản trị; không hardcode trong UI/Backend.
 
 ---
 
@@ -56,7 +67,7 @@
 | Đối tượng | Kích thước chuẩn | Ghi chú |
 |----------|------------------|--------|
 | Area | Tối thiểu 3.0 x 1.5 | Tự co giãn theo nội dung |
-| Device | 1.2 x 0.5 | Theo logic NS gốc |
+| Device | 1.2 x 0.5 | Theo preset layout |
 | Waypoint | 0.25 x 0.25 | Kích thước cố định |
 | Interface Tag | 0.6 x 0.2 | Auto-fit theo text |
 
@@ -68,7 +79,7 @@
 - **Backup/MGMT:** nét đứt theo preset.
 - **Arrow:** chỉ dùng khi cần hướng; mặc định tắt.
 
-### 5.1 Preset nét vẽ (Strict NS)
+### 5.1 Preset nét vẽ (theo layout mode)
 
 | Đối tượng | Stroke | StrokeWidth | Dash |
 |----------|--------|-------------|------|
@@ -84,13 +95,13 @@
 ## 6. Màu sắc
 
 ### 6.1 Màu thiết bị
-- Dùng bảng mapping theo prefix tên (tương thích NS).
-- Không cho phép nhập màu tự do ở Strict NS.
+- Dùng bảng mapping theo prefix tên (tham chiếu NS).
+- Không cho phép nhập màu tự do trong chế độ preset.
 
 ### 6.2 Màu link theo purpose
 - Dùng bảng mapping (WAN/DMZ/LAN/MGMT/HA/STORAGE/BACKUP/VPN).
 
-### 6.3 Bảng preset màu (Strict NS)
+### 6.3 Bảng preset màu (theo layout mode)
 
 **Thiết bị (theo prefix tên):**
 
@@ -128,7 +139,7 @@
 - Màu chữ: đen/xám đậm để đảm bảo tương phản.
 - Nền area: màu nhạt trung tính.
 
-### 7.1 Preset chữ (Strict NS)
+### 7.1 Preset chữ (theo layout mode)
 
 | Đối tượng | Font | Size | Màu chữ |
 |----------|------|------|--------|
@@ -137,7 +148,7 @@
 | Link Label | Calibri | 9 | #000000 |
 | Interface Tag | Calibri | 9 | #000000 |
 
-### 7.2 Preset nền (Strict NS)
+### 7.2 Preset nền (theo layout mode)
 
 | Đối tượng | Nền |
 |----------|-----|
@@ -161,7 +172,7 @@
 
 - **UI/Konva:** map trực tiếp từ tokens sang `fill`, `stroke`, `strokeWidth`, `fontSize`, `fontFamily`.
 - **PPTX:** map màu/nét/chữ tương ứng; không dùng giá trị ngoài preset.
-- **Strict NS:** bắt buộc mapping 1:1, không override tự do.
+- **Preset:** bắt buộc mapping đúng preset, không override tự do.
 - **Flexible:** chỉ cho phép override trong danh sách cho phép; log cảnh báo nếu không export được.
 
 ---
@@ -195,7 +206,7 @@
 | Interface Tag | Rect + Text | Rectangle + TextBox | Fill (alpha) + line |
 
 **Lưu ý:**
-- Không dùng gradient trong Strict NS.
+- Không dùng gradient trong chế độ preset.
 - Mọi color map từ preset RGB → PPTX RGB.
 
 ---

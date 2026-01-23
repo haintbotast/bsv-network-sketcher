@@ -22,7 +22,8 @@
 - Thư viện template dữ liệu chuẩn (JSON) có version để áp dụng nhanh.
 - Hỗ trợ dán dữ liệu dạng bảng (clipboard CSV) vào grid.
 - Kiểm tra hợp lệ tại chỗ (port, IP, VLAN, trùng tên).
- - Hỗ trợ validate-only (không ghi DB) để trả lỗi theo dòng/cột.
+- Hỗ trợ validate-only (không ghi DB) để trả lỗi theo dòng/cột.
+- Chuẩn hóa dữ liệu theo `docs/TEMPLATE_SCHEMA.md`.
 
 ### 2.3 Nhập dữ liệu từ Excel/CSV (tùy chọn)
 - Hỗ trợ nhập Excel/CSV theo thứ tự phụ thuộc (Areas → Devices → Links → ...).
@@ -93,3 +94,5 @@
 - `docs/DIAGRAM_STYLE_SPEC.md`
 - `docs/API_SPEC.md`
 - `docs/TEMPLATE_SCHEMA.md`
+- `docs/TEST_STRATEGY.md`
+- `docs/NS_REFERENCE.md`

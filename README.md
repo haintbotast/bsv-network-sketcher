@@ -10,3 +10,7 @@ Tài liệu chính:
 - `docs/API_SPEC.md`
 - `docs/TEMPLATE_SCHEMA.md`
 - `docs/TRACEABILITY_MATRIX.md`
+- `docs/TEST_STRATEGY.md`
+- `docs/NS_REFERENCE.md`
+- `docs/DEPLOYMENT_GUIDE.md`
+- `docs/APPENDIX.md`

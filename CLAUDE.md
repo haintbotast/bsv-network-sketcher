@@ -36,6 +36,10 @@
 - `docs/DIAGRAM_STYLE_SPEC.md` là nguồn chuẩn về style sơ đồ và mapping UI/Konva/PPTX.
 - `docs/API_SPEC.md` là nguồn chuẩn về đặc tả API.
 - `docs/TEMPLATE_SCHEMA.md` là nguồn chuẩn về schema template và validation.
+- `docs/TEST_STRATEGY.md` là nguồn chuẩn về chiến lược kiểm thử.
+- `docs/NS_REFERENCE.md` là nguồn chuẩn về tham chiếu logic NS gốc.
+- `docs/DEPLOYMENT_GUIDE.md` là nguồn chuẩn về triển khai tối giản.
+- `docs/APPENDIX.md` là nguồn chuẩn về phụ lục tham chiếu.
 - Dự án tham chiếu repo gốc để đảm bảo logic tương đương:
   https://github.com/cisco-open/network-sketcher
   Dùng để đối chiếu logic nghiệp vụ và độ tương thích đầu ra.
@@ -49,6 +53,9 @@
 - Mọi thay đổi về yêu cầu nghiệp vụ/sản phẩm/kỹ thuật phải cập nhật BRD/PRD/SRS tương ứng.
 - Mọi thay đổi về hình khối/màu/nét/chữ phải cập nhật DIAGRAM_STYLE_SPEC.md.
 - Mọi thay đổi về API hoặc schema template phải cập nhật API_SPEC/TEMPLATE_SCHEMA.
+- Mọi thay đổi về kiểm thử phải cập nhật TEST_STRATEGY.md.
+- Mọi thay đổi tham chiếu NS gốc phải cập nhật NS_REFERENCE.md.
+- Mọi thay đổi về triển khai phải cập nhật DEPLOYMENT_GUIDE.md.
 
 ## Biên soạn hướng dẫn (thực hành tốt)
 - Giữ hướng dẫn ngắn gọn, tập trung, có kiểm soát phiên bản; coi file này là README cho tác tử.

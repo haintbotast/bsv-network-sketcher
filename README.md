@@ -9,3 +9,4 @@ Tài liệu chính:
 - `docs/DIAGRAM_STYLE_SPEC.md`
 - `docs/API_SPEC.md`
 - `docs/TEMPLATE_SCHEMA.md`
+- `docs/TRACEABILITY_MATRIX.md`

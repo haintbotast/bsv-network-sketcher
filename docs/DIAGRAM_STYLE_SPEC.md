@@ -51,6 +51,15 @@
 | Link | Line | Màu theo purpose; nét liền/đứt |
 | Interface Tag | Text + background | Offset khỏi link |
 
+### 4.1 Kích thước chuẩn (tham chiếu)
+
+| Đối tượng | Kích thước chuẩn | Ghi chú |
+|----------|------------------|--------|
+| Area | Tối thiểu 3.0 x 1.5 | Tự co giãn theo nội dung |
+| Device | 1.2 x 0.5 | Theo logic NS gốc |
+| Waypoint | 0.25 x 0.25 | Kích thước cố định |
+| Interface Tag | 0.6 x 0.2 | Auto-fit theo text |
+
 ---
 
 ## 5. Nét vẽ & kiểu đường (line)
@@ -58,6 +67,17 @@
 - **Primary:** nét liền, strokeWidth chuẩn.
 - **Backup/MGMT:** nét đứt theo preset.
 - **Arrow:** chỉ dùng khi cần hướng; mặc định tắt.
+
+### 5.1 Preset nét vẽ (Strict NS)
+
+| Đối tượng | Stroke | StrokeWidth | Dash |
+|----------|--------|-------------|------|
+| Area | #333333 | 1 | None |
+| Device | #333333 | 1 | None |
+| Link Primary | Theo purpose | 1.5 | None |
+| Link Backup | Theo purpose | 1.5 | 4,2 |
+| Link MGMT | Theo purpose | 1.5 | 6,3 |
+| Interface Tag | #333333 | 0.5 | None |
 
 ---
 
@@ -107,6 +127,23 @@
 - Size chữ: theo token (area/device/link).
 - Màu chữ: đen/xám đậm để đảm bảo tương phản.
 - Nền area: màu nhạt trung tính.
+
+### 7.1 Preset chữ (Strict NS)
+
+| Đối tượng | Font | Size | Màu chữ |
+|----------|------|------|--------|
+| Area Label | Calibri | 14 | #333333 |
+| Device Label | Calibri | 10 | #000000 |
+| Link Label | Calibri | 9 | #000000 |
+| Interface Tag | Calibri | 9 | #000000 |
+
+### 7.2 Preset nền (Strict NS)
+
+| Đối tượng | Nền |
+|----------|-----|
+| Area | #F0F0F0 |
+| Interface Tag | #FFFFFF (80% opacity) |
+| Canvas | #FFFFFF |
 
 ---
 

@@ -543,3 +543,4 @@ class AuditLog(Base):
 - `docs/API_SPEC.md`
 - `docs/DEPLOYMENT_GUIDE.md`
 - `PROJECT_TOPOLOGY.md`
+- `docs/RELEASE_CHECKLIST.md`

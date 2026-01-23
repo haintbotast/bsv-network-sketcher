@@ -19,6 +19,7 @@
 | `docs/API_SPEC.md` | Đặc tả API |
 | `docs/TEMPLATE_SCHEMA.md` | Schema template + validation |
 | `docs/TEST_STRATEGY.md` | Chiến lược kiểm thử |
+| `docs/RELEASE_CHECKLIST.md` | Tiêu chí chấp nhận & checklist phát hành |
 | `docs/SECURITY_SPEC.md` | Bảo mật & audit |
 | `docs/NS_REFERENCE.md` | Tham chiếu logic NS gốc |
 | `docs/TRACEABILITY_MATRIX.md` | Traceability rút gọn |

@@ -337,5 +337,6 @@ def extract_excel_metadata(xlsx_path: str) -> dict:
 - `docs/DIAGRAM_STYLE_SPEC.md` - Quy chuẩn style output
 - `docs/TEMPLATE_SCHEMA.md` - Schema validate input
 - `docs/RULE_BASED_CHECKS.md` - Rule-based checks tối thiểu
+- `docs/RELEASE_CHECKLIST.md` - Checklist phát hành tối thiểu
 - `schemas/template.json` - JSON Schema chính thức
 - `templates/samples/` - Mẫu dữ liệu test

@@ -44,6 +44,7 @@ globs:
 - `docs/API_SPEC.md` là nguồn chuẩn về đặc tả API.
 - `docs/TEMPLATE_SCHEMA.md` là nguồn chuẩn về schema template và validation.
 - `docs/TEST_STRATEGY.md` là nguồn chuẩn về chiến lược kiểm thử.
+- `docs/RELEASE_CHECKLIST.md` là nguồn chuẩn về tiêu chí chấp nhận và checklist phát hành.
 - `docs/RULE_BASED_CHECKS.md` là nguồn chuẩn về rule-based checks.
 - `docs/NS_REFERENCE.md` là nguồn chuẩn về tham chiếu logic NS gốc.
 - `docs/DEPLOYMENT_GUIDE.md` là nguồn chuẩn về triển khai tối giản.
@@ -65,6 +66,7 @@ globs:
 - Mọi thay đổi về API hoặc schema template phải cập nhật API_SPEC/TEMPLATE_SCHEMA.
 - Mọi thay đổi về kiểm thử phải cập nhật TEST_STRATEGY.md.
 - Mọi thay đổi về rule-based checks phải cập nhật RULE_BASED_CHECKS.md.
+- Mọi thay đổi về tiêu chí phát hành phải cập nhật RELEASE_CHECKLIST.md.
 - Mọi thay đổi tham chiếu NS gốc phải cập nhật NS_REFERENCE.md.
 - Mọi thay đổi về triển khai phải cập nhật DEPLOYMENT_GUIDE.md.
 - Mọi thay đổi về cấu hình admin phải cập nhật ADMIN_CONFIG_SCHEMA.md/ADMIN_UI_FLOW.md.

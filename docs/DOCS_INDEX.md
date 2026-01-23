@@ -15,6 +15,7 @@
 | `docs/PRD.md` | Yêu cầu sản phẩm |
 | `docs/SRS.md` | Yêu cầu kỹ thuật |
 | `docs/DIAGRAM_STYLE_SPEC.md` | Style/layout spec |
+| `docs/RULE_BASED_CHECKS.md` | Quy tắc kiểm tra rule-based |
 | `docs/API_SPEC.md` | Đặc tả API |
 | `docs/TEMPLATE_SCHEMA.md` | Schema template + validation |
 | `docs/TEST_STRATEGY.md` | Chiến lược kiểm thử |

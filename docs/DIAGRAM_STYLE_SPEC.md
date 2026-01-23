@@ -236,3 +236,10 @@
 - Màu tùy ý ngoài preset.
 - Gradient/opacity tự do (trừ interface tag theo preset).
 - Thay đổi font family ngoài `Calibri` khi xuất PPTX.
+
+---
+
+## 14. Kiểm tra rule-based (tham chiếu)
+
+- Bộ quy tắc kiểm tra tối thiểu (không chồng lấn, khoảng cách tối thiểu, nhãn không đè, số lượng node/link, logic L1→L2→L3) được chuẩn hóa tại `docs/RULE_BASED_CHECKS.md`.
+- Layout mode có thể override các tham số khoảng cách theo preset hoặc cấu hình admin.

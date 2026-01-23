@@ -17,7 +17,7 @@
 - Tạo/sửa/xóa dự án.
 - Gán layout mode (cisco/iso/custom) và theme.
 - Quản lý phiên bản topology (snapshot, xem lại, khôi phục).
- - Cho phép cập nhật topology hiện có; trước khi export có thể tạo snapshot tự động.
+- Cho phép cập nhật topology hiện có; trước khi export có thể tạo snapshot tự động.
 
 ### 2.2 Nhập liệu trực tiếp & template dữ liệu
 - Nhập liệu trực tiếp bằng form/bảng theo schema chuẩn.

@@ -163,7 +163,7 @@ GET  /admin/config/versions
 POST /admin/config/versions/{version_id}/restore
 ```
 
-**Phạm vi cấu hình:** preset layout/style, validation rules, export defaults.
+**Phạm vi cấu hình:** preset layout/style, validation rules + layout checks, export defaults.
 **Schema:** xem `docs/ADMIN_CONFIG_SCHEMA.md`.
 
 ---

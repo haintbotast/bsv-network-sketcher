@@ -19,7 +19,7 @@
 **Hiển thị tối thiểu:**
 - `layout.default_mode`, `layout.allowed_modes`
 - `style.default_theme`, preset size
-- `validation` rule cơ bản
+- `validation` rule cơ bản + `validation.layout_checks`
 - `export` default format + include metadata
 
 **Lịch sử cấu hình:**

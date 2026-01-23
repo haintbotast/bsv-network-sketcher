@@ -114,6 +114,8 @@
 | L3 Address | interface_name | Phải tồn tại | `INTERFACE_NOT_FOUND` |
 | L3 Address | interface | Không vi phạm liên lớp | `L3_ASSIGNMENT_INVALID` |
 
+**Ghi chú:** Các kiểm tra hình học/bố cục (không chồng lấn, khoảng cách tối thiểu, nhãn không đè) tham chiếu `docs/RULE_BASED_CHECKS.md`.
+
 ---
 
 ## 5. Quy tắc chuẩn hóa dữ liệu
@@ -685,5 +687,6 @@ class TemplateValidator:
 - `docs/API_SPEC.md`
 - `docs/DIAGRAM_STYLE_SPEC.md`
 - `docs/TEST_STRATEGY.md`
+- `docs/RULE_BASED_CHECKS.md`
 ### 2.9 Metadata
 - `layout_mode` (cisco | iso | custom, optional; nếu có sẽ gợi ý layout cho project).

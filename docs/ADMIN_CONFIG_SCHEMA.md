@@ -27,7 +27,15 @@
   "validation": {
     "port_name_requires_space": true,
     "vlan_range": [1, 4094],
-    "ip_prefix_range": [1, 32]
+    "ip_prefix_range": [1, 32],
+    "layout_checks": {
+      "area_padding": 0.15,
+      "device_gap": 0.2,
+      "label_gap": 0.05,
+      "link_gap": 0.05,
+      "overlap_epsilon": 0.01,
+      "min_link_segment": 0.1
+    }
   },
   "export": {
     "default_format": "pptx",
@@ -43,6 +51,7 @@
 - Mọi thay đổi config phải ghi audit log.
 - Khi thay đổi `allowed_modes` hoặc `themes`, cần cập nhật UI chọn mode/theme.
 - `config_version` tăng khi thay đổi schema.
+- Khi thay đổi `validation.layout_checks`, cần cập nhật `docs/RULE_BASED_CHECKS.md` và test liên quan.
 
 ---
 
@@ -51,3 +60,4 @@
 - `docs/API_SPEC.md`
 - `docs/DIAGRAM_STYLE_SPEC.md`
 - `docs/TEMPLATE_SCHEMA.md`
+- `docs/RULE_BASED_CHECKS.md`

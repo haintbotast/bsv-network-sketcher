@@ -58,6 +58,7 @@ Service Layer (Project/Diagram/Export/Import/Auth)
 | File Storage | Tệp upload/xuất | Local FS |
 | Job Worker | Sinh PPTX/Excel | Poller + ProcessPool |
 | Versioning | Snapshot topology | Lưu JSON theo project |
+| Config Versioning | Snapshot cấu hình | Lưu JSON cấu hình admin |
 
 ---
 
@@ -110,6 +111,7 @@ UI đọc trạng thái → tải file
 | Templates | Mẫu đầu vào chuẩn | `templates/` |
 | Logs | Nhật ký vận hành | `logs/` (tùy chọn) |
 | Versions | Snapshot topology | `data/project_versions` |
+| Config Versions | Snapshot cấu hình | `data/config_versions` |
 
 ---
 

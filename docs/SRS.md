@@ -67,6 +67,41 @@
 - `project_versions`: snapshot JSON của topology, `version`, `created_by`, `created_at`.
 - `export_jobs`: tham chiếu `version_id` để truy vết output.
 
+**Schema gợi ý (SQLite):**
+```sql
+CREATE TABLE project_versions (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  version_number INTEGER NOT NULL,
+  label TEXT,
+  note TEXT,
+  snapshot_json TEXT NOT NULL,
+  created_by TEXT REFERENCES users(id),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  is_current INTEGER DEFAULT 0,
+  UNIQUE(project_id, version_number)
+);
+```
+
+### 3.2 Phiên bản cấu hình hệ thống (gợi ý tối thiểu)
+- `config_versions`: snapshot JSON cấu hình admin, có lịch sử và restore.
+
+**Schema gợi ý (SQLite):**
+```sql
+CREATE TABLE config_versions (
+  id TEXT PRIMARY KEY,
+  config_key TEXT NOT NULL DEFAULT 'global',
+  version_number INTEGER NOT NULL,
+  label TEXT,
+  note TEXT,
+  config_json TEXT NOT NULL,
+  created_by TEXT REFERENCES users(id),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  is_current INTEGER DEFAULT 0,
+  UNIQUE(config_key, version_number)
+);
+```
+
 ## 4. Yêu cầu giao diện
 
 - UI web responsive cơ bản.

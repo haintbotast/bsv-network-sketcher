@@ -159,6 +159,8 @@ Events: diagram.updated, export.progress, export.completed, export.failed
 ```
 GET  /admin/config
 PUT  /admin/config
+GET  /admin/config/versions
+POST /admin/config/versions/{version_id}/restore
 ```
 
 **Phạm vi cấu hình:** preset layout/style, validation rules, export defaults.

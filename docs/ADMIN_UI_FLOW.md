@@ -14,12 +14,17 @@
 2) Chọn tab: Layout / Style / Validation / Export
 3) Sửa giá trị → **Validate** → **Save**
 4) Hiển thị diff + audit log entry
+5) Lưu **config version** mới và cho phép khôi phục
 
 **Hiển thị tối thiểu:**
 - `layout.default_mode`, `layout.allowed_modes`
 - `style.default_theme`, preset size
 - `validation` rule cơ bản
 - `export` default format + include metadata
+
+**Lịch sử cấu hình:**
+- Bảng `version`, `created_at`, `created_by`, `note`
+- Nút **Restore** (xác nhận + audit log)
 
 ---
 
@@ -34,6 +39,7 @@
 **Gợi ý UI:**
 - Nút **Create Snapshot** trước khi export
 - Hiển thị tag `current` cho version đang dùng
+- Preview hiển thị **metadata** (version, time, user)
 
 ---
 

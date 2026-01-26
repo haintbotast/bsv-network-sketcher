@@ -74,8 +74,8 @@ Chi tiết topology xem `PROJECT_TOPOLOGY.md`.
 
 ## 5.1. Tiến độ hiện tại (tóm tắt)
 
-- **Hoàn thành:** Phase 1, 2A, 2B, 2C, 3, 4, 5, 6, 7 (backend đầy đủ, frontend khung + data grid mock).
-- **Đang thiếu:** Kết nối frontend với backend, chức năng chỉnh sửa/sync dữ liệu thật, layout mode + style preset, UI import/export, kiểm thử.
+- **Hoàn thành:** Phase 1, 2A, 2B, 2C, 3, 4, 5, 6, 7 (backend đầy đủ, frontend khung + data grid đã nối API cơ bản).
+- **Đang thiếu:** Hoàn thiện chỉnh sửa/sync dữ liệu canvas theo nghiệp vụ, layout mode + style preset, UI import/export, kiểm thử.
 
 ## 5.2. TODO tiếp theo (ưu tiên)
 

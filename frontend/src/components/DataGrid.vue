@@ -68,14 +68,18 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'update:rows', value: Array<Record<string, any>>): void
+  (event: 'row:add', row: Record<string, any>): void
+  (event: 'row:remove', row: Record<string, any>): void
+  (event: 'row:change', payload: { row: Record<string, any>; key: string; value: any; index: number }): void
 }>()
 
 function updateCell(index: number, key: string, value: string, column: ColumnDef) {
+  const parsed = column.type === 'number' ? Number(value) : value
   const next = props.rows.map((row, rowIndex) => {
     if (rowIndex !== index) return row
-    const parsed = column.type === 'number' ? Number(value) : value
     return { ...row, [key]: parsed }
   })
+  emit('row:change', { row: next[index], key, value: parsed, index })
   emit('update:rows', next)
 }
 
@@ -85,9 +89,14 @@ function addRow() {
     : `row-${Date.now()}`
   const row = { id: fallbackId, ...props.defaultRow }
   emit('update:rows', [...props.rows, row])
+  emit('row:add', row)
 }
 
 function removeRow(index: number) {
+  const removed = props.rows[index]
+  if (removed) {
+    emit('row:remove', removed)
+  }
   const next = props.rows.filter((_, rowIndex) => rowIndex !== index)
   emit('update:rows', next)
 }

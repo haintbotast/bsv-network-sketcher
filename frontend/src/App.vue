@@ -13,30 +13,76 @@
 
     <section class="workspace">
       <aside class="panel left">
-        <h2>Danh mục</h2>
-        <ul>
-          <li>Areas: {{ areas.length }}</li>
-          <li>Devices: {{ devices.length }}</li>
-          <li>Links: {{ links.length }}</li>
-        </ul>
-
-        <div class="controls">
-          <button type="button" @click="zoomIn">Zoom +</button>
-          <button type="button" @click="zoomOut">Zoom -</button>
-          <button type="button" @click="togglePan">
-            {{ viewport.isPanning ? 'Tắt kéo' : 'Bật kéo' }}
-          </button>
-          <button type="button" class="ghost" @click="resetViewport">Reset view</button>
+        <div class="section">
+          <h2>Tài khoản</h2>
+          <div v-if="!currentUser" class="stack">
+            <input v-model="authForm.email" type="email" placeholder="Email" class="input" />
+            <input v-model="authForm.password" type="password" placeholder="Mật khẩu" class="input" />
+            <input v-model="authForm.displayName" type="text" placeholder="Tên hiển thị (tuỳ chọn)" class="input" />
+            <div class="row">
+              <button type="button" class="primary" @click="handleLogin">Đăng nhập</button>
+              <button type="button" class="ghost" @click="handleRegister">Đăng ký</button>
+            </div>
+          </div>
+          <div v-else class="stack">
+            <div class="user-chip">
+              <span>{{ currentUser.display_name || currentUser.email }}</span>
+              <button type="button" class="ghost" @click="handleLogout">Đăng xuất</button>
+            </div>
+          </div>
         </div>
 
-        <button type="button" class="primary" @click="fetchHealth">Kiểm tra backend</button>
+        <div v-if="currentUser" class="section">
+          <h2>Dự án</h2>
+          <div class="stack">
+            <select v-model="selectedProjectId" class="select">
+              <option :value="null">-- Chọn project --</option>
+              <option v-for="project in projects" :key="project.id" :value="project.id">
+                {{ project.name }} ({{ project.layout_mode }})
+              </option>
+            </select>
+            <div class="divider"></div>
+            <input v-model="projectForm.name" type="text" placeholder="Tên project" class="input" />
+            <select v-model="projectForm.layoutMode" class="select">
+              <option value="cisco">Cisco</option>
+              <option value="iso">ISO</option>
+              <option value="custom">Custom</option>
+            </select>
+            <input v-model="projectForm.description" type="text" placeholder="Mô tả (tuỳ chọn)" class="input" />
+            <button type="button" class="primary" @click="handleCreateProject">Tạo project</button>
+          </div>
+        </div>
+
+        <div v-if="activeProject" class="section">
+          <h2>Thống kê</h2>
+          <ul>
+            <li>Areas: {{ areas.length }}</li>
+            <li>Devices: {{ devices.length }}</li>
+            <li>Links: {{ links.length }}</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>Điều khiển</h2>
+          <div class="controls">
+            <button type="button" @click="zoomIn">Zoom +</button>
+            <button type="button" @click="zoomOut">Zoom -</button>
+            <button type="button" @click="togglePan">
+              {{ viewport.isPanning ? 'Tắt kéo' : 'Bật kéo' }}
+            </button>
+            <button type="button" class="ghost" @click="resetViewport">Reset view</button>
+          </div>
+          <button type="button" class="primary" @click="fetchHealth">Kiểm tra backend</button>
+        </div>
+
+        <p v-if="notice" :class="['notice', noticeType]">{{ notice }}</p>
       </aside>
 
       <main class="canvas">
         <CanvasStage
-          :areas="areas"
-          :devices="devices"
-          :links="links"
+          :areas="canvasAreas"
+          :devices="canvasDevices"
+          :links="canvasLinks"
           :viewport="viewportState"
           :is-panning="viewport.isPanning"
           :selected-id="selectedId"
@@ -58,6 +104,9 @@
           title="Grid: Areas"
           :columns="areaColumns"
           :default-row="areaDefaults"
+          @row:add="handleAreaAdd"
+          @row:change="handleAreaChange"
+          @row:remove="handleAreaRemove"
         />
         <DataGrid
           v-else-if="activeGrid === 'devices'"
@@ -65,6 +114,9 @@
           title="Grid: Devices"
           :columns="deviceColumns"
           :default-row="deviceDefaults"
+          @row:add="handleDeviceAdd"
+          @row:change="handleDeviceChange"
+          @row:remove="handleDeviceRemove"
         />
         <DataGrid
           v-else
@@ -72,22 +124,65 @@
           title="Grid: Links"
           :columns="linkColumns"
           :default-row="linkDefaults"
+          @row:add="handleLinkAdd"
+          @row:change="handleLinkChange"
+          @row:remove="handleLinkRemove"
         />
 
-        <div class="hint">Phase 7: Data grid nhập liệu</div>
+        <div class="hint">
+          {{ activeProject ? 'Phase 7: Data grid nhập liệu (đã nối API)' : 'Cần đăng nhập và chọn project' }}
+        </div>
       </aside>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import CanvasStage from './components/CanvasStage.vue'
 import DataGrid, { type ColumnDef } from './components/DataGrid.vue'
 import type { AreaModel, DeviceModel, LinkModel, Viewport } from './models/types'
+import type { AreaRecord, AreaStyle, DeviceRecord, LinkRecord, ProjectRecord, UserRecord } from './models/api'
+import { getMe, loginUser, logout as logoutUser, registerUser } from './services/auth'
+import { listProjects, createProject } from './services/projects'
+import { listAreas, createArea, updateArea, deleteArea } from './services/areas'
+import { listDevices, createDevice, updateDevice, deleteDevice } from './services/devices'
+import { listLinks, createLink, updateLink, deleteLink } from './services/links'
+import { getToken } from './services/api'
+
+const UNIT_PX = 120
+const GRID_FALLBACK_X = 4
+const GRID_FALLBACK_Y = 2.5
 
 const statusText = ref('đang kiểm tra...')
-const apiBase = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
+const notice = ref('')
+const noticeType = ref<'info' | 'success' | 'error'>('info')
+
+const authForm = reactive({
+  email: '',
+  password: '',
+  displayName: ''
+})
+const currentUser = ref<UserRecord | null>(null)
+
+const projects = ref<ProjectRecord[]>([])
+const selectedProjectId = ref<string | null>(null)
+const projectForm = reactive({
+  name: '',
+  description: '',
+  layoutMode: 'cisco' as 'cisco' | 'iso' | 'custom'
+})
+
+type AreaRow = AreaRecord & { __temp?: boolean }
+type DeviceRow = DeviceRecord & { __temp?: boolean }
+type LinkRow = LinkRecord & { __temp?: boolean }
+
+const areas = ref<AreaRow[]>([])
+const devices = ref<DeviceRow[]>([])
+const links = ref<LinkRow[]>([])
+
+const selectedId = ref<string | null>(null)
+const activeGrid = ref<'areas' | 'devices' | 'links'>('areas')
 
 const viewport = reactive({
   scale: 1,
@@ -96,121 +191,54 @@ const viewport = reactive({
   isPanning: false
 })
 
-const areas = ref<AreaModel[]>([
-  {
-    id: 'area-1',
-    name: 'Core',
-    x: 40,
-    y: 40,
-    width: 420,
-    height: 260,
-    fill: '#fff4ea',
-    stroke: '#c9b8a5'
-  },
-  {
-    id: 'area-2',
-    name: 'Edge',
-    x: 520,
-    y: 80,
-    width: 320,
-    height: 200,
-    fill: '#f3f0ff',
-    stroke: '#b3a8d6'
-  }
-])
-
-const devices = ref<DeviceModel[]>([
-  {
-    id: 'dev-1',
-    areaId: 'area-1',
-    name: 'Core-SW-1',
-    x: 120,
-    y: 120,
-    width: 120,
-    height: 56,
-    type: 'Switch'
-  },
-  {
-    id: 'dev-2',
-    areaId: 'area-1',
-    name: 'Core-SW-2',
-    x: 260,
-    y: 200,
-    width: 120,
-    height: 56,
-    type: 'Switch'
-  },
-  {
-    id: 'dev-3',
-    areaId: 'area-2',
-    name: 'Edge-RTR',
-    x: 580,
-    y: 140,
-    width: 120,
-    height: 56,
-    type: 'Router'
-  }
-])
-
-const links = ref<LinkModel[]>([
-  {
-    id: 'link-1',
-    fromDeviceId: 'dev-1',
-    toDeviceId: 'dev-2',
-    fromPort: 'Gi 0/1',
-    toPort: 'Gi 0/2',
-    style: 'solid'
-  },
-  {
-    id: 'link-2',
-    fromDeviceId: 'dev-2',
-    toDeviceId: 'dev-3',
-    fromPort: 'Gi 0/3',
-    toPort: 'Gi 0/4',
-    style: 'dashed'
-  }
-])
-
-const selectedId = ref<string | null>(null)
-const activeGrid = ref<'areas' | 'devices' | 'links'>('areas')
-
 const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']
+const linkPurposes = ['DEFAULT', 'WAN', 'INTERNET', 'DMZ', 'LAN', 'MGMT', 'HA', 'STORAGE', 'BACKUP', 'VPN']
+
+const defaultAreaStyle: AreaStyle = {
+  fill_color_rgb: [255, 244, 234],
+  stroke_color_rgb: [201, 184, 165],
+  stroke_width: 1.5
+}
 
 const areaColumns: ColumnDef[] = [
   { key: 'name', label: 'Tên' },
-  { key: 'x', label: 'X', type: 'number', width: '72px' },
-  { key: 'y', label: 'Y', type: 'number', width: '72px' },
-  { key: 'width', label: 'W', type: 'number', width: '72px' },
-  { key: 'height', label: 'H', type: 'number', width: '72px' }
+  { key: 'grid_row', label: 'Grid R', type: 'number', width: '72px' },
+  { key: 'grid_col', label: 'Grid C', type: 'number', width: '72px' },
+  { key: 'position_x', label: 'X (đv)', type: 'number', width: '80px' },
+  { key: 'position_y', label: 'Y (đv)', type: 'number', width: '80px' },
+  { key: 'width', label: 'W (đv)', type: 'number', width: '72px' },
+  { key: 'height', label: 'H (đv)', type: 'number', width: '72px' }
 ]
 
 const deviceColumns = computed<ColumnDef[]>(() => [
   { key: 'name', label: 'Thiết bị' },
   {
-    key: 'areaId',
+    key: 'area_name',
     label: 'Area',
     type: 'select',
-    options: areas.value.map(area => ({ value: area.id, label: area.name }))
+    options: areas.value.map(area => ({ value: area.name, label: area.name }))
   },
   {
-    key: 'type',
+    key: 'device_type',
     label: 'Loại',
     type: 'select',
     options: deviceTypes.map(type => ({ value: type, label: type }))
   },
-  { key: 'x', label: 'X', type: 'number', width: '72px' },
-  { key: 'y', label: 'Y', type: 'number', width: '72px' }
+  { key: 'position_x', label: 'X (đv)', type: 'number', width: '80px' },
+  { key: 'position_y', label: 'Y (đv)', type: 'number', width: '80px' },
+  { key: 'width', label: 'W (đv)', type: 'number', width: '72px' },
+  { key: 'height', label: 'H (đv)', type: 'number', width: '72px' }
 ])
 
 const linkColumns = computed<ColumnDef[]>(() => {
-  const deviceOptions = devices.value.map(device => ({ value: device.id, label: device.name }))
+  const deviceOptions = devices.value.map(device => ({ value: device.name, label: device.name }))
   return [
-    { key: 'fromDeviceId', label: 'Từ thiết bị', type: 'select', options: deviceOptions },
-    { key: 'fromPort', label: 'Cổng đi' },
-    { key: 'toDeviceId', label: 'Đến thiết bị', type: 'select', options: deviceOptions },
-    { key: 'toPort', label: 'Cổng đến' },
+    { key: 'from_device_name', label: 'Từ thiết bị', type: 'select', options: deviceOptions },
+    { key: 'from_port', label: 'Cổng đi' },
+    { key: 'to_device_name', label: 'Đến thiết bị', type: 'select', options: deviceOptions },
+    { key: 'to_port', label: 'Cổng đến' },
     {
-      key: 'style',
+      key: 'line_style',
       label: 'Style',
       type: 'select',
       options: [
@@ -218,39 +246,58 @@ const linkColumns = computed<ColumnDef[]>(() => {
         { value: 'dashed', label: 'Dashed' },
         { value: 'dotted', label: 'Dotted' }
       ]
+    },
+    {
+      key: 'purpose',
+      label: 'Mục đích',
+      type: 'select',
+      options: linkPurposes.map(purpose => ({ value: purpose, label: purpose }))
     }
   ]
 })
 
-const areaDefaults: AreaModel = {
-  id: 'area-new',
+const areaDefaults: AreaRow = {
+  id: 'area-temp',
+  project_id: '',
   name: 'Area mới',
-  x: 80,
-  y: 80,
-  width: 240,
-  height: 160,
-  fill: '#fff4ea',
-  stroke: '#c9b8a5'
+  grid_row: 1,
+  grid_col: 1,
+  position_x: 1,
+  position_y: 1,
+  width: 3,
+  height: 1.5,
+  style: defaultAreaStyle,
+  __temp: true
 }
 
-const deviceDefaults: DeviceModel = {
-  id: 'dev-new',
-  areaId: 'area-1',
+const deviceDefaults: DeviceRow = {
+  id: 'device-temp',
+  project_id: '',
   name: 'Device mới',
-  x: 120,
-  y: 120,
-  width: 120,
-  height: 56,
-  type: 'Switch'
+  area_id: '',
+  area_name: '',
+  device_type: 'Switch',
+  position_x: 1,
+  position_y: 1,
+  width: 1.2,
+  height: 0.5,
+  color_rgb: null,
+  __temp: true
 }
 
-const linkDefaults: LinkModel = {
-  id: 'link-new',
-  fromDeviceId: 'dev-1',
-  toDeviceId: 'dev-2',
-  fromPort: 'Gi 0/1',
-  toPort: 'Gi 0/2',
-  style: 'solid'
+const linkDefaults: LinkRow = {
+  id: 'link-temp',
+  project_id: '',
+  from_device_id: '',
+  from_device_name: '',
+  from_port: 'Gi 0/1',
+  to_device_id: '',
+  to_device_name: '',
+  to_port: 'Gi 0/2',
+  purpose: 'DEFAULT',
+  line_style: 'solid',
+  color_rgb: null,
+  __temp: true
 }
 
 const statusClass = computed(() => {
@@ -265,6 +312,67 @@ const viewportState = computed<Viewport>(() => ({
   offsetX: viewport.offsetX,
   offsetY: viewport.offsetY
 }))
+
+const activeProject = computed(() => projects.value.find(p => p.id === selectedProjectId.value) || null)
+
+const canvasAreas = computed<AreaModel[]>(() => {
+  return areas.value.map(area => {
+    const style = area.style || defaultAreaStyle
+    const xUnits = area.position_x ?? (area.grid_col - 1) * GRID_FALLBACK_X
+    const yUnits = area.position_y ?? (area.grid_row - 1) * GRID_FALLBACK_Y
+    return {
+      id: area.id,
+      name: area.name,
+      x: xUnits * UNIT_PX,
+      y: yUnits * UNIT_PX,
+      width: (area.width || 3) * UNIT_PX,
+      height: (area.height || 1.5) * UNIT_PX,
+      fill: rgbToHex(style.fill_color_rgb),
+      stroke: rgbToHex(style.stroke_color_rgb)
+    }
+  })
+})
+
+const canvasDevices = computed<DeviceModel[]>(() => {
+  return devices.value.map(device => {
+    const xUnits = device.position_x ?? 0
+    const yUnits = device.position_y ?? 0
+    return {
+      id: device.id,
+      areaId: device.area_id,
+      name: device.name,
+      x: xUnits * UNIT_PX,
+      y: yUnits * UNIT_PX,
+      width: (device.width || 1.2) * UNIT_PX,
+      height: (device.height || 0.5) * UNIT_PX,
+      type: device.device_type || 'Unknown'
+    }
+  })
+})
+
+const canvasLinks = computed<LinkModel[]>(() => {
+  const byName = new Map(devices.value.map(device => [device.name, device]))
+  const byId = new Map(devices.value.map(device => [device.id, device]))
+  return links.value
+    .map(link => {
+      const from = link.from_device_name ? byName.get(link.from_device_name) : byId.get(link.from_device_id)
+      const to = link.to_device_name ? byName.get(link.to_device_name) : byId.get(link.to_device_id)
+      if (!from || !to) return null
+      return {
+        id: link.id,
+        fromDeviceId: from.id,
+        toDeviceId: to.id,
+        fromPort: link.from_port,
+        toPort: link.to_port,
+        style: (link.line_style || 'solid') as 'solid' | 'dashed' | 'dotted'
+      }
+    })
+    .filter(Boolean) as LinkModel[]
+})
+
+function rgbToHex(rgb: [number, number, number]) {
+  return `#${rgb.map(value => value.toString(16).padStart(2, '0')).join('')}`
+}
 
 function updateViewport(value: Viewport) {
   viewport.offsetX = value.offsetX
@@ -294,9 +402,14 @@ function togglePan() {
   viewport.isPanning = !viewport.isPanning
 }
 
+function setNotice(message: string, type: 'info' | 'success' | 'error' = 'info') {
+  notice.value = message
+  noticeType.value = type
+}
+
 async function fetchHealth() {
   try {
-    const res = await fetch(`${apiBase}/api/v1/health`)
+    const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'}/api/v1/health`)
     if (!res.ok) {
       statusText.value = 'lỗi kết nối'
       return
@@ -308,7 +421,308 @@ async function fetchHealth() {
   }
 }
 
-fetchHealth()
+async function initAuth() {
+  const token = getToken()
+  if (!token) return
+  try {
+    currentUser.value = await getMe()
+    await loadProjects()
+  } catch (error) {
+    logoutUser()
+    currentUser.value = null
+    setNotice('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'error')
+  }
+}
+
+async function handleLogin() {
+  if (!authForm.email || !authForm.password) {
+    setNotice('Vui lòng nhập email và mật khẩu.', 'error')
+    return
+  }
+  try {
+    await loginUser({ email: authForm.email, password: authForm.password })
+    currentUser.value = await getMe()
+    await loadProjects()
+    setNotice('Đăng nhập thành công.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Đăng nhập thất bại.', 'error')
+  }
+}
+
+async function handleRegister() {
+  if (!authForm.email || !authForm.password) {
+    setNotice('Vui lòng nhập email và mật khẩu.', 'error')
+    return
+  }
+  try {
+    await registerUser({
+      email: authForm.email,
+      password: authForm.password,
+      display_name: authForm.displayName || undefined
+    })
+    await handleLogin()
+  } catch (error: any) {
+    setNotice(error?.message || 'Đăng ký thất bại.', 'error')
+  }
+}
+
+function handleLogout() {
+  logoutUser()
+  currentUser.value = null
+  projects.value = []
+  selectedProjectId.value = null
+  areas.value = []
+  devices.value = []
+  links.value = []
+}
+
+async function loadProjects() {
+  try {
+    projects.value = await listProjects()
+    if (!selectedProjectId.value && projects.value.length > 0) {
+      selectedProjectId.value = projects.value[0].id
+    }
+  } catch (error: any) {
+    setNotice(error?.message || 'Không tải được danh sách project.', 'error')
+  }
+}
+
+async function handleCreateProject() {
+  if (!projectForm.name) {
+    setNotice('Tên project không được để trống.', 'error')
+    return
+  }
+  try {
+    const created = await createProject({
+      name: projectForm.name,
+      description: projectForm.description || undefined,
+      layout_mode: projectForm.layoutMode
+    })
+    projects.value = [created, ...projects.value]
+    selectedProjectId.value = created.id
+    projectForm.name = ''
+    projectForm.description = ''
+    setNotice('Đã tạo project.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Tạo project thất bại.', 'error')
+  }
+}
+
+async function loadProjectData(projectId: string) {
+  try {
+    const [areasData, devicesData, linksData] = await Promise.all([
+      listAreas(projectId),
+      listDevices(projectId),
+      listLinks(projectId)
+    ])
+    areas.value = areasData
+    devices.value = devicesData
+    links.value = linksData
+  } catch (error: any) {
+    setNotice(error?.message || 'Không tải được dữ liệu project.', 'error')
+  }
+}
+
+const areaUpdateTimers = new Map<string, number>()
+const deviceUpdateTimers = new Map<string, number>()
+const linkUpdateTimers = new Map<string, number>()
+
+function scheduleUpdate(map: Map<string, number>, key: string, handler: () => void) {
+  const existing = map.get(key)
+  if (existing) window.clearTimeout(existing)
+  const timer = window.setTimeout(() => {
+    map.delete(key)
+    handler()
+  }, 600)
+  map.set(key, timer)
+}
+
+async function handleAreaAdd(row: AreaRow) {
+  if (!selectedProjectId.value) {
+    setNotice('Vui lòng chọn project trước.', 'error')
+    return
+  }
+  try {
+    const created = await createArea(selectedProjectId.value, {
+      name: row.name,
+      grid_row: row.grid_row,
+      grid_col: row.grid_col,
+      position_x: row.position_x,
+      position_y: row.position_y,
+      width: row.width,
+      height: row.height,
+      style: row.style || defaultAreaStyle
+    })
+    const index = areas.value.findIndex(area => area.id === row.id)
+    if (index >= 0) areas.value[index] = created
+  } catch (error: any) {
+    setNotice(error?.message || 'Tạo area thất bại.', 'error')
+  }
+}
+
+function handleAreaChange(payload: { row: AreaRow }) {
+  if (!selectedProjectId.value) return
+  if (payload.row.__temp) return
+  scheduleUpdate(areaUpdateTimers, payload.row.id, async () => {
+    try {
+      const updated = await updateArea(selectedProjectId.value as string, payload.row.id, {
+        name: payload.row.name,
+        grid_row: payload.row.grid_row,
+        grid_col: payload.row.grid_col,
+        position_x: payload.row.position_x,
+        position_y: payload.row.position_y,
+        width: payload.row.width,
+        height: payload.row.height,
+        style: payload.row.style || undefined
+      })
+      const index = areas.value.findIndex(area => area.id === payload.row.id)
+      if (index >= 0) areas.value[index] = updated
+    } catch (error: any) {
+      setNotice(error?.message || 'Cập nhật area thất bại.', 'error')
+    }
+  })
+}
+
+async function handleAreaRemove(row: AreaRow) {
+  if (!selectedProjectId.value) return
+  if (row.__temp) return
+  try {
+    await deleteArea(selectedProjectId.value, row.id)
+  } catch (error: any) {
+    setNotice(error?.message || 'Xóa area thất bại.', 'error')
+  }
+}
+
+async function handleDeviceAdd(row: DeviceRow) {
+  if (!selectedProjectId.value) {
+    setNotice('Vui lòng chọn project trước.', 'error')
+    return
+  }
+  if (!row.area_name) {
+    setNotice('Cần chọn area cho device.', 'error')
+    return
+  }
+  try {
+    const created = await createDevice(selectedProjectId.value, {
+      name: row.name,
+      area_name: row.area_name,
+      device_type: row.device_type,
+      position_x: row.position_x,
+      position_y: row.position_y,
+      width: row.width,
+      height: row.height,
+      color_rgb: row.color_rgb || undefined
+    })
+    const index = devices.value.findIndex(device => device.id === row.id)
+    if (index >= 0) devices.value[index] = created
+  } catch (error: any) {
+    setNotice(error?.message || 'Tạo device thất bại.', 'error')
+  }
+}
+
+function handleDeviceChange(payload: { row: DeviceRow }) {
+  if (!selectedProjectId.value) return
+  if (payload.row.__temp) return
+  scheduleUpdate(deviceUpdateTimers, payload.row.id, async () => {
+    try {
+      const updated = await updateDevice(selectedProjectId.value as string, payload.row.id, {
+        name: payload.row.name,
+        area_name: payload.row.area_name || undefined,
+        device_type: payload.row.device_type,
+        position_x: payload.row.position_x,
+        position_y: payload.row.position_y,
+        width: payload.row.width,
+        height: payload.row.height,
+        color_rgb: payload.row.color_rgb || undefined
+      })
+      const index = devices.value.findIndex(device => device.id === payload.row.id)
+      if (index >= 0) devices.value[index] = updated
+    } catch (error: any) {
+      setNotice(error?.message || 'Cập nhật device thất bại.', 'error')
+    }
+  })
+}
+
+async function handleDeviceRemove(row: DeviceRow) {
+  if (!selectedProjectId.value) return
+  if (row.__temp) return
+  try {
+    await deleteDevice(selectedProjectId.value, row.id)
+  } catch (error: any) {
+    setNotice(error?.message || 'Xóa device thất bại.', 'error')
+  }
+}
+
+async function handleLinkAdd(row: LinkRow) {
+  if (!selectedProjectId.value) {
+    setNotice('Vui lòng chọn project trước.', 'error')
+    return
+  }
+  if (!row.from_device_name || !row.to_device_name) {
+    setNotice('Cần chọn thiết bị đầu/cuối cho link.', 'error')
+    return
+  }
+  try {
+    const created = await createLink(selectedProjectId.value, {
+      from_device: row.from_device_name,
+      from_port: row.from_port,
+      to_device: row.to_device_name,
+      to_port: row.to_port,
+      purpose: row.purpose || undefined,
+      line_style: row.line_style || 'solid'
+    })
+    const index = links.value.findIndex(link => link.id === row.id)
+    if (index >= 0) links.value[index] = created
+  } catch (error: any) {
+    setNotice(error?.message || 'Tạo link thất bại.', 'error')
+  }
+}
+
+function handleLinkChange(payload: { row: LinkRow }) {
+  if (!selectedProjectId.value) return
+  if (payload.row.__temp) return
+  scheduleUpdate(linkUpdateTimers, payload.row.id, async () => {
+    try {
+      const updated = await updateLink(selectedProjectId.value as string, payload.row.id, {
+        from_device: payload.row.from_device_name || undefined,
+        from_port: payload.row.from_port,
+        to_device: payload.row.to_device_name || undefined,
+        to_port: payload.row.to_port,
+        purpose: payload.row.purpose || undefined,
+        line_style: payload.row.line_style || undefined
+      })
+      const index = links.value.findIndex(link => link.id === payload.row.id)
+      if (index >= 0) links.value[index] = updated
+    } catch (error: any) {
+      setNotice(error?.message || 'Cập nhật link thất bại.', 'error')
+    }
+  })
+}
+
+async function handleLinkRemove(row: LinkRow) {
+  if (!selectedProjectId.value) return
+  if (row.__temp) return
+  try {
+    await deleteLink(selectedProjectId.value, row.id)
+  } catch (error: any) {
+    setNotice(error?.message || 'Xóa link thất bại.', 'error')
+  }
+}
+
+watch(selectedProjectId, async (projectId) => {
+  if (projectId) {
+    await loadProjectData(projectId)
+  } else {
+    areas.value = []
+    devices.value = []
+    links.value = []
+  }
+})
+
+onMounted(() => {
+  fetchHealth()
+  initAuth()
+})
 </script>
 
 <style scoped>
@@ -374,7 +788,7 @@ fetchHealth()
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(200px, 260px) 1fr minmax(320px, 380px);
+  grid-template-columns: minmax(220px, 280px) 1fr minmax(320px, 400px);
   gap: 16px;
   height: 100%;
   min-height: 0;
@@ -388,18 +802,54 @@ fetchHealth()
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-.panel h2 {
-  font-size: 16px;
-  margin: 0;
+.section h2 {
+  font-size: 15px;
+  margin: 0 0 8px;
 }
 
 .panel ul {
   margin: 0;
   padding: 0 0 0 18px;
   color: var(--muted);
+}
+
+.stack {
+  display: grid;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.input,
+.select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(28, 28, 28, 0.12);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.divider {
+  height: 1px;
+  background: rgba(28, 28, 28, 0.08);
+  margin: 4px 0;
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #f8f1ea;
 }
 
 .controls {
@@ -415,19 +865,39 @@ fetchHealth()
   background: #efe7df;
 }
 
-.controls .ghost {
+.ghost {
   background: transparent;
   border-color: #dccfc4;
 }
 
-.panel .primary {
-  margin-top: auto;
+.primary {
   background: var(--accent);
   color: white;
   border: none;
   border-radius: 12px;
-  padding: 10px 14px;
+  padding: 8px 12px;
   cursor: pointer;
+}
+
+.notice {
+  font-size: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+.notice.info {
+  background: #f0efe9;
+  color: #5c544d;
+}
+
+.notice.success {
+  background: #e5f3eb;
+  color: #1c7c54;
+}
+
+.notice.error {
+  background: #f7e8e8;
+  color: #b63d3d;
 }
 
 .canvas {
@@ -466,11 +936,6 @@ fetchHealth()
 @media (max-width: 1024px) {
   .workspace {
     grid-template-columns: 1fr;
-  }
-
-  .panel.left,
-  .panel.right {
-    order: 2;
   }
 
   .canvas {

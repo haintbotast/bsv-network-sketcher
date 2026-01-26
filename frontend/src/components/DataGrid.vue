@@ -2,7 +2,7 @@
   <div class="grid">
     <div class="grid-header">
       <h3>{{ title }}</h3>
-      <button type="button" class="add" @click="addRow">+ Thêm</button>
+      <button v-if="showAdd" type="button" class="add" @click="addRow">+ Thêm</button>
     </div>
     <div class="grid-body">
       <table>
@@ -50,6 +50,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 export type ColumnDef = {
   key: string
   label: string
@@ -64,6 +65,7 @@ const props = defineProps<{
   columns: ColumnDef[]
   rows: Array<Record<string, any>>
   defaultRow: Record<string, any>
+  showAdd?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -104,6 +106,8 @@ function removeRow(index: number) {
 function columnStyle(column: ColumnDef) {
   return column.width ? { width: column.width } : undefined
 }
+
+const showAdd = computed(() => props.showAdd !== false)
 </script>
 
 <style scoped>

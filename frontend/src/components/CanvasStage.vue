@@ -134,16 +134,38 @@ const headOfficeTopByLocation = computed(() => {
   return map
 })
 
-const visibleAreas = computed(() => {
-  const bounds = visibleBounds.value
-  const visible = props.areas
-    .filter(area => {
-      const rect = areaViewMap.value.get(area.id)
-      if (!rect) return false
-      const withinX = rect.x + rect.width > bounds.left - 50 && rect.x < bounds.right + 50
-      const withinY = rect.y + rect.height > bounds.top - 50 && rect.y < bounds.bottom + 50
-      return withinX && withinY
+const childAreasByParent = computed(() => {
+  const map = new Map<string, Array<{ id: string; rect: { x: number; y: number; width: number; height: number } }>>()
+  const areaList = [...props.areas]
+
+  areaList.forEach(area => {
+    const rect = areaViewMap.value.get(area.id)
+    if (!rect) return
+
+    areaList.forEach(potentialParent => {
+      if (potentialParent.id === area.id) return
+      const parentRect = areaViewMap.value.get(potentialParent.id)
+      if (!parentRect) return
+
+      const isInside = rect.x >= parentRect.x &&
+                       rect.y >= parentRect.y &&
+                       rect.x + rect.width <= parentRect.x + parentRect.width &&
+                       rect.y + rect.height <= parentRect.y + parentRect.height
+
+      if (isInside) {
+        const children = map.get(potentialParent.id) || []
+        children.push({ id: area.id, rect })
+        map.set(potentialParent.id, children)
+      }
     })
+  })
+
+  return map
+})
+
+const visibleAreas = computed(() => {
+  const visible = props.areas
+    .filter(area => areaViewMap.value.has(area.id))
     .sort((a, b) => {
       const rectA = areaViewMap.value.get(a.id)
       const rectB = areaViewMap.value.get(b.id)
@@ -154,7 +176,28 @@ const visibleAreas = computed(() => {
       const rect = areaViewMap.value.get(area.id)!
       const parts = area.name.split(' - ')
       const zone = parts.slice(1).join(' - ')
-      const labelOffset = zone === 'Head Office' ? 12 : 6
+      const children = childAreasByParent.value.get(area.id) || []
+      const hasChildren = children.length > 0
+
+      let labelY = 8
+      let labelAlign: 'left' | 'right' = 'left'
+
+      if (hasChildren) {
+        const topLeftChild = children.reduce((closest, child) => {
+          if (!closest) return child
+          const closestDist = Math.sqrt(Math.pow(closest.rect.x - rect.x, 2) + Math.pow(closest.rect.y - rect.y, 2))
+          const childDist = Math.sqrt(Math.pow(child.rect.x - rect.x, 2) + Math.pow(child.rect.y - rect.y, 2))
+          return childDist < closestDist ? child : closest
+        }, children[0])
+
+        if (topLeftChild && topLeftChild.rect.x - rect.x < rect.width * 0.4) {
+          labelAlign = 'right'
+        }
+      }
+
+      const isSubZone = SUB_ZONES.has(zone)
+      const fontSize = isSubZone ? 12 : 14
+
       return {
         id: area.id,
         group: {
@@ -172,18 +215,19 @@ const visibleAreas = computed(() => {
           height: rect.height,
           fill: area.fill,
           stroke: area.stroke,
-          strokeWidth: 1.5,
+          strokeWidth: hasChildren ? 2 : 1.5,
           cornerRadius: 10
         },
         label: {
-          x: TEXT_PADDING,
-          y: labelOffset,
+          x: labelAlign === 'right' ? rect.width - TEXT_PADDING : TEXT_PADDING,
+          y: labelY,
           width: Math.max(rect.width - TEXT_PADDING * 2, 0),
           text: area.name,
-          fontSize: 14,
+          fontSize,
           fill: '#3f3a33',
           wrap: 'none',
-          ellipsis: true
+          ellipsis: true,
+          align: labelAlign
         }
       }
     })
@@ -334,21 +378,31 @@ const deviceViewMap = computed(() => {
       })
       rowCursor += rowsNeeded
     })
+
+    // Ensure no overlap after clamping (push down in same column)
+    const placed = sorted
+      .map(entry => ({ id: entry.device.id, rect: map.get(entry.device.id) }))
+      .filter(item => item.rect)
+      .map(item => item as { id: string; rect: { x: number; y: number; width: number; height: number } })
+      .sort((a, b) => a.rect.y - b.rect.y || a.rect.x - b.rect.x)
+
+    for (let i = 1; i < placed.length; i += 1) {
+      const prev = placed[i - 1]
+      const curr = placed[i]
+      const sameColumn = Math.abs(curr.rect.x - prev.rect.x) < (cellWidth * 0.5)
+      if (sameColumn && curr.rect.y < prev.rect.y + prev.rect.height + DEVICE_GAP) {
+        curr.rect.y = prev.rect.y + prev.rect.height + DEVICE_GAP
+        clampIntoArea(curr.rect, deviceArea)
+      }
+    }
   })
 
   return map
 })
 
 const visibleDevices = computed(() => {
-  const bounds = visibleBounds.value
   return props.devices
-    .filter(device => {
-      const rect = deviceViewMap.value.get(device.id)
-      if (!rect) return false
-      const withinX = rect.x + rect.width > bounds.left - 40 && rect.x < bounds.right + 40
-      const withinY = rect.y + rect.height > bounds.top - 40 && rect.y < bounds.bottom + 40
-      return withinX && withinY
-    })
+    .filter(device => deviceViewMap.value.has(device.id))
     .map(device => {
       const rect = deviceViewMap.value.get(device.id)!
       const isSelected = props.selectedId === device.id
@@ -388,7 +442,6 @@ const visibleDevices = computed(() => {
 })
 
 const visibleLinks = computed(() => {
-  const bounds = visibleBounds.value
   return props.links
     .map(link => {
       const fromView = deviceViewMap.value.get(link.fromDeviceId)
@@ -402,12 +455,6 @@ const visibleLinks = computed(() => {
         x: toView.x + toView.width / 2,
         y: toView.y + toView.height / 2
       }
-      const minX = Math.min(fromCenter.x, toCenter.x)
-      const maxX = Math.max(fromCenter.x, toCenter.x)
-      const minY = Math.min(fromCenter.y, toCenter.y)
-      const maxY = Math.max(fromCenter.y, toCenter.y)
-      if (maxX < bounds.left - 80 || minX > bounds.right + 80) return null
-      if (maxY < bounds.top - 80 || minY > bounds.bottom + 80) return null
       return {
         id: link.id,
         config: {

@@ -100,38 +100,51 @@
           <button type="button" :class="{ active: activeGrid === 'areas' }" @click="activeGrid = 'areas'">Areas</button>
           <button type="button" :class="{ active: activeGrid === 'devices' }" @click="activeGrid = 'devices'">Devices</button>
           <button type="button" :class="{ active: activeGrid === 'links' }" @click="activeGrid = 'links'">Links</button>
+          <button type="button" class="ghost" @click="togglePanelMode">
+            {{ panelMode === 'selection' ? 'Chỉ chọn' : 'Xem tất cả' }}
+          </button>
           <label class="panel-size">
             <span>Rộng</span>
             <input type="range" min="280" max="520" step="20" v-model.number="rightPanelWidth" />
           </label>
         </div>
 
+        <div v-if="panelMode === 'selection' && !selectedRowForActiveGrid" class="panel-hint">
+          Chọn một đối tượng trên canvas để xem chi tiết.
+        </div>
+
         <DataGrid
           v-if="activeGrid === 'areas'"
-          v-model:rows="areas"
+          :rows="areaRowsView"
+          :show-add="panelMode === 'all'"
           title="Grid: Areas"
           :columns="areaColumns"
           :default-row="areaDefaults"
+          @update:rows="handleAreaRowsUpdate"
           @row:add="handleAreaAdd"
           @row:change="handleAreaChange"
           @row:remove="handleAreaRemove"
         />
         <DataGrid
           v-else-if="activeGrid === 'devices'"
-          v-model:rows="devices"
+          :rows="deviceRowsView"
+          :show-add="panelMode === 'all'"
           title="Grid: Devices"
           :columns="deviceColumns"
           :default-row="deviceDefaults"
+          @update:rows="handleDeviceRowsUpdate"
           @row:add="handleDeviceAdd"
           @row:change="handleDeviceChange"
           @row:remove="handleDeviceRemove"
         />
         <DataGrid
           v-else
-          v-model:rows="links"
+          :rows="linkRowsView"
+          :show-add="panelMode === 'all'"
           title="Grid: Links"
           :columns="linkColumns"
           :default-row="linkDefaults"
+          @update:rows="handleLinkRowsUpdate"
           @row:add="handleLinkAdd"
           @row:change="handleLinkChange"
           @row:remove="handleLinkRemove"
@@ -203,6 +216,65 @@ const rightPanelWidth = ref(360)
 const layoutMode = computed(() => activeProject.value?.layout_mode || 'cisco')
 const layoutModeSelection = ref<'cisco' | 'iso' | 'custom'>('cisco')
 const layoutModeUpdating = ref(false)
+
+const panelMode = ref<'selection' | 'all'>('all')
+
+function togglePanelMode() {
+  panelMode.value = panelMode.value === 'selection' ? 'all' : 'selection'
+}
+
+const selectedRowForActiveGrid = computed(() => {
+  if (!selectedId.value) return null
+  if (activeGrid.value === 'areas') {
+    return areas.value.find(a => a.id === selectedId.value) || null
+  }
+  if (activeGrid.value === 'devices') {
+    return devices.value.find(d => d.id === selectedId.value) || null
+  }
+  if (activeGrid.value === 'links') {
+    return links.value.find(l => l.id === selectedId.value) || null
+  }
+  return null
+})
+
+const areaRowsView = computed(() => {
+  if (panelMode.value === 'all') return areas.value
+  if (!selectedId.value) return []
+  const found = areas.value.find(a => a.id === selectedId.value)
+  return found ? [found] : []
+})
+
+const deviceRowsView = computed(() => {
+  if (panelMode.value === 'all') return devices.value
+  if (!selectedId.value) return []
+  const found = devices.value.find(d => d.id === selectedId.value)
+  return found ? [found] : []
+})
+
+const linkRowsView = computed(() => {
+  if (panelMode.value === 'all') return links.value
+  if (!selectedId.value) return []
+  const found = links.value.find(l => l.id === selectedId.value)
+  return found ? [found] : []
+})
+
+function handleAreaRowsUpdate(rows: AreaRow[]) {
+  if (panelMode.value === 'all') {
+    areas.value = rows
+  }
+}
+
+function handleDeviceRowsUpdate(rows: DeviceRow[]) {
+  if (panelMode.value === 'all') {
+    devices.value = rows
+  }
+}
+
+function handleLinkRowsUpdate(rows: LinkRow[]) {
+  if (panelMode.value === 'all') {
+    links.value = rows
+  }
+}
 
 const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']
 const linkPurposes = ['DEFAULT', 'WAN', 'INTERNET', 'DMZ', 'LAN', 'MGMT', 'HA', 'STORAGE', 'BACKUP', 'VPN']
@@ -998,6 +1070,15 @@ onMounted(() => {
   background: var(--accent-soft);
   border-radius: 12px;
   font-size: 13px;
+}
+
+.panel-hint {
+  padding: 16px 12px;
+  background: #f8f5f2;
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
 }
 
 .hint-text {

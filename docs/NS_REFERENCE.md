@@ -148,8 +148,8 @@ def get_link_color(purpose: str) -> list[int]:
 | `add device_location` | `add_device_location()` | `POST /api/v1/projects/{id}/devices` |
 | `add l1_link` | `add_l1_link()` | `POST /api/v1/projects/{id}/links` |
 | `add l1_link_bulk` | `add_l1_link_bulk()` | `POST /api/v1/projects/{id}/links/bulk` |
-| `add portchannel_bulk` | `add_portchannel_bulk()` | `POST /api/v1/projects/{id}/portchannels/bulk` |
-| `add virtual_port_bulk` | `add_virtual_port_bulk()` | `POST /api/v1/projects/{id}/interfaces/virtual/bulk` |
+| `add portchannel_bulk` | `add_portchannel_bulk()` | `POST /api/v1/projects/{id}/port-channels/bulk` |
+| `add virtual_port_bulk` | `add_virtual_port_bulk()` | `POST /api/v1/projects/{id}/virtual-ports/bulk` |
 | `add l2_segment_bulk` | `add_l2_segment_bulk()` | `POST /api/v1/projects/{id}/l2-segments/bulk` |
 | `add ip_address_bulk` | `add_ip_address_bulk()` | `POST /api/v1/projects/{id}/l3-addresses/bulk` |
 | `export l1_diagram` | `export_l1_diagram()` | `POST /api/v1/projects/{id}/export` body: `{type: "l1"}` |

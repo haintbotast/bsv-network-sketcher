@@ -68,6 +68,8 @@ POST   /templates/{id}/apply
 /projects/{project_id}/devices
 /projects/{project_id}/interfaces
 /projects/{project_id}/links
+/projects/{project_id}/port-channels
+/projects/{project_id}/virtual-ports
 /projects/{project_id}/l2/segments
 /projects/{project_id}/l2/assignments
 /projects/{project_id}/l3/addresses
@@ -78,6 +80,8 @@ POST   /templates/{id}/apply
 POST /projects/{project_id}/areas/bulk
 POST /projects/{project_id}/devices/bulk
 POST /projects/{project_id}/links/bulk
+POST /projects/{project_id}/port-channels/bulk
+POST /projects/{project_id}/virtual-ports/bulk
 ```
 
 ---

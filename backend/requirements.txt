@@ -16,5 +16,5 @@ pyjwt>=2.8.0
 python-multipart>=0.0.6
 
 # Export (Phase 2)
-# python-pptx>=0.6.21
-# openpyxl>=3.1.2
+python-pptx>=0.6.21
+openpyxl>=3.1.2

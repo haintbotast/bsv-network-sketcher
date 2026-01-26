@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import CurrentUser, DBSession
+from app.core.config import ALLOW_SELF_REGISTER
 from app.schemas.auth import Token, UserCreate, UserLogin, UserResponse
 from app.services.auth import (
     authenticate_user,
@@ -18,6 +19,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user_data: UserCreate, db: DBSession) -> UserResponse:
     """Đăng ký user mới."""
+    if not ALLOW_SELF_REGISTER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Đăng ký tự do đã bị tắt",
+        )
     existing_user = await get_user_by_email(db, user_data.email)
     if existing_user:
         raise HTTPException(

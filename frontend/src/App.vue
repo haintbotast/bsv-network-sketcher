@@ -18,11 +18,10 @@
           <div v-if="!currentUser" class="stack">
             <input v-model="authForm.email" type="email" placeholder="Email" class="input" />
             <input v-model="authForm.password" type="password" placeholder="Mật khẩu" class="input" />
-            <input v-model="authForm.displayName" type="text" placeholder="Tên hiển thị (tuỳ chọn)" class="input" />
             <div class="row">
               <button type="button" class="primary" @click="handleLogin">Đăng nhập</button>
-              <button type="button" class="ghost" @click="handleRegister">Đăng ký</button>
             </div>
+            <p class="hint-text">Đăng ký tự do đã tắt. Vui lòng dùng tài khoản admin được cấp.</p>
           </div>
           <div v-else class="stack">
             <div class="user-chip">
@@ -143,7 +142,7 @@ import CanvasStage from './components/CanvasStage.vue'
 import DataGrid, { type ColumnDef } from './components/DataGrid.vue'
 import type { AreaModel, DeviceModel, LinkModel, Viewport } from './models/types'
 import type { AreaRecord, AreaStyle, DeviceRecord, LinkRecord, ProjectRecord, UserRecord } from './models/api'
-import { getMe, loginUser, logout as logoutUser, registerUser } from './services/auth'
+import { getMe, loginUser, logout as logoutUser } from './services/auth'
 import { listProjects, createProject } from './services/projects'
 import { listAreas, createArea, updateArea, deleteArea } from './services/areas'
 import { listDevices, createDevice, updateDevice, deleteDevice } from './services/devices'
@@ -160,8 +159,7 @@ const noticeType = ref<'info' | 'success' | 'error'>('info')
 
 const authForm = reactive({
   email: '',
-  password: '',
-  displayName: ''
+  password: ''
 })
 const currentUser = ref<UserRecord | null>(null)
 
@@ -446,23 +444,6 @@ async function handleLogin() {
     setNotice('Đăng nhập thành công.', 'success')
   } catch (error: any) {
     setNotice(error?.message || 'Đăng nhập thất bại.', 'error')
-  }
-}
-
-async function handleRegister() {
-  if (!authForm.email || !authForm.password) {
-    setNotice('Vui lòng nhập email và mật khẩu.', 'error')
-    return
-  }
-  try {
-    await registerUser({
-      email: authForm.email,
-      password: authForm.password,
-      display_name: authForm.displayName || undefined
-    })
-    await handleLogin()
-  } catch (error: any) {
-    setNotice(error?.message || 'Đăng ký thất bại.', 'error')
   }
 }
 
@@ -931,6 +912,12 @@ onMounted(() => {
   background: var(--accent-soft);
   border-radius: 12px;
   font-size: 13px;
+}
+
+.hint-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 @media (max-width: 1024px) {

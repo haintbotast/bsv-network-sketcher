@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-01-23
+> **Cập nhật:** 2026-01-26
 > **Mục tiêu:** Định nghĩa các yêu cầu và cơ chế bảo mật cho ứng dụng web.
 
 ---
@@ -16,6 +16,11 @@
 ---
 
 ## 2. Authentication (Xác thực)
+
+### 2.0 Chính sách đăng ký
+
+- **Mặc định tắt** đăng ký tự do (`ALLOW_SELF_REGISTER=false`).
+- Tài khoản admin ban đầu được tạo thủ công bởi người vận hành.
 
 ### 2.1 Cơ chế JWT
 

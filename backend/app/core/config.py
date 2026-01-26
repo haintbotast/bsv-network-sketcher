@@ -23,6 +23,7 @@ DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 EXPORTS_DIR = os.getenv("EXPORTS_DIR", "./exports")
+ALLOW_SELF_REGISTER = os.getenv("ALLOW_SELF_REGISTER", "false").lower() == "true"
 
 _frontend_urls = os.getenv("FRONTEND_URLS", "").split(",")
 FRONTEND_URLS = [url.strip() for url in _frontend_urls if url.strip()]

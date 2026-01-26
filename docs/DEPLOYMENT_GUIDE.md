@@ -19,7 +19,7 @@
 ## 2. Cài đặt backend (tóm tắt)
 
 - Tạo venv, cài dependencies.
-- Thiết lập `.env` (DB path, SECRET_KEY, FRONTEND_URLS).
+- Thiết lập `.env` (DB path, SECRET_KEY, FRONTEND_URLS, ALLOW_SELF_REGISTER).
 - Chạy `uvicorn` hoặc service (systemd/NSSM).
 
 ---
@@ -72,6 +72,14 @@
 - DB bị khóa → chờ, kiểm tra WAL/worker.
 - Import lỗi → xem logs + kiểm tra schema.
 - Export timeout → tăng timeout hoặc kiểm tra ProcessPool.
+
+---
+
+## 8.1. Tạo admin ban đầu (bắt buộc khi tắt đăng ký)
+
+- **Khuyến nghị:** tắt đăng ký tự do (`ALLOW_SELF_REGISTER=false`).
+- Tạo admin trực tiếp trong DB bằng script nội bộ.
+- Liên hệ người vận hành để lấy thông tin tài khoản admin.
 
 ---
 

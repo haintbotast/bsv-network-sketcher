@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-23  
+> **Cập nhật:** 2026-01-26  
 > **Mục tiêu:** Hướng dẫn triển khai tối giản cho môi trường nội bộ.
 
 ---
@@ -19,7 +19,7 @@
 ## 2. Cài đặt backend (tóm tắt)
 
 - Tạo venv, cài dependencies.
-- Thiết lập `.env` (DB path, SECRET_KEY, FRONTEND_URL).
+- Thiết lập `.env` (DB path, SECRET_KEY, FRONTEND_URLS).
 - Chạy `uvicorn` hoặc service (systemd/NSSM).
 
 ---

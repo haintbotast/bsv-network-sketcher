@@ -313,7 +313,7 @@ fetchHealth()
 
 <style scoped>
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 16px;
@@ -376,7 +376,8 @@ fetchHealth()
   display: grid;
   grid-template-columns: minmax(200px, 260px) 1fr minmax(320px, 380px);
   gap: 16px;
-  min-height: 60vh;
+  height: 100%;
+  min-height: 0;
 }
 
 .panel {
@@ -430,7 +431,8 @@ fetchHealth()
 }
 
 .canvas {
-  min-height: 60vh;
+  height: 100%;
+  min-height: 0;
 }
 
 .grid-tabs {

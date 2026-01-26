@@ -188,7 +188,12 @@ const visibleLinks = computed(() => {
 function updateSize() {
   const el = containerRef.value
   if (!el) return
-  const rect = el.getBoundingClientRect()
+  const rect = {
+    width: el.clientWidth,
+    height: el.clientHeight
+  }
+  if (!rect.width || !rect.height) return
+  if (rect.width === stageSize.value.width && rect.height === stageSize.value.height) return
   stageSize.value = {
     width: Math.max(Math.floor(rect.width), 0),
     height: Math.max(Math.floor(rect.height), 0)

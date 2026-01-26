@@ -88,7 +88,8 @@ const gridConfig = computed(() => ({
   stroke: '#d0c6bc',
   strokeWidth: 1,
   dash: [8, 6],
-  cornerRadius: 12
+  cornerRadius: 12,
+  name: 'grid-bg'
 }))
 
 const visibleBounds = computed(() => getVisibleBounds(stageSize.value, props.viewport))
@@ -222,7 +223,13 @@ function batchDraw() {
 function isStageTarget(event: any) {
   const stage = stageRef.value?.getNode?.()
   if (!stage) return false
-  return event?.target === stage
+  const target = event?.target
+  if (!target) return false
+  if (target === stage) return true
+  const name = typeof target.name === 'function'
+    ? target.name()
+    : (typeof target.getAttr === 'function' ? target.getAttr('name') : '')
+  return name === 'grid-bg'
 }
 
 function onPointerDown(event: any) {

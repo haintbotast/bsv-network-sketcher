@@ -2,8 +2,8 @@
 
 > **Phiên bản:** 1.4  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-23  
-> **Trạng thái:** Lập kế hoạch  
+> **Cập nhật:** 2026-01-26  
+> **Trạng thái:** Đang triển khai  
 > **Mục tiêu:** Tối giản tài liệu kế hoạch, giữ nội dung cốt lõi và dẫn chiếu chi tiết sang các tài liệu chuyên biệt.
 
 ---
@@ -71,6 +71,30 @@ Chi tiết topology xem `PROJECT_TOPOLOGY.md`.
 - **GĐ5:** Render sơ đồ + layout mode + style preset.
 - **GĐ6:** Nhập liệu + template + versioning + (tùy chọn) Excel/CSV.
 - **GĐ7:** Kiểm thử + triển khai tối giản.
+
+## 5.1. Tiến độ hiện tại (tóm tắt)
+
+- **Hoàn thành:** Phase 1, 2A, 2B, 2C, 3, 4, 5, 6, 7 (backend đầy đủ, frontend khung + data grid mock).
+- **Đang thiếu:** Kết nối frontend với backend, chức năng chỉnh sửa/sync dữ liệu thật, layout mode + style preset, UI import/export, kiểm thử.
+
+## 5.2. TODO tiếp theo (ưu tiên)
+
+1) **Frontend ↔ Backend**
+   - Tích hợp auth/login và lưu token.
+   - Kết nối CRUD thật cho projects/areas/devices/links.
+   - Đồng bộ realtime qua WebSocket (export events, cập nhật dữ liệu).
+2) **Canvas editor**
+   - Tạo/sửa/xóa area, device, link trên canvas.
+   - Kéo‑thả, resize, snap/grid theo dữ liệu thật.
+3) **Layout mode + style**
+   - Áp dụng `docs/DIAGRAM_STYLE_SPEC.md`.
+   - Bổ sung lựa chọn Cisco/ISO/Custom.
+4) **Import/Export UI**
+   - UI import template/JSON + validate.
+   - UI export PPTX/Excel và theo dõi trạng thái job.
+5) **Kiểm thử**
+   - Unit tests (pytest) theo `docs/TEST_STRATEGY.md`.
+   - Integration tests + `docs/RELEASE_CHECKLIST.md`.
 
 ---
 

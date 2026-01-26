@@ -46,10 +46,35 @@
       </main>
 
       <aside class="panel right">
-        <h2>Inspector</h2>
-        <p v-if="selected">Đang chọn: {{ selected.label }}</p>
-        <p v-else>Chọn một phần tử để xem chi tiết.</p>
-        <div class="hint">Phase 6: Canvas editor (L1/L2/L3)</div>
+        <div class="grid-tabs">
+          <button type="button" :class="{ active: activeGrid === 'areas' }" @click="activeGrid = 'areas'">Areas</button>
+          <button type="button" :class="{ active: activeGrid === 'devices' }" @click="activeGrid = 'devices'">Devices</button>
+          <button type="button" :class="{ active: activeGrid === 'links' }" @click="activeGrid = 'links'">Links</button>
+        </div>
+
+        <DataGrid
+          v-if="activeGrid === 'areas'"
+          v-model:rows="areas"
+          title="Grid: Areas"
+          :columns="areaColumns"
+          :default-row="areaDefaults"
+        />
+        <DataGrid
+          v-else-if="activeGrid === 'devices'"
+          v-model:rows="devices"
+          title="Grid: Devices"
+          :columns="deviceColumns"
+          :default-row="deviceDefaults"
+        />
+        <DataGrid
+          v-else
+          v-model:rows="links"
+          title="Grid: Links"
+          :columns="linkColumns"
+          :default-row="linkDefaults"
+        />
+
+        <div class="hint">Phase 7: Data grid nhập liệu</div>
       </aside>
     </section>
   </div>
@@ -58,6 +83,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import CanvasStage from './components/CanvasStage.vue'
+import DataGrid, { type ColumnDef } from './components/DataGrid.vue'
 import type { AreaModel, DeviceModel, LinkModel, Viewport } from './models/types'
 
 const statusText = ref('đang kiểm tra...')
@@ -70,7 +96,7 @@ const viewport = reactive({
   isPanning: false
 })
 
-const areas = reactive<AreaModel[]>([
+const areas = ref<AreaModel[]>([
   {
     id: 'area-1',
     name: 'Core',
@@ -93,7 +119,7 @@ const areas = reactive<AreaModel[]>([
   }
 ])
 
-const devices = reactive<DeviceModel[]>([
+const devices = ref<DeviceModel[]>([
   {
     id: 'dev-1',
     areaId: 'area-1',
@@ -126,7 +152,7 @@ const devices = reactive<DeviceModel[]>([
   }
 ])
 
-const links = reactive<LinkModel[]>([
+const links = ref<LinkModel[]>([
   {
     id: 'link-1',
     fromDeviceId: 'dev-1',
@@ -146,14 +172,86 @@ const links = reactive<LinkModel[]>([
 ])
 
 const selectedId = ref<string | null>(null)
+const activeGrid = ref<'areas' | 'devices' | 'links'>('areas')
 
-const selected = computed(() => {
-  const device = devices.find(item => item.id === selectedId.value)
-  if (device) return { label: `${device.name} (${device.type})` }
-  const area = areas.find(item => item.id === selectedId.value)
-  if (area) return { label: `${area.name} (Area)` }
-  return null
+const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']
+
+const areaColumns: ColumnDef[] = [
+  { key: 'name', label: 'Tên' },
+  { key: 'x', label: 'X', type: 'number', width: '72px' },
+  { key: 'y', label: 'Y', type: 'number', width: '72px' },
+  { key: 'width', label: 'W', type: 'number', width: '72px' },
+  { key: 'height', label: 'H', type: 'number', width: '72px' }
+]
+
+const deviceColumns = computed<ColumnDef[]>(() => [
+  { key: 'name', label: 'Thiết bị' },
+  {
+    key: 'areaId',
+    label: 'Area',
+    type: 'select',
+    options: areas.value.map(area => ({ value: area.id, label: area.name }))
+  },
+  {
+    key: 'type',
+    label: 'Loại',
+    type: 'select',
+    options: deviceTypes.map(type => ({ value: type, label: type }))
+  },
+  { key: 'x', label: 'X', type: 'number', width: '72px' },
+  { key: 'y', label: 'Y', type: 'number', width: '72px' }
+])
+
+const linkColumns = computed<ColumnDef[]>(() => {
+  const deviceOptions = devices.value.map(device => ({ value: device.id, label: device.name }))
+  return [
+    { key: 'fromDeviceId', label: 'Từ thiết bị', type: 'select', options: deviceOptions },
+    { key: 'fromPort', label: 'Cổng đi' },
+    { key: 'toDeviceId', label: 'Đến thiết bị', type: 'select', options: deviceOptions },
+    { key: 'toPort', label: 'Cổng đến' },
+    {
+      key: 'style',
+      label: 'Style',
+      type: 'select',
+      options: [
+        { value: 'solid', label: 'Solid' },
+        { value: 'dashed', label: 'Dashed' },
+        { value: 'dotted', label: 'Dotted' }
+      ]
+    }
+  ]
 })
+
+const areaDefaults: AreaModel = {
+  id: 'area-new',
+  name: 'Area mới',
+  x: 80,
+  y: 80,
+  width: 240,
+  height: 160,
+  fill: '#fff4ea',
+  stroke: '#c9b8a5'
+}
+
+const deviceDefaults: DeviceModel = {
+  id: 'dev-new',
+  areaId: 'area-1',
+  name: 'Device mới',
+  x: 120,
+  y: 120,
+  width: 120,
+  height: 56,
+  type: 'Switch'
+}
+
+const linkDefaults: LinkModel = {
+  id: 'link-new',
+  fromDeviceId: 'dev-1',
+  toDeviceId: 'dev-2',
+  fromPort: 'Gi 0/1',
+  toPort: 'Gi 0/2',
+  style: 'solid'
+}
 
 const statusClass = computed(() => {
   if (statusText.value === 'healthy') return 'ok'
@@ -276,7 +374,7 @@ fetchHealth()
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(200px, 260px) 1fr minmax(220px, 280px);
+  grid-template-columns: minmax(200px, 260px) 1fr minmax(320px, 380px);
   gap: 16px;
   min-height: 60vh;
 }
@@ -333,6 +431,26 @@ fetchHealth()
 
 .canvas {
   min-height: 60vh;
+}
+
+.grid-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.grid-tabs button {
+  flex: 1;
+  border: 1px solid rgba(28, 28, 28, 0.12);
+  background: transparent;
+  border-radius: 10px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.grid-tabs button.active {
+  background: var(--accent-soft);
+  border-color: rgba(214, 108, 59, 0.4);
 }
 
 .hint {

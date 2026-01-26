@@ -79,6 +79,12 @@
           <button type="button" @click="zoomIn">Zoom +</button>
           <button type="button" @click="zoomOut">Zoom -</button>
           <button type="button" class="ghost" @click="resetViewport">Reset view</button>
+          <span class="toolbar-divider"></span>
+          <button type="button" :class="{ active: viewMode === 'L1' }" @click="setViewMode('L1')">L1</button>
+          <button type="button" :class="{ active: viewMode === 'L2' }" @click="setViewMode('L2')">L2</button>
+          <button type="button" :class="{ active: viewMode === 'L3' }" @click="setViewMode('L3')">L3</button>
+          <button type="button" :class="{ active: viewMode === 'overview' }" @click="setViewMode('overview')">Tổng quan</button>
+          <span class="toolbar-divider"></span>
           <button type="button" class="ghost" @click="toggleRightPanel">
             {{ showRightPanel ? 'Ẩn panel' : 'Hiện panel' }}
           </button>
@@ -90,6 +96,9 @@
           :viewport="viewportState"
           :layout-mode="layoutMode"
           :selected-id="selectedId"
+          :view-mode="viewMode"
+          :l2-assignments="l2Assignments"
+          :l3-addresses="l3Addresses"
           @select="handleSelect"
           @update:viewport="updateViewport"
         />
@@ -222,6 +231,34 @@ const panelMode = ref<'selection' | 'all'>('all')
 function togglePanelMode() {
   panelMode.value = panelMode.value === 'selection' ? 'all' : 'selection'
 }
+
+// View mode for canvas (L1/L2/L3/Overview)
+type ViewMode = 'L1' | 'L2' | 'L3' | 'overview'
+const viewMode = ref<ViewMode>('L1')
+
+// L2/L3 data
+type L2AssignmentRecord = {
+  id: string
+  device_id: string
+  device_name?: string | null
+  interface_name: string
+  vlan_id?: number | null
+  port_mode: 'access' | 'trunk'
+}
+
+type L3AddressRecord = {
+  id: string
+  device_id: string
+  device_name?: string | null
+  interface_name: string
+  ip_address: string
+  prefix_length: number
+}
+
+const l2Assignments = ref<L2AssignmentRecord[]>([])
+const l3Addresses = ref<L3AddressRecord[]>([])
+const l2Loaded = ref(false)
+const l3Loaded = ref(false)
 
 const selectedRowForActiveGrid = computed(() => {
   if (!selectedId.value) return null
@@ -485,6 +522,52 @@ function resetViewport() {
 
 function toggleRightPanel() {
   showRightPanel.value = !showRightPanel.value
+}
+
+async function setViewMode(mode: ViewMode) {
+  viewMode.value = mode
+  if (!selectedProjectId.value) return
+
+  // Lazy load L2 data
+  if ((mode === 'L2' || mode === 'L3' || mode === 'overview') && !l2Loaded.value) {
+    await fetchL2Data()
+  }
+  // Lazy load L3 data
+  if ((mode === 'L3' || mode === 'overview') && !l3Loaded.value) {
+    await fetchL3Data()
+  }
+}
+
+async function fetchL2Data() {
+  if (!selectedProjectId.value) return
+  try {
+    const res = await fetch(
+      `${import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'}/api/v1/projects/${selectedProjectId.value}/l2/assignments`,
+      { headers: { Authorization: `Bearer ${getToken()}` } }
+    )
+    if (res.ok) {
+      l2Assignments.value = await res.json()
+      l2Loaded.value = true
+    }
+  } catch (e) {
+    console.error('Failed to fetch L2 assignments:', e)
+  }
+}
+
+async function fetchL3Data() {
+  if (!selectedProjectId.value) return
+  try {
+    const res = await fetch(
+      `${import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'}/api/v1/projects/${selectedProjectId.value}/l3/addresses`,
+      { headers: { Authorization: `Bearer ${getToken()}` } }
+    )
+    if (res.ok) {
+      l3Addresses.value = await res.json()
+      l3Loaded.value = true
+    }
+  } catch (e) {
+    console.error('Failed to fetch L3 addresses:', e)
+  }
 }
 
 function setNotice(message: string, type: 'info' | 'success' | 'error' = 'info') {
@@ -778,6 +861,13 @@ async function handleLinkRemove(row: LinkRow) {
 }
 
 watch(selectedProjectId, async (projectId) => {
+  // Reset L2/L3 loaded flags when project changes
+  l2Loaded.value = false
+  l3Loaded.value = false
+  l2Assignments.value = []
+  l3Addresses.value = []
+  viewMode.value = 'L1'
+
   if (projectId) {
     await loadProjectData(projectId)
     const project = projects.value.find(item => item.id === projectId)
@@ -1027,6 +1117,19 @@ onMounted(() => {
 .canvas-toolbar .ghost {
   background: transparent;
   border-color: #dccfc4;
+}
+
+.canvas-toolbar button.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(28, 28, 28, 0.15);
+  margin: 0 4px;
 }
 
 .grid-tabs {

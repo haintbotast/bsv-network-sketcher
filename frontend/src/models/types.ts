@@ -44,3 +44,42 @@ export type LinkModel = {
   toPort: string
   style: 'solid' | 'dashed' | 'dotted'
 }
+
+// View modes for canvas
+export type ViewMode = 'L1' | 'L2' | 'L3' | 'overview'
+
+// L2 Layer records
+export type L2SegmentRecord = {
+  id: string
+  project_id: string
+  name: string
+  vlan_id: number
+  description?: string | null
+}
+
+export type L2AssignmentRecord = {
+  id: string
+  project_id: string
+  device_id: string
+  device_name?: string | null
+  interface_name: string
+  l2_segment_id: string
+  l2_segment_name?: string | null
+  vlan_id?: number | null
+  port_mode: 'access' | 'trunk'
+  native_vlan?: number | null
+  allowed_vlans?: number[] | null
+}
+
+// L3 Layer records
+export type L3AddressRecord = {
+  id: string
+  project_id: string
+  device_id: string
+  device_name?: string | null
+  interface_name: string
+  ip_address: string
+  prefix_length: number
+  is_secondary: boolean
+  description?: string | null
+}

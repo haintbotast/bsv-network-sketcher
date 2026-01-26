@@ -48,22 +48,47 @@
           <v-text :config="device.label" />
         </v-group>
       </v-layer>
+
+      <!-- L2/L3 Overlay Layer -->
+      <v-layer ref="overlayLayerRef">
+        <!-- L3 IP Labels (show in L3 and overview) -->
+        <v-group
+          v-for="label in l3Labels"
+          :key="label.id"
+          :config="label.group"
+        >
+          <v-rect :config="label.bg" />
+          <v-text :config="label.text" />
+        </v-group>
+        <!-- L2 VLAN Labels (show in L2 and overview) -->
+        <v-group
+          v-for="label in l2Labels"
+          :key="label.id"
+          :config="label.group"
+        >
+          <v-rect :config="label.bg" />
+          <v-text :config="label.text" />
+        </v-group>
+      </v-layer>
     </v-stage>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { AreaModel, DeviceModel, LinkModel, Viewport } from '../models/types'
+import type { AreaModel, DeviceModel, LinkModel, Viewport, ViewMode, L2AssignmentRecord, L3AddressRecord } from '../models/types'
 import { getVisibleBounds, logicalRectToView } from '../utils/viewport'
 
-const props = defineProps<{ 
+const props = defineProps<{
   areas: AreaModel[]
   devices: DeviceModel[]
   links: LinkModel[]
   viewport: Viewport
   layoutMode?: 'cisco' | 'iso' | 'custom'
   selectedId?: string | null
+  viewMode?: ViewMode
+  l2Assignments?: L2AssignmentRecord[]
+  l3Addresses?: L3AddressRecord[]
 }>()
 
 const emit = defineEmits<{
@@ -82,6 +107,7 @@ const gridLayerRef = ref()
 const areaLayerRef = ref()
 const linkLayerRef = ref()
 const deviceLayerRef = ref()
+const overlayLayerRef = ref()
 
 const gridConfig = computed(() => ({
   x: 16,
@@ -469,6 +495,90 @@ const visibleLinks = computed(() => {
     .filter(Boolean) as Array<{ id: string; config: Record<string, unknown> }>
 })
 
+// L2 Labels - VLAN info on devices
+const l2Labels = computed(() => {
+  const mode = props.viewMode || 'L1'
+  if (mode !== 'L2' && mode !== 'overview') return []
+  if (!props.l2Assignments || props.l2Assignments.length === 0) return []
+
+  // Group assignments by device
+  const byDevice = new Map<string, { vlans: Set<number>; modes: Set<string> }>()
+  props.l2Assignments.forEach(a => {
+    if (!a.device_id || a.vlan_id == null) return
+    const existing = byDevice.get(a.device_id) || { vlans: new Set(), modes: new Set() }
+    existing.vlans.add(a.vlan_id)
+    existing.modes.add(a.port_mode)
+    byDevice.set(a.device_id, existing)
+  })
+
+  const labels: Array<{
+    id: string
+    group: { x: number; y: number }
+    bg: { x: number; y: number; width: number; height: number; fill: string; cornerRadius: number }
+    text: { x: number; y: number; text: string; fontSize: number; fill: string }
+  }> = []
+
+  byDevice.forEach((info, deviceId) => {
+    const deviceRect = deviceViewMap.value.get(deviceId)
+    if (!deviceRect) return
+    const vlans = Array.from(info.vlans).slice(0, 3).join(',')
+    const moreCount = info.vlans.size > 3 ? ` +${info.vlans.size - 3}` : ''
+    const text = `VLAN: ${vlans}${moreCount}`
+    const labelWidth = text.length * 6 + 8
+    labels.push({
+      id: `l2-${deviceId}`,
+      group: { x: deviceRect.x, y: deviceRect.y + deviceRect.height + 2 },
+      bg: { x: 0, y: 0, width: labelWidth, height: 16, fill: '#e8f4e8', cornerRadius: 4 },
+      text: { x: 4, y: 2, text, fontSize: 10, fill: '#2d5a2d' }
+    })
+  })
+
+  return labels
+})
+
+// L3 Labels - IP addresses on devices
+const l3Labels = computed(() => {
+  const mode = props.viewMode || 'L1'
+  if (mode !== 'L3' && mode !== 'overview') return []
+  if (!props.l3Addresses || props.l3Addresses.length === 0) return []
+
+  // Group addresses by device
+  const byDevice = new Map<string, Array<{ ip: string; prefix: number }>>()
+  props.l3Addresses.forEach(a => {
+    if (!a.device_id) return
+    const list = byDevice.get(a.device_id) || []
+    list.push({ ip: a.ip_address, prefix: a.prefix_length })
+    byDevice.set(a.device_id, list)
+  })
+
+  const labels: Array<{
+    id: string
+    group: { x: number; y: number }
+    bg: { x: number; y: number; width: number; height: number; fill: string; cornerRadius: number }
+    text: { x: number; y: number; text: string; fontSize: number; fill: string }
+  }> = []
+
+  byDevice.forEach((addresses, deviceId) => {
+    const deviceRect = deviceViewMap.value.get(deviceId)
+    if (!deviceRect) return
+    // Show first 2 IPs, then "+N more"
+    const shown = addresses.slice(0, 2).map(a => `${a.ip}/${a.prefix}`).join(', ')
+    const moreCount = addresses.length > 2 ? ` +${addresses.length - 2}` : ''
+    const text = `${shown}${moreCount}`
+    const labelWidth = Math.min(text.length * 6 + 8, deviceRect.width)
+    // Position below device (and below L2 label if in overview)
+    const yOffset = mode === 'overview' ? deviceRect.height + 20 : deviceRect.height + 2
+    labels.push({
+      id: `l3-${deviceId}`,
+      group: { x: deviceRect.x, y: deviceRect.y + yOffset },
+      bg: { x: 0, y: 0, width: labelWidth, height: 16, fill: '#e8e8f4', cornerRadius: 4 },
+      text: { x: 4, y: 2, text, fontSize: 10, fill: '#2d2d5a' }
+    })
+  })
+
+  return labels
+})
+
 function updateSize() {
   const el = containerRef.value
   if (!el) return
@@ -493,6 +603,7 @@ function batchDraw() {
   areaLayerRef.value?.getNode()?.batchDraw()
   linkLayerRef.value?.getNode()?.batchDraw()
   deviceLayerRef.value?.getNode()?.batchDraw()
+  overlayLayerRef.value?.getNode()?.batchDraw()
 }
 
 function isStageTarget(event: any) {
@@ -551,7 +662,7 @@ onBeforeUnmount(() => {
   observer = null
 })
 
-watch([visibleAreas, visibleDevices, visibleLinks, stageSize], () => {
+watch([visibleAreas, visibleDevices, visibleLinks, l2Labels, l3Labels, stageSize], () => {
   batchDraw()
 })
 </script>

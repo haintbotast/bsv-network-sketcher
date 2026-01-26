@@ -62,6 +62,7 @@ const props = defineProps<{
   devices: DeviceModel[]
   links: LinkModel[]
   viewport: Viewport
+  layoutMode?: 'cisco' | 'iso' | 'custom'
   selectedId?: string | null
 }>()
 
@@ -99,6 +100,8 @@ const visibleBounds = computed(() => getVisibleBounds(stageSize.value, props.vie
 const AREA_PADDING = 12
 const TEXT_PADDING = 10
 const SUB_ZONES = new Set(['Department', 'Projects', 'IT'])
+const LABEL_GAP_MAIN = 22
+const LABEL_GAP_SUB = 18
 
 const areaViewMap = computed(() => {
   const map = new Map<string, { x: number; y: number; width: number; height: number }>()
@@ -149,6 +152,9 @@ const visibleAreas = computed(() => {
     })
     .map(area => {
       const rect = areaViewMap.value.get(area.id)!
+      const parts = area.name.split(' - ')
+      const zone = parts.slice(1).join(' - ')
+      const labelOffset = zone === 'Head Office' ? 12 : 6
       return {
         id: area.id,
         group: {
@@ -171,7 +177,7 @@ const visibleAreas = computed(() => {
         },
         label: {
           x: TEXT_PADDING,
-          y: TEXT_PADDING - 2,
+          y: labelOffset,
           width: Math.max(rect.width - TEXT_PADDING * 2, 0),
           text: area.name,
           fontSize: 14,
@@ -281,6 +287,13 @@ const deviceViewMap = computed(() => {
       }
     }
 
+    const labelGap = SUB_ZONES.has(zoneName) ? LABEL_GAP_SUB : LABEL_GAP_MAIN
+    deviceArea = {
+      ...deviceArea,
+      y: deviceArea.y + labelGap,
+      height: Math.max(deviceArea.height - labelGap, 0)
+    }
+
     const sorted = [...entries].sort((a, b) => a.device.name.localeCompare(b.device.name))
     const maxWidth = Math.max(...sorted.map(entry => entry.rect.width))
     const maxHeight = Math.max(...sorted.map(entry => entry.rect.height))
@@ -309,8 +322,13 @@ const deviceViewMap = computed(() => {
         const col = index % cols
         const row = Math.floor(index / cols)
         const rect = { ...entry.rect }
-        rect.x = deviceArea.x + AREA_PADDING + col * cellWidth
-        rect.y = deviceArea.y + AREA_PADDING + (rowCursor + row) * cellHeight
+        if (props.layoutMode === 'iso') {
+          rect.x = deviceArea.x + AREA_PADDING + (rowCursor + row) * cellWidth
+          rect.y = deviceArea.y + AREA_PADDING + col * cellHeight
+        } else {
+          rect.x = deviceArea.x + AREA_PADDING + col * cellWidth
+          rect.y = deviceArea.y + AREA_PADDING + (rowCursor + row) * cellHeight
+        }
         clampIntoArea(rect, deviceArea)
         map.set(entry.device.id, rect)
       })

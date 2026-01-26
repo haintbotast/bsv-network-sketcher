@@ -40,6 +40,11 @@
                 {{ project.name }} ({{ project.layout_mode }})
               </option>
             </select>
+            <select v-if="activeProject" v-model="layoutModeSelection" class="select">
+              <option value="cisco">Cisco</option>
+              <option value="iso">ISO</option>
+              <option value="custom">Custom</option>
+            </select>
             <div class="divider"></div>
             <input v-model="projectForm.name" type="text" placeholder="Tên project" class="input" />
             <select v-model="projectForm.layoutMode" class="select">
@@ -83,6 +88,7 @@
           :devices="canvasDevices"
           :links="canvasLinks"
           :viewport="viewportState"
+          :layout-mode="layoutMode"
           :selected-id="selectedId"
           @select="handleSelect"
           @update:viewport="updateViewport"
@@ -146,7 +152,7 @@ import DataGrid, { type ColumnDef } from './components/DataGrid.vue'
 import type { AreaModel, DeviceModel, LinkModel, Viewport } from './models/types'
 import type { AreaRecord, AreaStyle, DeviceRecord, LinkRecord, ProjectRecord, UserRecord } from './models/api'
 import { getMe, loginUser, logout as logoutUser } from './services/auth'
-import { listProjects, createProject } from './services/projects'
+import { listProjects, createProject, updateProject } from './services/projects'
 import { listAreas, createArea, updateArea, deleteArea } from './services/areas'
 import { listDevices, createDevice, updateDevice, deleteDevice } from './services/devices'
 import { listLinks, createLink, updateLink, deleteLink } from './services/links'
@@ -193,6 +199,10 @@ const viewport = reactive({
 
 const showRightPanel = ref(true)
 const rightPanelWidth = ref(360)
+
+const layoutMode = computed(() => activeProject.value?.layout_mode || 'cisco')
+const layoutModeSelection = ref<'cisco' | 'iso' | 'custom'>('cisco')
+const layoutModeUpdating = ref(false)
 
 const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']
 const linkPurposes = ['DEFAULT', 'WAN', 'INTERNET', 'DMZ', 'LAN', 'MGMT', 'HA', 'STORAGE', 'BACKUP', 'VPN']
@@ -698,10 +708,31 @@ async function handleLinkRemove(row: LinkRow) {
 watch(selectedProjectId, async (projectId) => {
   if (projectId) {
     await loadProjectData(projectId)
+    const project = projects.value.find(item => item.id === projectId)
+    if (project) {
+      layoutModeSelection.value = project.layout_mode
+    }
   } else {
     areas.value = []
     devices.value = []
     links.value = []
+  }
+})
+
+watch(layoutModeSelection, async (value) => {
+  if (!activeProject.value) return
+  if (layoutModeUpdating.value) return
+  if (activeProject.value.layout_mode === value) return
+  layoutModeUpdating.value = true
+  try {
+    const updated = await updateProject(activeProject.value.id, { layout_mode: value })
+    projects.value = projects.value.map(project => (project.id === updated.id ? updated : project))
+    setNotice('Đã cập nhật layout mode.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Cập nhật layout mode thất bại.', 'error')
+    layoutModeSelection.value = activeProject.value.layout_mode
+  } finally {
+    layoutModeUpdating.value = false
   }
 })
 

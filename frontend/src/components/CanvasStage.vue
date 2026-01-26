@@ -185,6 +185,8 @@ const visibleAreas = computed(() => {
 })
 
 const DEVICE_GAP = 12
+const ROLE_ORDER_MAIN = ['router', 'firewall', 'core', 'dist', 'access', 'endpoint']
+const ROLE_ORDER_SUB = ['access', 'endpoint']
 
 const DEVICE_COLORS: Array<{ match: (device: DeviceModel) => boolean; color: [number, number, number] }> = [
   { match: device => device.type === 'Router' || /RTR|ROUTER|ISP/i.test(device.name), color: [70, 130, 180] },
@@ -208,6 +210,26 @@ function resolveDeviceFill(device: DeviceModel) {
     }
   }
   return '#d9d9d9'
+}
+
+function resolveDeviceRole(device: DeviceModel) {
+  const name = device.name.toUpperCase()
+  if (device.type === 'Router' || name.includes('RTR') || name.includes('ROUTER') || name.includes('ISP')) {
+    return 'router'
+  }
+  if (device.type === 'Firewall' || name.includes('FW') || name.includes('FIREWALL')) {
+    return 'firewall'
+  }
+  if (name.includes('CORE')) {
+    return 'core'
+  }
+  if (name.includes('DIST')) {
+    return 'dist'
+  }
+  if (name.includes('ACC') || name.includes('ACCESS')) {
+    return 'access'
+  }
+  return 'endpoint'
 }
 
 const deviceViewMap = computed(() => {
@@ -243,11 +265,12 @@ const deviceViewMap = computed(() => {
 
     let deviceArea = area
     const areaModel = areaById.value.get(areaId)
+    let zoneName = ''
     if (areaModel) {
       const parts = areaModel.name.split(' - ')
       const location = parts[0]
-      const zone = parts.slice(1).join(' - ')
-      if (zone === 'Head Office') {
+      zoneName = parts.slice(1).join(' - ')
+      if (zoneName === 'Head Office') {
         const subTop = headOfficeTopByLocation.value.get(location)
         if (subTop !== undefined) {
           const usableHeight = Math.max(subTop - area.y - DEVICE_GAP, 0)
@@ -264,16 +287,34 @@ const deviceViewMap = computed(() => {
     const availableWidth = Math.max(deviceArea.width - AREA_PADDING * 2, maxWidth)
     const cellWidth = maxWidth + DEVICE_GAP
     const cellHeight = maxHeight + DEVICE_GAP
-    const cols = Math.max(1, Math.floor((availableWidth + DEVICE_GAP) / cellWidth))
+    const maxCols = Math.max(1, Math.floor((availableWidth + DEVICE_GAP) / cellWidth))
 
-    sorted.forEach((entry, index) => {
-      const col = index % cols
-      const row = Math.floor(index / cols)
-      const rect = { ...entry.rect }
-      rect.x = deviceArea.x + AREA_PADDING + col * cellWidth
-      rect.y = deviceArea.y + AREA_PADDING + row * cellHeight
-      clampIntoArea(rect, deviceArea)
-      map.set(entry.device.id, rect)
+    const tiers = new Map<string, Array<{ device: DeviceModel; rect: { x: number; y: number; width: number; height: number } }>>()
+    sorted.forEach(entry => {
+      const role = resolveDeviceRole(entry.device)
+      const list = tiers.get(role) || []
+      list.push(entry)
+      tiers.set(role, list)
+    })
+
+    const order = SUB_ZONES.has(zoneName) ? ROLE_ORDER_SUB : ROLE_ORDER_MAIN
+    let rowCursor = 0
+
+    order.forEach(role => {
+      const list = tiers.get(role)
+      if (!list || list.length === 0) return
+      const cols = Math.min(maxCols, list.length)
+      const rowsNeeded = Math.ceil(list.length / cols)
+      list.forEach((entry, index) => {
+        const col = index % cols
+        const row = Math.floor(index / cols)
+        const rect = { ...entry.rect }
+        rect.x = deviceArea.x + AREA_PADDING + col * cellWidth
+        rect.y = deviceArea.y + AREA_PADDING + (rowCursor + row) * cellHeight
+        clampIntoArea(rect, deviceArea)
+        map.set(entry.device.id, rect)
+      })
+      rowCursor += rowsNeeded
     })
   })
 

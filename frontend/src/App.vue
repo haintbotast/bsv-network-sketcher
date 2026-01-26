@@ -62,15 +62,7 @@
         </div>
 
         <div class="section">
-          <h2>Điều khiển</h2>
-          <div class="controls">
-            <button type="button" @click="zoomIn">Zoom +</button>
-            <button type="button" @click="zoomOut">Zoom -</button>
-            <button type="button" @click="togglePan">
-              {{ viewport.isPanning ? 'Tắt kéo' : 'Bật kéo' }}
-            </button>
-            <button type="button" class="ghost" @click="resetViewport">Reset view</button>
-          </div>
+          <h2>Trạng thái</h2>
           <button type="button" class="primary" @click="fetchHealth">Kiểm tra backend</button>
         </div>
 
@@ -78,6 +70,14 @@
       </aside>
 
       <main class="canvas">
+        <div class="canvas-toolbar">
+          <button type="button" @click="zoomIn">Zoom +</button>
+          <button type="button" @click="zoomOut">Zoom -</button>
+          <button type="button" @click="togglePan">
+            {{ viewport.isPanning ? 'Tắt kéo' : 'Bật kéo' }}
+          </button>
+          <button type="button" class="ghost" @click="resetViewport">Reset view</button>
+        </div>
         <CanvasStage
           :areas="canvasAreas"
           :devices="canvasDevices"
@@ -884,6 +884,35 @@ onMounted(() => {
 .canvas {
   height: 100%;
   min-height: 0;
+  position: relative;
+}
+
+.canvas-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 12px;
+  border: 1px solid rgba(28, 28, 28, 0.1);
+  box-shadow: var(--shadow);
+}
+
+.canvas-toolbar button {
+  border-radius: 10px;
+  border: 1px solid transparent;
+  padding: 6px 10px;
+  cursor: pointer;
+  background: #efe7df;
+  font-size: 12px;
+}
+
+.canvas-toolbar .ghost {
+  background: transparent;
+  border-color: #dccfc4;
 }
 
 .grid-tabs {

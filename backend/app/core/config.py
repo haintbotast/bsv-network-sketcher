@@ -23,3 +23,12 @@ DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 EXPORTS_DIR = os.getenv("EXPORTS_DIR", "./exports")
+
+_frontend_urls = os.getenv("FRONTEND_URLS", "").split(",")
+FRONTEND_URLS = [url.strip() for url in _frontend_urls if url.strip()]
+if not FRONTEND_URLS:
+    fallback = os.getenv("FRONTEND_URL", "")
+    if fallback:
+        FRONTEND_URLS = [fallback.strip()]
+    else:
+        FRONTEND_URLS = ["http://localhost:5173", "http://127.0.0.1:5173"]

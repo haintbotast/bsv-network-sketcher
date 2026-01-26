@@ -1,12 +1,18 @@
 <template>
   <div ref="containerRef" class="canvas-shell">
     <v-stage
+      ref="stageRef"
       :config="{
         width: stageSize.width,
-        height: stageSize.height,
-        draggable: isPanning
+        height: stageSize.height
       }"
-      @dragend="onStageDragEnd"
+      @mousedown="onPointerDown"
+      @mousemove="onPointerMove"
+      @mouseup="onPointerUp"
+      @mouseleave="onPointerUp"
+      @touchstart="onPointerDown"
+      @touchmove="onPointerMove"
+      @touchend="onPointerUp"
     >
       <v-layer ref="gridLayerRef">
         <v-rect :config="gridConfig" />
@@ -54,7 +60,6 @@ const props = defineProps<{
   devices: DeviceModel[]
   links: LinkModel[]
   viewport: Viewport
-  isPanning: boolean
   selectedId?: string | null
 }>()
 
@@ -64,8 +69,11 @@ const emit = defineEmits<{
 }>()
 
 const containerRef = ref<HTMLDivElement | null>(null)
+const stageRef = ref()
 const stageSize = ref({ width: 300, height: 200 })
 let observer: ResizeObserver | null = null
+const isPanning = ref(false)
+const lastPointer = ref<{ x: number; y: number } | null>(null)
 
 const gridLayerRef = ref()
 const areaLayerRef = ref()
@@ -200,16 +208,6 @@ function updateSize() {
   }
 }
 
-function onStageDragEnd(event: any) {
-  const node = event?.target
-  if (!node) return
-  emit('update:viewport', {
-    ...props.viewport,
-    offsetX: node.x(),
-    offsetY: node.y()
-  })
-}
-
 function emitSelect(id: string, type: 'device' | 'area') {
   emit('select', { id, type })
 }
@@ -219,6 +217,41 @@ function batchDraw() {
   areaLayerRef.value?.getNode()?.batchDraw()
   linkLayerRef.value?.getNode()?.batchDraw()
   deviceLayerRef.value?.getNode()?.batchDraw()
+}
+
+function isStageTarget(event: any) {
+  const stage = stageRef.value?.getNode?.()
+  if (!stage) return false
+  return event?.target === stage
+}
+
+function onPointerDown(event: any) {
+  if (!isStageTarget(event)) return
+  const stage = stageRef.value?.getNode?.()
+  const pointer = stage?.getPointerPosition?.()
+  if (!pointer) return
+  isPanning.value = true
+  lastPointer.value = { x: pointer.x, y: pointer.y }
+}
+
+function onPointerMove(event: any) {
+  if (!isPanning.value) return
+  const stage = stageRef.value?.getNode?.()
+  const pointer = stage?.getPointerPosition?.()
+  if (!pointer || !lastPointer.value) return
+  const dx = pointer.x - lastPointer.value.x
+  const dy = pointer.y - lastPointer.value.y
+  lastPointer.value = { x: pointer.x, y: pointer.y }
+  emit('update:viewport', {
+    ...props.viewport,
+    offsetX: props.viewport.offsetX + dx,
+    offsetY: props.viewport.offsetY + dy
+  })
+}
+
+function onPointerUp() {
+  isPanning.value = false
+  lastPointer.value = null
 }
 
 onMounted(() => {

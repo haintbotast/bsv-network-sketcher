@@ -11,7 +11,7 @@
       </div>
     </header>
 
-    <section class="workspace">
+    <section class="workspace" :class="{ 'right-collapsed': !showRightPanel }" :style="{ '--right-panel-width': `${rightPanelWidth}px` }">
       <aside class="panel left">
         <div class="section">
           <h2>Tài khoản</h2>
@@ -73,17 +73,16 @@
         <div class="canvas-toolbar">
           <button type="button" @click="zoomIn">Zoom +</button>
           <button type="button" @click="zoomOut">Zoom -</button>
-          <button type="button" @click="togglePan">
-            {{ viewport.isPanning ? 'Tắt kéo' : 'Bật kéo' }}
-          </button>
           <button type="button" class="ghost" @click="resetViewport">Reset view</button>
+          <button type="button" class="ghost" @click="toggleRightPanel">
+            {{ showRightPanel ? 'Ẩn panel' : 'Hiện panel' }}
+          </button>
         </div>
         <CanvasStage
           :areas="canvasAreas"
           :devices="canvasDevices"
           :links="canvasLinks"
           :viewport="viewportState"
-          :is-panning="viewport.isPanning"
           :selected-id="selectedId"
           @select="handleSelect"
           @update:viewport="updateViewport"
@@ -95,6 +94,10 @@
           <button type="button" :class="{ active: activeGrid === 'areas' }" @click="activeGrid = 'areas'">Areas</button>
           <button type="button" :class="{ active: activeGrid === 'devices' }" @click="activeGrid = 'devices'">Devices</button>
           <button type="button" :class="{ active: activeGrid === 'links' }" @click="activeGrid = 'links'">Links</button>
+          <label class="panel-size">
+            <span>Rộng</span>
+            <input type="range" min="280" max="520" step="20" v-model.number="rightPanelWidth" />
+          </label>
         </div>
 
         <DataGrid
@@ -185,9 +188,11 @@ const activeGrid = ref<'areas' | 'devices' | 'links'>('areas')
 const viewport = reactive({
   scale: 1,
   offsetX: 0,
-  offsetY: 0,
-  isPanning: false
+  offsetY: 0
 })
+
+const showRightPanel = ref(true)
+const rightPanelWidth = ref(360)
 
 const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']
 const linkPurposes = ['DEFAULT', 'WAN', 'INTERNET', 'DMZ', 'LAN', 'MGMT', 'HA', 'STORAGE', 'BACKUP', 'VPN']
@@ -396,8 +401,8 @@ function resetViewport() {
   viewport.offsetY = 0
 }
 
-function togglePan() {
-  viewport.isPanning = !viewport.isPanning
+function toggleRightPanel() {
+  showRightPanel.value = !showRightPanel.value
 }
 
 function setNotice(message: string, type: 'info' | 'success' | 'error' = 'info') {
@@ -769,10 +774,14 @@ onMounted(() => {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) 1fr minmax(320px, 400px);
+  grid-template-columns: minmax(220px, 280px) 1fr var(--right-panel-width, 360px);
   gap: 16px;
   height: 100%;
   min-height: 0;
+}
+
+.workspace.right-collapsed {
+  grid-template-columns: minmax(220px, 280px) 1fr 0px;
 }
 
 .panel {
@@ -784,6 +793,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .section h2 {
@@ -918,6 +929,8 @@ onMounted(() => {
 .grid-tabs {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .grid-tabs button {
@@ -933,6 +946,19 @@ onMounted(() => {
 .grid-tabs button.active {
   background: var(--accent-soft);
   border-color: rgba(214, 108, 59, 0.4);
+}
+
+.panel-size {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.panel-size input {
+  width: 120px;
 }
 
 .hint {
@@ -957,6 +983,11 @@ onMounted(() => {
   .canvas {
     order: 1;
     min-height: 50vh;
+  }
+
+  .panel-size {
+    width: 100%;
+    margin-left: 0;
   }
 }
 </style>

@@ -45,7 +45,7 @@ async def list_addresses(
     limit: int = 100,
 ):
     """Lấy danh sách L3 addresses của project."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -73,7 +73,7 @@ async def get_address(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Lấy thông tin L3 address."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -99,7 +99,7 @@ async def create_address(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Tạo L3 address mới."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -125,7 +125,7 @@ async def bulk_create_addresses(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Tạo nhiều L3 addresses cùng lúc."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -181,7 +181,7 @@ async def update_address(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Cập nhật L3 address."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -223,7 +223,7 @@ async def delete_address(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Xóa L3 address."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:

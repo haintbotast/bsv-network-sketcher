@@ -29,7 +29,7 @@ async def list_segments(
     limit: int = 100,
 ):
     """Lấy danh sách L2 segments của project."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -47,7 +47,7 @@ async def get_segment(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Lấy thông tin L2 segment."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -68,7 +68,7 @@ async def create_segment(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Tạo L2 segment mới."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -94,7 +94,7 @@ async def bulk_create_segments(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Tạo nhiều L2 segments cùng lúc."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -146,7 +146,7 @@ async def update_segment(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Cập nhật L2 segment."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -177,7 +177,7 @@ async def delete_segment(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Xóa L2 segment."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:

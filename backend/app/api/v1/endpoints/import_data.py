@@ -22,7 +22,7 @@ async def import_project_data(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Import dữ liệu tổng hợp vào project."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:

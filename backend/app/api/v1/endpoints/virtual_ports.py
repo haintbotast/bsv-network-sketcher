@@ -56,7 +56,7 @@ async def list_virtual_ports(
     limit: int = 100,
 ):
     """Lấy danh sách Virtual Ports của project."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -86,7 +86,7 @@ async def get_virtual_port(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Lấy thông tin Virtual Port."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -113,7 +113,7 @@ async def create_virtual_port(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Tạo Virtual Port mới."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -149,7 +149,7 @@ async def bulk_create_virtual_ports(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Tạo nhiều Virtual Ports cùng lúc."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -223,7 +223,7 @@ async def update_virtual_port(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Cập nhật Virtual Port."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -283,7 +283,7 @@ async def delete_virtual_port(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Xóa Virtual Port."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:

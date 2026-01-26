@@ -140,6 +140,7 @@ async def import_project_data(
     options: ImportOptions,
     mode: str,
 ) -> ImportResult:
+    project_id = project.id
     errors: list[ErrorDetail] = []
     created = {
         "areas": 0,
@@ -228,11 +229,13 @@ async def import_project_data(
     )
     l3_address_items = _validate_items("l3_address", l3_addresses_raw, L3AddressCreate, errors)
 
+    if db.in_transaction():
+        await db.rollback()
     tx = await db.begin()
     applied = False
     try:
         if options.merge_strategy == "replace":
-            await _clear_project_data(db, project.id)
+            await _clear_project_data(db, project_id)
 
         area_by_name: dict[str, Area] = {}
         device_by_name: dict[str, Device] = {}
@@ -247,29 +250,29 @@ async def import_project_data(
         l3_address_keys: set[tuple[str, str, str, int]] = set()
 
         if options.merge_strategy == "merge":
-            result = await db.execute(select(Area).where(Area.project_id == project.id))
+            result = await db.execute(select(Area).where(Area.project_id == project_id))
             for area in result.scalars().all():
                 area_by_name[area.name] = area
 
-            result = await db.execute(select(Device).where(Device.project_id == project.id))
+            result = await db.execute(select(Device).where(Device.project_id == project_id))
             for device in result.scalars().all():
                 device_by_name[device.name] = device
 
-            result = await db.execute(select(L2Segment).where(L2Segment.project_id == project.id))
+            result = await db.execute(select(L2Segment).where(L2Segment.project_id == project_id))
             for segment in result.scalars().all():
                 l2_segment_by_name[segment.name] = segment
                 l2_segment_by_vlan[segment.vlan_id] = segment
 
-            result = await db.execute(select(PortChannel).where(PortChannel.project_id == project.id))
+            result = await db.execute(select(PortChannel).where(PortChannel.project_id == project_id))
             for pc in result.scalars().all():
                 port_channel_by_key.add((pc.device_id, pc.name))
                 port_channel_number_by_key.add((pc.device_id, pc.channel_number))
 
-            result = await db.execute(select(VirtualPort).where(VirtualPort.project_id == project.id))
+            result = await db.execute(select(VirtualPort).where(VirtualPort.project_id == project_id))
             for vp in result.scalars().all():
                 virtual_port_by_key.add((vp.device_id, vp.name))
 
-            result = await db.execute(select(L1Link).where(L1Link.project_id == project.id))
+            result = await db.execute(select(L1Link).where(L1Link.project_id == project_id))
             for link in result.scalars().all():
                 key = _normalize_link_key(
                     link.from_device_id,
@@ -283,13 +286,13 @@ async def import_project_data(
 
             result = await db.execute(
                 select(InterfaceL2Assignment).where(
-                    InterfaceL2Assignment.project_id == project.id
+                    InterfaceL2Assignment.project_id == project_id
                 )
             )
             for assignment in result.scalars().all():
                 l2_assignment_keys.add((assignment.device_id, assignment.interface_name))
 
-            result = await db.execute(select(L3Address).where(L3Address.project_id == project.id))
+            result = await db.execute(select(L3Address).where(L3Address.project_id == project_id))
             for addr in result.scalars().all():
                 l3_address_keys.add(
                     (addr.device_id, addr.interface_name, addr.ip_address, addr.prefix_length)
@@ -314,7 +317,7 @@ async def import_project_data(
 
             style_json = area_data.style.model_dump() if area_data.style else None
             area = Area(
-                project_id=project.id,
+                project_id=project_id,
                 name=area_data.name,
                 grid_row=area_data.grid_row,
                 grid_col=area_data.grid_col,
@@ -363,7 +366,7 @@ async def import_project_data(
                 color_rgb_json = json.dumps(device_data.color_rgb)
 
             device = Device(
-                project_id=project.id,
+                project_id=project_id,
                 area_id=area.id,
                 name=device_data.name,
                 device_type=device_data.device_type,
@@ -443,7 +446,7 @@ async def import_project_data(
                 continue
 
             link = L1Link(
-                project_id=project.id,
+                project_id=project_id,
                 from_device_id=from_device.id,
                 from_port=link_data.from_port,
                 to_device_id=to_device.id,
@@ -535,7 +538,7 @@ async def import_project_data(
                 continue
 
             port_channel = PortChannel(
-                project_id=project.id,
+                project_id=project_id,
                 device_id=device.id,
                 name=pc_data.name,
                 channel_number=channel_number,
@@ -589,7 +592,7 @@ async def import_project_data(
                 continue
 
             virtual_port = VirtualPort(
-                project_id=project.id,
+                project_id=project_id,
                 device_id=device.id,
                 name=vp_data.name,
                 interface_type=vp_data.interface_type,
@@ -617,7 +620,7 @@ async def import_project_data(
                 continue
 
             segment = L2Segment(
-                project_id=project.id,
+                project_id=project_id,
                 name=seg_data.name,
                 vlan_id=seg_data.vlan_id,
                 description=seg_data.description,
@@ -671,7 +674,7 @@ async def import_project_data(
                 continue
 
             assignment = InterfaceL2Assignment(
-                project_id=project.id,
+                project_id=project_id,
                 device_id=device.id,
                 interface_name=assign_data.interface_name,
                 l2_segment_id=segment.id,
@@ -719,7 +722,7 @@ async def import_project_data(
                 continue
 
             address = L3Address(
-                project_id=project.id,
+                project_id=project_id,
                 device_id=device.id,
                 interface_name=addr_data.interface_name,
                 ip_address=addr_data.ip_address,

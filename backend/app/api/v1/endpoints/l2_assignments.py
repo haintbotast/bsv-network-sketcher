@@ -49,7 +49,7 @@ async def list_assignments(
     limit: int = 100,
 ):
     """Lấy danh sách L2 assignments của project."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -85,7 +85,7 @@ async def get_assignment(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Lấy thông tin L2 assignment."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -118,7 +118,7 @@ async def create_assignment(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Tạo L2 assignment mới."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -167,7 +167,7 @@ async def bulk_create_assignments(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Tạo nhiều L2 assignments cùng lúc."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -242,7 +242,7 @@ async def update_assignment(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Cập nhật L2 assignment."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -298,7 +298,7 @@ async def delete_assignment(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Xóa L2 assignment."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:

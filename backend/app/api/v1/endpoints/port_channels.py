@@ -54,7 +54,7 @@ async def list_port_channels(
     limit: int = 100,
 ):
     """Lấy danh sách Port Channels của project."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -84,7 +84,7 @@ async def get_port_channel(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Lấy thông tin Port Channel."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -113,7 +113,7 @@ async def create_port_channel(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Tạo Port Channel mới."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -162,7 +162,7 @@ async def bulk_create_port_channels(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Tạo nhiều Port Channels cùng lúc."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -264,7 +264,7 @@ async def update_port_channel(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Cập nhật Port Channel."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:
@@ -339,7 +339,7 @@ async def delete_port_channel(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Xóa Port Channel."""
-    project = await project_service.get_project(db, project_id)
+    project = await project_service.get_project_by_id(db, project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=404, detail="Project không tồn tại")
     if project.owner_id != current_user.id:

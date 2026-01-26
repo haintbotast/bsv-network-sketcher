@@ -110,13 +110,19 @@ const areaViewMap = computed(() => {
 
 const visibleAreas = computed(() => {
   const bounds = visibleBounds.value
-  return props.areas
+  const visible = props.areas
     .filter(area => {
       const rect = areaViewMap.value.get(area.id)
       if (!rect) return false
       const withinX = rect.x + rect.width > bounds.left - 50 && rect.x < bounds.right + 50
       const withinY = rect.y + rect.height > bounds.top - 50 && rect.y < bounds.bottom + 50
       return withinX && withinY
+    })
+    .sort((a, b) => {
+      const rectA = areaViewMap.value.get(a.id)
+      const rectB = areaViewMap.value.get(b.id)
+      if (!rectA || !rectB) return 0
+      return rectB.width * rectB.height - rectA.width * rectA.height
     })
     .map(area => {
       const rect = areaViewMap.value.get(area.id)!
@@ -152,6 +158,7 @@ const visibleAreas = computed(() => {
         }
       }
     })
+  return visible
 })
 
 const DEVICE_GAP = 12
@@ -211,42 +218,23 @@ const deviceViewMap = computed(() => {
       return
     }
 
-    let hasOverlap = false
-    for (let i = 0; i < entries.length; i += 1) {
-      for (let j = i + 1; j < entries.length; j += 1) {
-        if (rectsOverlap(entries[i].rect, entries[j].rect)) {
-          hasOverlap = true
-          break
-        }
-      }
-      if (hasOverlap) break
-    }
+    const sorted = [...entries].sort((a, b) => a.device.name.localeCompare(b.device.name))
+    const maxWidth = Math.max(...sorted.map(entry => entry.rect.width))
+    const maxHeight = Math.max(...sorted.map(entry => entry.rect.height))
+    const availableWidth = Math.max(area.width - AREA_PADDING * 2, maxWidth)
+    const cellWidth = maxWidth + DEVICE_GAP
+    const cellHeight = maxHeight + DEVICE_GAP
+    const cols = Math.max(1, Math.floor((availableWidth + DEVICE_GAP) / cellWidth))
 
-    if (hasOverlap) {
-      const sorted = [...entries].sort((a, b) => a.device.name.localeCompare(b.device.name))
-      const maxWidth = Math.max(...sorted.map(entry => entry.rect.width))
-      const maxHeight = Math.max(...sorted.map(entry => entry.rect.height))
-      const availableWidth = Math.max(area.width - AREA_PADDING * 2, maxWidth)
-      const cellWidth = maxWidth + DEVICE_GAP
-      const cellHeight = maxHeight + DEVICE_GAP
-      const cols = Math.max(1, Math.floor((availableWidth + DEVICE_GAP) / cellWidth))
-
-      sorted.forEach((entry, index) => {
-        const col = index % cols
-        const row = Math.floor(index / cols)
-        const rect = { ...entry.rect }
-        rect.x = area.x + AREA_PADDING + col * cellWidth
-        rect.y = area.y + AREA_PADDING + row * cellHeight
-        clampIntoArea(rect, area)
-        map.set(entry.device.id, rect)
-      })
-    } else {
-      entries.forEach(entry => {
-        const rect = { ...entry.rect }
-        clampIntoArea(rect, area)
-        map.set(entry.device.id, rect)
-      })
-    }
+    sorted.forEach((entry, index) => {
+      const col = index % cols
+      const row = Math.floor(index / cols)
+      const rect = { ...entry.rect }
+      rect.x = area.x + AREA_PADDING + col * cellWidth
+      rect.y = area.y + AREA_PADDING + row * cellHeight
+      clampIntoArea(rect, area)
+      map.set(entry.device.id, rect)
+    })
   })
 
   return map

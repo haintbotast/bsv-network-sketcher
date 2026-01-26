@@ -98,12 +98,35 @@ const visibleBounds = computed(() => getVisibleBounds(stageSize.value, props.vie
 
 const AREA_PADDING = 12
 const TEXT_PADDING = 10
+const SUB_ZONES = new Set(['Department', 'Projects', 'IT'])
 
 const areaViewMap = computed(() => {
   const map = new Map<string, { x: number; y: number; width: number; height: number }>()
   props.areas.forEach(area => {
     const rect = logicalRectToView(area, props.viewport)
     map.set(area.id, rect)
+  })
+  return map
+})
+
+const areaById = computed(() => {
+  const map = new Map<string, AreaModel>()
+  props.areas.forEach(area => map.set(area.id, area))
+  return map
+})
+
+const headOfficeTopByLocation = computed(() => {
+  const map = new Map<string, number>()
+  props.areas.forEach(area => {
+    const parts = area.name.split(' - ')
+    if (parts.length < 2) return
+    const location = parts[0]
+    const zone = parts.slice(1).join(' - ')
+    if (!SUB_ZONES.has(zone)) return
+    const rect = areaViewMap.value.get(area.id)
+    if (!rect) return
+    const current = map.get(location)
+    map.set(location, current === undefined ? rect.y : Math.min(current, rect.y))
   })
   return map
 })
@@ -218,10 +241,27 @@ const deviceViewMap = computed(() => {
       return
     }
 
+    let deviceArea = area
+    const areaModel = areaById.value.get(areaId)
+    if (areaModel) {
+      const parts = areaModel.name.split(' - ')
+      const location = parts[0]
+      const zone = parts.slice(1).join(' - ')
+      if (zone === 'Head Office') {
+        const subTop = headOfficeTopByLocation.value.get(location)
+        if (subTop !== undefined) {
+          const usableHeight = Math.max(subTop - area.y - DEVICE_GAP, 0)
+          if (usableHeight > 0) {
+            deviceArea = { ...area, height: usableHeight }
+          }
+        }
+      }
+    }
+
     const sorted = [...entries].sort((a, b) => a.device.name.localeCompare(b.device.name))
     const maxWidth = Math.max(...sorted.map(entry => entry.rect.width))
     const maxHeight = Math.max(...sorted.map(entry => entry.rect.height))
-    const availableWidth = Math.max(area.width - AREA_PADDING * 2, maxWidth)
+    const availableWidth = Math.max(deviceArea.width - AREA_PADDING * 2, maxWidth)
     const cellWidth = maxWidth + DEVICE_GAP
     const cellHeight = maxHeight + DEVICE_GAP
     const cols = Math.max(1, Math.floor((availableWidth + DEVICE_GAP) / cellWidth))
@@ -230,9 +270,9 @@ const deviceViewMap = computed(() => {
       const col = index % cols
       const row = Math.floor(index / cols)
       const rect = { ...entry.rect }
-      rect.x = area.x + AREA_PADDING + col * cellWidth
-      rect.y = area.y + AREA_PADDING + row * cellHeight
-      clampIntoArea(rect, area)
+      rect.x = deviceArea.x + AREA_PADDING + col * cellWidth
+      rect.y = deviceArea.y + AREA_PADDING + row * cellHeight
+      clampIntoArea(rect, deviceArea)
       map.set(entry.device.id, rect)
     })
   })

@@ -198,9 +198,9 @@ const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Stor
 const linkPurposes = ['DEFAULT', 'WAN', 'INTERNET', 'DMZ', 'LAN', 'MGMT', 'HA', 'STORAGE', 'BACKUP', 'VPN']
 
 const defaultAreaStyle: AreaStyle = {
-  fill_color_rgb: [255, 244, 234],
-  stroke_color_rgb: [201, 184, 165],
-  stroke_width: 1.5
+  fill_color_rgb: [240, 240, 240],
+  stroke_color_rgb: [51, 51, 51],
+  stroke_width: 1
 }
 
 const areaColumns: ColumnDef[] = [

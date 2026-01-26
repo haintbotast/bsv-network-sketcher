@@ -22,6 +22,7 @@
         <v-group
           v-for="area in visibleAreas"
           :key="area.id"
+          :config="area.group"
         >
           <v-rect :config="area.rect" />
           <v-text :config="area.label" />
@@ -40,6 +41,7 @@
         <v-group
           v-for="device in visibleDevices"
           :key="device.id"
+          :config="device.group"
           @click="() => emitSelect(device.id, 'device')"
         >
           <v-rect :config="device.rect" />
@@ -94,64 +96,205 @@ const gridConfig = computed(() => ({
 
 const visibleBounds = computed(() => getVisibleBounds(stageSize.value, props.viewport))
 
+const AREA_PADDING = 12
+const TEXT_PADDING = 10
+
+const areaViewMap = computed(() => {
+  const map = new Map<string, { x: number; y: number; width: number; height: number }>()
+  props.areas.forEach(area => {
+    const rect = logicalRectToView(area, props.viewport)
+    map.set(area.id, rect)
+  })
+  return map
+})
+
 const visibleAreas = computed(() => {
   const bounds = visibleBounds.value
   return props.areas
     .filter(area => {
-      const withinX = area.x + area.width > bounds.left - 50 && area.x < bounds.right + 50
-      const withinY = area.y + area.height > bounds.top - 50 && area.y < bounds.bottom + 50
+      const rect = areaViewMap.value.get(area.id)
+      if (!rect) return false
+      const withinX = rect.x + rect.width > bounds.left - 50 && rect.x < bounds.right + 50
+      const withinY = rect.y + rect.height > bounds.top - 50 && rect.y < bounds.bottom + 50
       return withinX && withinY
     })
     .map(area => {
-      const rect = logicalRectToView(area, props.viewport)
+      const rect = areaViewMap.value.get(area.id)!
       return {
         id: area.id,
+        group: {
+          x: rect.x,
+          y: rect.y,
+          clipX: 0,
+          clipY: 0,
+          clipWidth: rect.width,
+          clipHeight: rect.height
+        },
         rect: {
-          ...rect,
+          x: 0,
+          y: 0,
+          width: rect.width,
+          height: rect.height,
           fill: area.fill,
           stroke: area.stroke,
           strokeWidth: 1.5,
           cornerRadius: 10
         },
         label: {
-          x: rect.x + 12,
-          y: rect.y + 10,
+          x: TEXT_PADDING,
+          y: TEXT_PADDING - 2,
+          width: Math.max(rect.width - TEXT_PADDING * 2, 0),
           text: area.name,
           fontSize: 14,
-          fill: '#3f3a33'
+          fill: '#3f3a33',
+          wrap: 'none',
+          ellipsis: true
         }
       }
     })
 })
 
-const deviceMap = computed(() => new Map(props.devices.map(device => [device.id, device])))
+const DEVICE_GAP = 12
+
+const DEVICE_COLORS: Array<{ match: (device: DeviceModel) => boolean; color: [number, number, number] }> = [
+  { match: device => device.type === 'Router' || /RTR|ROUTER|ISP/i.test(device.name), color: [70, 130, 180] },
+  { match: device => device.type === 'Firewall' || /FW|FIREWALL/i.test(device.name), color: [220, 80, 80] },
+  { match: device => /CORE|SW-CORE/i.test(device.name), color: [34, 139, 34] },
+  { match: device => /DIST|DISTR/i.test(device.name), color: [60, 179, 113] },
+  { match: device => /ACC|ACCESS/i.test(device.name), color: [0, 139, 139] },
+  { match: device => device.type === 'Server' || /SRV|SERVER|APP|WEB|DB/i.test(device.name), color: [106, 90, 205] },
+  { match: device => device.type === 'Storage' || /STO|NAS|SAN|STORAGE|BACKUP/i.test(device.name), color: [205, 133, 63] },
+  { match: device => device.type === 'AP' || /\\bAP\\b/i.test(device.name), color: [0, 139, 139] }
+]
+
+function rgbToHex(rgb: [number, number, number]) {
+  return `#${rgb.map(value => value.toString(16).padStart(2, '0')).join('')}`
+}
+
+function resolveDeviceFill(device: DeviceModel) {
+  for (const entry of DEVICE_COLORS) {
+    if (entry.match(device)) {
+      return rgbToHex(entry.color)
+    }
+  }
+  return '#d9d9d9'
+}
+
+const deviceViewMap = computed(() => {
+  const map = new Map<string, { x: number; y: number; width: number; height: number }>()
+  const devicesByArea = new Map<string, Array<{ device: DeviceModel; rect: { x: number; y: number; width: number; height: number } }>>()
+
+  props.devices.forEach(device => {
+    const rect = logicalRectToView(device, props.viewport)
+    const list = devicesByArea.get(device.areaId) || []
+    list.push({ device, rect })
+    devicesByArea.set(device.areaId, list)
+  })
+
+  const clampIntoArea = (rect: { x: number; y: number; width: number; height: number }, area: { x: number; y: number; width: number; height: number }) => {
+    const minX = area.x + AREA_PADDING
+    const minY = area.y + AREA_PADDING
+    const maxX = area.x + area.width - rect.width - AREA_PADDING
+    const maxY = area.y + area.height - rect.height - AREA_PADDING
+    rect.x = maxX >= minX ? Math.min(Math.max(rect.x, minX), maxX) : minX
+    rect.y = maxY >= minY ? Math.min(Math.max(rect.y, minY), maxY) : minY
+  }
+
+  const rectsOverlap = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) => {
+    return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
+  }
+
+  devicesByArea.forEach((entries, areaId) => {
+    const area = areaViewMap.value.get(areaId)
+    if (!area) {
+      entries.forEach(entry => map.set(entry.device.id, entry.rect))
+      return
+    }
+
+    let hasOverlap = false
+    for (let i = 0; i < entries.length; i += 1) {
+      for (let j = i + 1; j < entries.length; j += 1) {
+        if (rectsOverlap(entries[i].rect, entries[j].rect)) {
+          hasOverlap = true
+          break
+        }
+      }
+      if (hasOverlap) break
+    }
+
+    if (hasOverlap) {
+      const sorted = [...entries].sort((a, b) => a.device.name.localeCompare(b.device.name))
+      const maxWidth = Math.max(...sorted.map(entry => entry.rect.width))
+      const maxHeight = Math.max(...sorted.map(entry => entry.rect.height))
+      const availableWidth = Math.max(area.width - AREA_PADDING * 2, maxWidth)
+      const cellWidth = maxWidth + DEVICE_GAP
+      const cellHeight = maxHeight + DEVICE_GAP
+      const cols = Math.max(1, Math.floor((availableWidth + DEVICE_GAP) / cellWidth))
+
+      sorted.forEach((entry, index) => {
+        const col = index % cols
+        const row = Math.floor(index / cols)
+        const rect = { ...entry.rect }
+        rect.x = area.x + AREA_PADDING + col * cellWidth
+        rect.y = area.y + AREA_PADDING + row * cellHeight
+        clampIntoArea(rect, area)
+        map.set(entry.device.id, rect)
+      })
+    } else {
+      entries.forEach(entry => {
+        const rect = { ...entry.rect }
+        clampIntoArea(rect, area)
+        map.set(entry.device.id, rect)
+      })
+    }
+  })
+
+  return map
+})
 
 const visibleDevices = computed(() => {
   const bounds = visibleBounds.value
   return props.devices
     .filter(device => {
-      const withinX = device.x + device.width > bounds.left - 40 && device.x < bounds.right + 40
-      const withinY = device.y + device.height > bounds.top - 40 && device.y < bounds.bottom + 40
+      const rect = deviceViewMap.value.get(device.id)
+      if (!rect) return false
+      const withinX = rect.x + rect.width > bounds.left - 40 && rect.x < bounds.right + 40
+      const withinY = rect.y + rect.height > bounds.top - 40 && rect.y < bounds.bottom + 40
       return withinX && withinY
     })
     .map(device => {
-      const rect = logicalRectToView(device, props.viewport)
+      const rect = deviceViewMap.value.get(device.id)!
       const isSelected = props.selectedId === device.id
+      const fill = resolveDeviceFill(device)
       return {
         id: device.id,
+        group: {
+          x: rect.x,
+          y: rect.y,
+          clipX: 0,
+          clipY: 0,
+          clipWidth: rect.width,
+          clipHeight: rect.height
+        },
         rect: {
-          ...rect,
-          fill: isSelected ? '#ffd9c8' : '#ffffff',
+          x: 0,
+          y: 0,
+          width: rect.width,
+          height: rect.height,
+          fill,
           stroke: isSelected ? '#d66c3b' : '#5f564f',
           strokeWidth: isSelected ? 2 : 1.2,
           cornerRadius: 8
         },
         label: {
-          x: rect.x + 10,
-          y: rect.y + 10,
+          x: 8,
+          y: 8,
+          width: Math.max(rect.width - 16, 0),
           text: device.name,
           fontSize: 13,
-          fill: '#302b27'
+          fill: '#302b27',
+          wrap: 'none',
+          ellipsis: true
         }
       }
     })
@@ -161,11 +304,9 @@ const visibleLinks = computed(() => {
   const bounds = visibleBounds.value
   return props.links
     .map(link => {
-      const from = deviceMap.value.get(link.fromDeviceId)
-      const to = deviceMap.value.get(link.toDeviceId)
-      if (!from || !to) return null
-      const fromView = logicalRectToView(from, props.viewport)
-      const toView = logicalRectToView(to, props.viewport)
+      const fromView = deviceViewMap.value.get(link.fromDeviceId)
+      const toView = deviceViewMap.value.get(link.toDeviceId)
+      if (!fromView || !toView) return null
       const fromCenter = {
         x: fromView.x + fromView.width / 2,
         y: fromView.y + fromView.height / 2

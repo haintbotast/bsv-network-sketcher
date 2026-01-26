@@ -15,32 +15,145 @@
       <aside class="panel left">
         <h2>Danh mục</h2>
         <ul>
-          <li>Areas</li>
-          <li>Devices</li>
-          <li>Links</li>
+          <li>Areas: {{ areas.length }}</li>
+          <li>Devices: {{ devices.length }}</li>
+          <li>Links: {{ links.length }}</li>
         </ul>
-        <button type="button" @click="fetchHealth">Kiểm tra backend</button>
+
+        <div class="controls">
+          <button type="button" @click="zoomIn">Zoom +</button>
+          <button type="button" @click="zoomOut">Zoom -</button>
+          <button type="button" @click="togglePan">
+            {{ viewport.isPanning ? 'Tắt kéo' : 'Bật kéo' }}
+          </button>
+          <button type="button" class="ghost" @click="resetViewport">Reset view</button>
+        </div>
+
+        <button type="button" class="primary" @click="fetchHealth">Kiểm tra backend</button>
       </aside>
 
       <main class="canvas">
-        <CanvasStage />
+        <CanvasStage
+          :areas="areas"
+          :devices="devices"
+          :links="links"
+          :viewport="viewportState"
+          :is-panning="viewport.isPanning"
+          :selected-id="selectedId"
+          @select="handleSelect"
+          @update:viewport="updateViewport"
+        />
       </main>
 
       <aside class="panel right">
         <h2>Inspector</h2>
-        <p>Chọn một phần tử để xem chi tiết.</p>
-        <div class="hint">Phase 5: Khung UI + Konva scaffold</div>
+        <p v-if="selected">Đang chọn: {{ selected.label }}</p>
+        <p v-else>Chọn một phần tử để xem chi tiết.</p>
+        <div class="hint">Phase 6: Canvas editor (L1/L2/L3)</div>
       </aside>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import CanvasStage from './components/CanvasStage.vue'
+import type { AreaModel, DeviceModel, LinkModel, Viewport } from './models/types'
 
 const statusText = ref('đang kiểm tra...')
 const apiBase = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
+
+const viewport = reactive({
+  scale: 1,
+  offsetX: 0,
+  offsetY: 0,
+  isPanning: false
+})
+
+const areas = reactive<AreaModel[]>([
+  {
+    id: 'area-1',
+    name: 'Core',
+    x: 40,
+    y: 40,
+    width: 420,
+    height: 260,
+    fill: '#fff4ea',
+    stroke: '#c9b8a5'
+  },
+  {
+    id: 'area-2',
+    name: 'Edge',
+    x: 520,
+    y: 80,
+    width: 320,
+    height: 200,
+    fill: '#f3f0ff',
+    stroke: '#b3a8d6'
+  }
+])
+
+const devices = reactive<DeviceModel[]>([
+  {
+    id: 'dev-1',
+    areaId: 'area-1',
+    name: 'Core-SW-1',
+    x: 120,
+    y: 120,
+    width: 120,
+    height: 56,
+    type: 'Switch'
+  },
+  {
+    id: 'dev-2',
+    areaId: 'area-1',
+    name: 'Core-SW-2',
+    x: 260,
+    y: 200,
+    width: 120,
+    height: 56,
+    type: 'Switch'
+  },
+  {
+    id: 'dev-3',
+    areaId: 'area-2',
+    name: 'Edge-RTR',
+    x: 580,
+    y: 140,
+    width: 120,
+    height: 56,
+    type: 'Router'
+  }
+])
+
+const links = reactive<LinkModel[]>([
+  {
+    id: 'link-1',
+    fromDeviceId: 'dev-1',
+    toDeviceId: 'dev-2',
+    fromPort: 'Gi 0/1',
+    toPort: 'Gi 0/2',
+    style: 'solid'
+  },
+  {
+    id: 'link-2',
+    fromDeviceId: 'dev-2',
+    toDeviceId: 'dev-3',
+    fromPort: 'Gi 0/3',
+    toPort: 'Gi 0/4',
+    style: 'dashed'
+  }
+])
+
+const selectedId = ref<string | null>(null)
+
+const selected = computed(() => {
+  const device = devices.find(item => item.id === selectedId.value)
+  if (device) return { label: `${device.name} (${device.type})` }
+  const area = areas.find(item => item.id === selectedId.value)
+  if (area) return { label: `${area.name} (Area)` }
+  return null
+})
 
 const statusClass = computed(() => {
   if (statusText.value === 'healthy') return 'ok'
@@ -48,6 +161,40 @@ const statusClass = computed(() => {
   if (statusText.value === 'lỗi kết nối') return 'error'
   return 'pending'
 })
+
+const viewportState = computed<Viewport>(() => ({
+  scale: viewport.scale,
+  offsetX: viewport.offsetX,
+  offsetY: viewport.offsetY
+}))
+
+function updateViewport(value: Viewport) {
+  viewport.offsetX = value.offsetX
+  viewport.offsetY = value.offsetY
+  viewport.scale = value.scale
+}
+
+function handleSelect(payload: { id: string }) {
+  selectedId.value = payload.id
+}
+
+function zoomIn() {
+  viewport.scale = Math.min(viewport.scale + 0.1, 2)
+}
+
+function zoomOut() {
+  viewport.scale = Math.max(viewport.scale - 0.1, 0.5)
+}
+
+function resetViewport() {
+  viewport.scale = 1
+  viewport.offsetX = 0
+  viewport.offsetY = 0
+}
+
+function togglePan() {
+  viewport.isPanning = !viewport.isPanning
+}
 
 async function fetchHealth() {
   try {
@@ -129,7 +276,7 @@ fetchHealth()
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) 1fr minmax(200px, 260px);
+  grid-template-columns: minmax(200px, 260px) 1fr minmax(220px, 280px);
   gap: 16px;
   min-height: 60vh;
 }
@@ -156,7 +303,25 @@ fetchHealth()
   color: var(--muted);
 }
 
-.panel button {
+.controls {
+  display: grid;
+  gap: 10px;
+}
+
+.controls button {
+  border-radius: 12px;
+  border: 1px solid transparent;
+  padding: 10px 14px;
+  cursor: pointer;
+  background: #efe7df;
+}
+
+.controls .ghost {
+  background: transparent;
+  border-color: #dccfc4;
+}
+
+.panel .primary {
   margin-top: auto;
   background: var(--accent);
   color: white;

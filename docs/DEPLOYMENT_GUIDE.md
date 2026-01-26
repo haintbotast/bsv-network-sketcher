@@ -37,6 +37,7 @@
 - **Linux:** systemd
 - **Windows:** NSSM
 - **Worker export:** chạy `python -m app.workers.export_worker` như một service riêng.
+- **WebSocket:** dùng chung service backend (port 8000).
 
 ---
 

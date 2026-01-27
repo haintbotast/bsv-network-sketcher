@@ -548,6 +548,9 @@ async function fetchL2Data() {
     if (res.ok) {
       l2Assignments.value = await res.json()
       l2Loaded.value = true
+      console.log('L2 data loaded:', l2Assignments.value.length, 'assignments')
+    } else {
+      console.error('L2 fetch failed:', res.status, res.statusText)
     }
   } catch (e) {
     console.error('Failed to fetch L2 assignments:', e)
@@ -564,6 +567,9 @@ async function fetchL3Data() {
     if (res.ok) {
       l3Addresses.value = await res.json()
       l3Loaded.value = true
+      console.log('L3 data loaded:', l3Addresses.value.length, 'addresses')
+    } else {
+      console.error('L3 fetch failed:', res.status, res.statusText)
     }
   } catch (e) {
     console.error('Failed to fetch L3 addresses:', e)

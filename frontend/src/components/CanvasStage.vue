@@ -499,7 +499,12 @@ const visibleLinks = computed(() => {
 const l2Labels = computed(() => {
   const mode = props.viewMode || 'L1'
   if (mode !== 'L2' && mode !== 'overview') return []
-  if (!props.l2Assignments || props.l2Assignments.length === 0) return []
+  if (!props.l2Assignments || props.l2Assignments.length === 0) {
+    console.log('L2 labels: no assignments, mode=', mode)
+    return []
+  }
+
+  console.log('L2 labels: processing', props.l2Assignments.length, 'assignments, deviceViewMap size=', deviceViewMap.value.size)
 
   // Group assignments by device
   const byDevice = new Map<string, { vlans: Set<number>; modes: Set<string> }>()
@@ -510,6 +515,7 @@ const l2Labels = computed(() => {
     existing.modes.add(a.port_mode)
     byDevice.set(a.device_id, existing)
   })
+  console.log('L2 labels: grouped into', byDevice.size, 'devices')
 
   const labels: Array<{
     id: string

@@ -85,6 +85,10 @@
           <button type="button" :class="{ active: viewMode === 'L3' }" @click="setViewMode('L3')">L3</button>
           <button type="button" :class="{ active: viewMode === 'overview' }" @click="setViewMode('overview')">Tổng quan</button>
           <span class="toolbar-divider"></span>
+          <button type="button" class="primary" @click="showAutoLayoutDialog = true" :disabled="!activeProject">
+            Auto Layout
+          </button>
+          <span class="toolbar-divider"></span>
           <button type="button" class="ghost" @click="toggleRightPanel">
             {{ showRightPanel ? 'Ẩn panel' : 'Hiện panel' }}
           </button>
@@ -99,6 +103,7 @@
           :view-mode="viewMode"
           :l2-assignments="l2Assignments"
           :l3-addresses="l3Addresses"
+          :auto-layout-coords="autoLayoutCoordsMap"
           @select="handleSelect"
           @update:viewport="updateViewport"
         />
@@ -164,6 +169,95 @@
         </div>
       </aside>
     </section>
+
+    <!-- Auto Layout Dialog -->
+    <div v-if="showAutoLayoutDialog" class="dialog-overlay" @click.self="showAutoLayoutDialog = false">
+      <div class="dialog-box">
+        <div class="dialog-header">
+          <h2>Auto Layout (Topology-Aware)</h2>
+          <button type="button" class="ghost-close" @click="showAutoLayoutDialog = false">✕</button>
+        </div>
+
+        <div class="dialog-body">
+          <div class="form-section">
+            <label>Layout Direction</label>
+            <select v-model="autoLayoutOptions.direction" class="select">
+              <option value="horizontal">Horizontal (Cisco style)</option>
+              <option value="vertical">Vertical (ISO style)</option>
+            </select>
+          </div>
+
+          <div class="form-section">
+            <label>Layer Gap ({{ autoLayoutOptions.layer_gap.toFixed(1) }} inches)</label>
+            <input
+              type="range"
+              min="0.5"
+              max="5.0"
+              step="0.1"
+              v-model.number="autoLayoutOptions.layer_gap"
+              class="slider"
+            />
+          </div>
+
+          <div class="form-section">
+            <label>Node Spacing ({{ autoLayoutOptions.node_spacing.toFixed(1) }} inches)</label>
+            <input
+              type="range"
+              min="0.2"
+              max="2.0"
+              step="0.1"
+              v-model.number="autoLayoutOptions.node_spacing"
+              class="slider"
+            />
+          </div>
+
+          <div class="form-section">
+            <label>Crossing Iterations ({{ autoLayoutOptions.crossing_iterations }})</label>
+            <input
+              type="range"
+              min="1"
+              max="100"
+              step="1"
+              v-model.number="autoLayoutOptions.crossing_iterations"
+              class="slider"
+            />
+          </div>
+
+          <div v-if="autoLayoutResult" class="layout-stats">
+            <h3>Layout Statistics</h3>
+            <ul>
+              <li>Total Layers: {{ autoLayoutResult.stats.total_layers }}</li>
+              <li>Edge Crossings: {{ autoLayoutResult.stats.total_crossings }}</li>
+              <li>Execution Time: {{ autoLayoutResult.stats.execution_time_ms }}ms</li>
+              <li>Algorithm: {{ autoLayoutResult.stats.algorithm }}</li>
+              <li>Devices Positioned: {{ autoLayoutResult.devices.length }}</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="dialog-footer">
+          <button
+            type="button"
+            class="primary"
+            @click="handleAutoLayoutPreview"
+            :disabled="!activeProject || autoLayoutLoading"
+          >
+            {{ autoLayoutLoading ? 'Computing...' : 'Preview Layout' }}
+          </button>
+          <button
+            type="button"
+            class="primary"
+            @click="handleAutoLayoutApply"
+            :disabled="!activeProject || !autoLayoutResult || autoLayoutLoading"
+          >
+            Apply to Database
+          </button>
+          <button type="button" class="ghost" @click="showAutoLayoutDialog = false">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -179,6 +273,8 @@ import { listAreas, createArea, updateArea, deleteArea } from './services/areas'
 import { listDevices, createDevice, updateDevice, deleteDevice } from './services/devices'
 import { listLinks, createLink, updateLink, deleteLink } from './services/links'
 import { getToken } from './services/api'
+import { autoLayout, invalidateLayoutCache } from './services/layout'
+import type { LayoutResult } from './services/layout'
 
 const UNIT_PX = 120
 const GRID_FALLBACK_X = 4
@@ -259,6 +355,17 @@ const l2Assignments = ref<L2AssignmentRecord[]>([])
 const l3Addresses = ref<L3AddressRecord[]>([])
 const l2Loaded = ref(false)
 const l3Loaded = ref(false)
+
+// Auto Layout state
+const showAutoLayoutDialog = ref(false)
+const autoLayoutOptions = reactive({
+  direction: 'horizontal' as 'horizontal' | 'vertical',
+  layer_gap: 2.0,
+  node_spacing: 0.5,
+  crossing_iterations: 24
+})
+const autoLayoutResult = ref<LayoutResult | null>(null)
+const autoLayoutLoading = ref(false)
 
 const selectedRowForActiveGrid = computed(() => {
   if (!selectedId.value) return null
@@ -490,6 +597,15 @@ const canvasLinks = computed<LinkModel[]>(() => {
       }
     })
     .filter(Boolean) as LinkModel[]
+})
+
+const autoLayoutCoordsMap = computed(() => {
+  if (!autoLayoutResult.value) return undefined
+  const map = new Map<string, { x: number; y: number }>()
+  autoLayoutResult.value.devices.forEach(device => {
+    map.set(device.id, { x: device.x, y: device.y })
+  })
+  return map
 })
 
 function rgbToHex(rgb: [number, number, number]) {
@@ -904,6 +1020,66 @@ watch(layoutModeSelection, async (value) => {
   }
 })
 
+async function handleAutoLayoutPreview() {
+  if (!selectedProjectId.value) {
+    setNotice('Vui lòng chọn project trước.', 'error')
+    return
+  }
+  autoLayoutLoading.value = true
+  try {
+    const result = await autoLayout(selectedProjectId.value, {
+      direction: autoLayoutOptions.direction,
+      layer_gap: autoLayoutOptions.layer_gap,
+      node_spacing: autoLayoutOptions.node_spacing,
+      crossing_iterations: autoLayoutOptions.crossing_iterations,
+      apply_to_db: false
+    })
+    autoLayoutResult.value = result
+    setNotice(
+      `Preview: ${result.devices.length} devices, ${result.stats.total_layers} layers, ${result.stats.total_crossings} crossings`,
+      'success'
+    )
+  } catch (error: any) {
+    setNotice(error?.message || 'Auto-layout preview thất bại.', 'error')
+    autoLayoutResult.value = null
+  } finally {
+    autoLayoutLoading.value = false
+  }
+}
+
+async function handleAutoLayoutApply() {
+  if (!selectedProjectId.value) {
+    setNotice('Vui lòng chọn project trước.', 'error')
+    return
+  }
+  if (!autoLayoutResult.value) {
+    setNotice('Vui lòng preview layout trước khi apply.', 'error')
+    return
+  }
+  autoLayoutLoading.value = true
+  try {
+    await autoLayout(selectedProjectId.value, {
+      direction: autoLayoutOptions.direction,
+      layer_gap: autoLayoutOptions.layer_gap,
+      node_spacing: autoLayoutOptions.node_spacing,
+      crossing_iterations: autoLayoutOptions.crossing_iterations,
+      apply_to_db: true
+    })
+    setNotice('Layout đã được áp dụng vào database!', 'success')
+    // Reload project data to reflect new positions
+    await loadProjectData(selectedProjectId.value)
+    // Invalidate cache
+    await invalidateLayoutCache(selectedProjectId.value)
+    // Close dialog
+    showAutoLayoutDialog.value = false
+    autoLayoutResult.value = null
+  } catch (error: any) {
+    setNotice(error?.message || 'Áp dụng layout thất bại.', 'error')
+  } finally {
+    autoLayoutLoading.value = false
+  }
+}
+
 onMounted(() => {
   fetchHealth()
   initAuth()
@@ -1210,5 +1386,150 @@ onMounted(() => {
     width: 100%;
     margin-left: 0;
   }
+}
+
+/* Auto Layout Dialog */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.dialog-box {
+  background: var(--panel);
+  border-radius: 18px;
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  width: 90%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(28, 28, 28, 0.08);
+}
+
+.dialog-header h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.ghost-close {
+  background: transparent;
+  border: 1px solid #dccfc4;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.ghost-close:hover {
+  background: #f8f1ea;
+}
+
+.dialog-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-section label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #e5ddd4;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+}
+
+.layout-stats {
+  background: #f8f1ea;
+  border-radius: 12px;
+  padding: 14px 18px;
+}
+
+.layout-stats h3 {
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.layout-stats ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.layout-stats li {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.dialog-footer {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(28, 28, 28, 0.08);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.dialog-footer button {
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.dialog-footer .primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

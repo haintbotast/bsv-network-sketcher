@@ -89,6 +89,7 @@ const props = defineProps<{
   viewMode?: ViewMode
   l2Assignments?: L2AssignmentRecord[]
   l3Addresses?: L3AddressRecord[]
+  autoLayoutCoords?: Map<string, { x: number; y: number }> // Auto-layout coords (logical units/inches)
 }>()
 
 const emit = defineEmits<{
@@ -313,6 +314,24 @@ const deviceViewMap = computed(() => {
   const devicesByArea = new Map<string, Array<{ device: DeviceModel; rect: { x: number; y: number; width: number; height: number } }>>()
 
   props.devices.forEach(device => {
+    // Priority 1: Auto-layout preview coords (temporary, from dialog)
+    const autoCoords = props.autoLayoutCoords?.get(device.id)
+    if (autoCoords) {
+      const deviceWithAutoCoords = { ...device, x: autoCoords.x * 120, y: autoCoords.y * 120 }
+      const rect = logicalRectToView(deviceWithAutoCoords, props.viewport)
+      map.set(device.id, rect)
+      return
+    }
+
+    // Priority 2: Database positions (from applied auto-layout or manual positioning)
+    // If device has non-zero position_x/position_y from DB, use them directly
+    if (device.x !== 0 || device.y !== 0) {
+      const rect = logicalRectToView(device, props.viewport)
+      map.set(device.id, rect)
+      return
+    }
+
+    // Priority 3: Fallback to tier-based positioning (for devices without positions)
     const rect = logicalRectToView(device, props.viewport)
     const list = devicesByArea.get(device.areaId) || []
     list.push({ device, rect })
@@ -641,10 +660,58 @@ function onPointerMove(event: any) {
   const dx = pointer.x - lastPointer.value.x
   const dy = pointer.y - lastPointer.value.y
   lastPointer.value = { x: pointer.x, y: pointer.y }
+
+  // Calculate diagram bounds (in view coordinates)
+  let minX = 0, minY = 0, maxX = 0, maxY = 0
+  let hasBounds = false
+
+  // Get bounds from areas
+  props.areas.forEach(area => {
+    if (area.x !== undefined && area.y !== undefined) {
+      const areaView = logicalRectToView({ x: area.x, y: area.y, width: area.width, height: area.height }, props.viewport)
+      minX = hasBounds ? Math.min(minX, areaView.x) : areaView.x
+      minY = hasBounds ? Math.min(minY, areaView.y) : areaView.y
+      maxX = hasBounds ? Math.max(maxX, areaView.x + areaView.width) : areaView.x + areaView.width
+      maxY = hasBounds ? Math.max(maxY, areaView.y + areaView.height) : areaView.y + areaView.height
+      hasBounds = true
+    }
+  })
+
+  // Get bounds from devices (if no areas)
+  if (!hasBounds) {
+    deviceViewMap.value.forEach(rect => {
+      minX = hasBounds ? Math.min(minX, rect.x) : rect.x
+      minY = hasBounds ? Math.min(minY, rect.y) : rect.y
+      maxX = hasBounds ? Math.max(maxX, rect.x + rect.width) : rect.x + rect.width
+      maxY = hasBounds ? Math.max(maxY, rect.y + rect.height) : rect.y + rect.height
+      hasBounds = true
+    })
+  }
+
+  // Clamp pan to keep diagram visible (allow 20% overflow)
+  const MARGIN = 200  // Pixels of margin
+  let newOffsetX = props.viewport.offsetX + dx
+  let newOffsetY = props.viewport.offsetY + dy
+
+  if (hasBounds && stageSize.value.width > 0 && stageSize.value.height > 0) {
+    const diagramWidth = maxX - minX
+    const diagramHeight = maxY - minY
+
+    // Clamp X (allow panning until diagram edge is at margin distance from canvas edge)
+    const maxOffsetX = MARGIN
+    const minOffsetX = stageSize.value.width - diagramWidth - MARGIN
+    newOffsetX = Math.max(minOffsetX, Math.min(maxOffsetX, newOffsetX))
+
+    // Clamp Y
+    const maxOffsetY = MARGIN
+    const minOffsetY = stageSize.value.height - diagramHeight - MARGIN
+    newOffsetY = Math.max(minOffsetY, Math.min(maxOffsetY, newOffsetY))
+  }
+
   emit('update:viewport', {
     ...props.viewport,
-    offsetX: props.viewport.offsetX + dx,
-    offsetY: props.viewport.offsetY + dy
+    offsetX: newOffsetX,
+    offsetY: newOffsetY
   })
 }
 

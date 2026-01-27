@@ -14,6 +14,7 @@ from app.api.v1.endpoints.virtual_ports import router as virtual_ports_router
 from app.api.v1.endpoints.import_data import router as import_router
 from app.api.v1.endpoints.export import router as export_router
 from app.api.v1.endpoints.ws import router as ws_router
+from app.api.v1.endpoints.layout import router as layout_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
@@ -30,3 +31,4 @@ api_router.include_router(virtual_ports_router)
 api_router.include_router(import_router)
 api_router.include_router(export_router)
 api_router.include_router(ws_router)
+api_router.include_router(layout_router)

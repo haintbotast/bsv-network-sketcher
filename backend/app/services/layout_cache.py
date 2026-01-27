@@ -25,17 +25,21 @@ class LayoutCache:
     def __init__(self):
         self._cache: dict[str, CachedLayout] = {}
 
-    def compute_topology_hash(self, devices: list, links: list) -> str:
+    def compute_topology_hash(self, devices: list, links: list, options: dict | None = None, areas: list | None = None) -> str:
         """
         Compute SHA256 hash of topology.
 
         Hash is based on:
         - Device IDs (sorted)
         - Link connections (from_device_id, to_device_id, purpose) sorted
+        - Options (layout parameters)
+        - Area placement data (optional)
 
         Args:
             devices: List of Device model instances
             links: List of L1Link model instances
+            options: Layout options dict (optional)
+            areas: List of Area model instances (optional)
 
         Returns:
             SHA256 hash string
@@ -54,6 +58,22 @@ class LayoutCache:
             "devices": device_ids,
             "links": link_tuples,
         }
+        if options:
+            hash_input["options"] = options
+        if areas:
+            area_tuples = sorted([
+                (
+                    a.id,
+                    a.position_x,
+                    a.position_y,
+                    a.width,
+                    a.height,
+                    a.grid_row,
+                    a.grid_col,
+                )
+                for a in areas
+            ])
+            hash_input["areas"] = area_tuples
 
         hash_str = json.dumps(hash_input, sort_keys=True)
         return hashlib.sha256(hash_str.encode()).hexdigest()

@@ -47,6 +47,14 @@ Các hướng dẫn này áp dụng cho mọi công cụ AI lập trình (Codex,
   https://github.com/cisco-open/network-sketcher
   Dùng để đối chiếu logic nghiệp vụ và độ tương thích đầu ra.
 
+## Ràng buộc layout theo AI Context NS (bắt buộc)
+- Nguồn gốc tham chiếu: `docs/[AI_Context]no_data.txt` (tiếng Anh); tóm tắt chuẩn tiếng Việt nằm trong `docs/NS_REFERENCE.md`.
+- Bố cục **phân tầng top‑to‑bottom**: Core/Distribution ở hàng trên, Access ở giữa, Endpoints ở dưới; cha luôn ở trên con.
+- Dùng `_AIR_` như ô trống để canh cột, giữ thẳng hàng theo chiều dọc.
+- Auto‑layout phải theo **2 tầng**: macro (vị trí Area) + micro (layout thiết bị внутри Area); không được xếp thiết bị xuyên Area.
+- **Overview chỉ L1** (hoặc flow); L2/L3 chỉ bật khi chọn view L2/L3 để tránh đè chữ/đường.
+- Liên kết khác Area phải đi qua **Waypoint area** (tên kết thúc `_wp_`); không nối trực tiếp Area với Area.
+
 ## Kỷ luật thay đổi
 - Chỉ thay đổi tối thiểu, có mục tiêu; tránh refactor không liên quan.
 - Nếu yêu cầu mới xung đột với file này hoặc kế hoạch, hỏi người dùng và cập nhật cả hai.

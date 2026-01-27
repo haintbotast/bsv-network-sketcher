@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.1
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-01-23
+> **Cập nhật:** 2026-01-27
 > **Nguồn:** Trích từ `WEB_APP_DEVELOPMENT_PLAN.md`.
 
 Section này cung cấp mapping chi tiết giữa source code gốc của Network Sketcher và các component tương ứng trong Web App, **chỉ để tham chiếu** logic nghiệp vụ.
@@ -16,6 +16,22 @@ Dự án này dựa trên source gốc của Network Sketcher để tham chiếu
 ```
 https://github.com/cisco-open/network-sketcher
 ```
+
+### 13.0.1 AI Context (nguồn tham chiếu bổ sung)
+
+**Nguồn gốc:** `docs/[AI_Context]no_data.txt` (tiếng Anh, file gốc do NS sinh).  
+**Mục tiêu:** Trích các ràng buộc layout/logic quan trọng để áp dụng cho web app.
+
+**Tóm tắt ràng buộc bắt buộc:**
+- **Bố cục phân tầng top‑to‑bottom:** Core/Distribution ở hàng trên, Access ở giữa, Endpoints ở dưới; quan hệ cha‑con phải theo chiều dọc.
+- **Grid theo hàng/cột** và dùng `_AIR_` làm ô trống để canh cột, giữ thẳng hàng.
+- **Liên kết khác Area bắt buộc qua Waypoint area** (tên kết thúc `_wp_`); không nối trực tiếp Area‑Area.
+- **Physical vs Logical:** Area = phân tách vật lý; VRF/VLAN = phân tách logic (không tạo Area riêng cho VRF).
+- **Ưu tiên bảo toàn layout gốc** khi đã có bố cục; auto‑layout chỉ là hỗ trợ.
+
+**Áp dụng cho web app:**
+- Auto‑layout phải theo **2 tầng**: macro (Area) + micro (thiết bị trong Area).
+- Overview mặc định **chỉ L1/flow** để giữ sạch bố cục; L2/L3 chỉ hiển thị ở view riêng.
 
 ### 13.1 Tổng quan tệp nguồn
 

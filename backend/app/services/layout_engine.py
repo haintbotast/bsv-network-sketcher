@@ -100,12 +100,12 @@ def detect_role_from_name(device_name: str) -> Optional[str]:
     name_lower = device_name.lower()
 
     patterns = [
-        (r"router|wan|isp|internet|edge", "router"),
-        (r"firewall|fw|vpn|ips|ids|waf", "firewall"),
-        (r"core|aggregation", "core"),
-        (r"dist|distribution", "dist"),
-        (r"access|edge-sw", "access"),
-        (r"server|nas|storage|backup|db|fe|be|app|web|proxy", "endpoint"),
+        (r"\brtr\b|router|wan|isp|internet|edge", "router"),
+        (r"\bfw\b|firewall|waf|ids|ips|vpn", "firewall"),
+        (r"\bcore\b|aggregation|\bagg\b", "core"),
+        (r"\bdist\b|distribution", "dist"),
+        (r"\bacc\b|access|edge-sw", "access"),
+        (r"server|\bsrv\b|nas|storage|backup|db|fe|be|app|web|proxy|pc|printer|ap|camera|lock|phone|ipphone|workstation|client", "endpoint"),
     ]
 
     for pattern, role in patterns:
@@ -283,6 +283,13 @@ def assign_layers(graph: Graph, devices: list, l1_links: list) -> Graph:
             if abs(current - expected) > 2:
                 layers[device.id] = (current + expected) // 2
 
+    # Nếu không có link hoặc tất cả đều nằm 1 lớp, ép theo role (top-to-bottom)
+    if not l1_links or all(layer == 0 for layer in layers.values()):
+        for device in devices:
+            role = detect_role_from_name(device.name)
+            if role and device.id in layers:
+                layers[device.id] = role_to_expected_layer[role]
+
     # Step 4: Refinement từ connectivity degree
     for node_id, node in graph.nodes.items():
         out_degree = len(graph.outgoing_edges(node_id))
@@ -297,6 +304,12 @@ def assign_layers(graph: Graph, devices: list, l1_links: list) -> Graph:
             layers[node_id] = max(layers[node_id], 5)  # Push to endpoint
 
     # Assign layers to graph nodes
+    # Normalize layers to 0..N (giữ thứ tự nhưng tránh gap lớn)
+    unique_layers = sorted(set(layers.values()))
+    layer_remap = {layer: idx for idx, layer in enumerate(unique_layers)}
+    for node_id in layers:
+        layers[node_id] = layer_remap[layers[node_id]]
+
     for node_id, layer in layers.items():
         graph.nodes[node_id].layer = layer
 

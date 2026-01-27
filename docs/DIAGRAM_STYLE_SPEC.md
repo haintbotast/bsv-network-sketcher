@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-23  
+> **Cập nhật:** 2026-01-27  
 > **Mục tiêu:** Chuẩn hóa hình khối, nét vẽ, màu sắc, chữ và nền cho toàn hệ thống (UI + Konva + export).
 
 ---
@@ -36,6 +36,21 @@
 - **Cisco-style:** core → distribution → access theo trục ngang (left → right); link ưu tiên ngang.
 - **ISO/IEC generic:** phân tầng top → down (hoặc left → right), trung tính về màu/nhãn.
 - **Custom:** phải khai báo hướng bố cục, khoảng cách tối thiểu, và quy tắc nhóm; nếu thiếu thì fallback về ISO.
+
+### 2.5 Bố cục phân tầng 2 tầng (Area/Device) theo AI Context
+
+**Nguyên tắc chung (bắt buộc):**
+- **Macro (Area):** sắp xếp các Area theo location/tầng; không để thiết bị xuyên Area.
+- **Micro (Device):** mỗi Area là một lưới **top‑to‑bottom** (Core/Distribution ở trên, Access ở giữa, Endpoints ở dưới).
+- Dùng `_AIR_` (ô trống) để canh cột, giữ thẳng hàng theo chiều dọc.
+
+**Quy tắc hiển thị theo view:**
+- **Overview:** chỉ L1/flow; không render nhãn L2/L3 để tránh đè chữ/đường.
+- **L2/L3:** chỉ hiển thị nhãn L2/L3 trong view tương ứng; có **band nhãn** để không chồng lên thiết bị.
+
+**Liên kết liên‑area:**
+- Bắt buộc đi qua **Waypoint area** (đuôi `_wp_`), không nối Area‑Area trực tiếp.
+- Link đi qua **anchor** trên biên Area để giảm cắt xuyên.
 
 ---
 

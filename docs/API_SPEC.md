@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.1
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-01-23
+> **Cập nhật:** 2026-01-27
 > **Mục tiêu:** Đặc tả API phục vụ nhập liệu trực tiếp, quản lý dự án và xuất dữ liệu.
 
 ---
@@ -83,6 +83,43 @@ POST /projects/{project_id}/links/bulk
 POST /projects/{project_id}/port-channels/bulk
 POST /projects/{project_id}/virtual-ports/bulk
 ```
+
+---
+
+## 5.1 Auto-layout (bố cục tự động)
+
+```
+POST /projects/{project_id}/auto-layout
+POST /projects/{project_id}/invalidate-layout-cache
+```
+
+**Request (gợi ý):**
+```json
+{
+  "direction": "horizontal|vertical",
+  "layer_gap": 2.0,
+  "node_spacing": 0.5,
+  "crossing_iterations": 24,
+  "apply_to_db": false,
+  "group_by_area": true,
+  "layout_scope": "project|area",
+  "anchor_routing": true,
+  "overview_mode": "l1-only"
+}
+```
+
+**Response (gợi ý):**
+```json
+{
+  "devices": [{ "id": "...", "x": 1.2, "y": 0.5, "layer": 2, "area_id": "..." }],
+  "areas": [{ "id": "...", "x": 0.0, "y": 0.0, "width": 3.0, "height": 1.5 }],
+  "stats": { "total_layers": 5, "total_crossings": 12, "execution_time_ms": 120, "algorithm": "sugiyama" }
+}
+```
+
+**Ghi chú:**
+- `group_by_area=true` là mặc định theo AI Context: layout 2 tầng (macro Area + micro Device).
+- `overview_mode="l1-only"` để tránh đè nhãn L2/L3 trong overview.
 
 ---
 

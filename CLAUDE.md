@@ -48,6 +48,14 @@
   https://github.com/cisco-open/network-sketcher
   Dùng để đối chiếu logic nghiệp vụ và độ tương thích đầu ra.
 
+## Ràng buộc layout theo AI Context NS (bắt buộc)
+- Nguồn gốc tham chiếu: `docs/[AI_Context]no_data.txt` (tiếng Anh); tóm tắt chuẩn tiếng Việt trong `docs/NS_REFERENCE.md`.
+- Bố cục phân tầng **top‑to‑bottom**: Core/Distribution ở trên, Access ở giữa, Endpoints ở dưới; cha ở trên con.
+- Dùng `_AIR_` để canh cột và giữ thẳng hàng.
+- Auto‑layout theo **2 tầng**: macro (Area) + micro (thiết bị trong Area); không xếp xuyên Area.
+- Overview chỉ L1 (hoặc flow); L2/L3 chỉ ở view riêng.
+- Liên kết khác Area phải qua **Waypoint area** (đuôi `_wp_`).
+
 ## Kỷ luật thay đổi
 - Chỉ thay đổi tối thiểu, có mục tiêu; tránh refactor không liên quan.
 - Nếu yêu cầu mới xung đột với file này hoặc kế hoạch, hỏi người dùng và cập nhật cả hai.

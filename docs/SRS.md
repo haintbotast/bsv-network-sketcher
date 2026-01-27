@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-23  
+> **Cập nhật:** 2026-01-27  
 > **Mục tiêu:** Đặc tả yêu cầu kỹ thuật để triển khai web app theo chuẩn layout network phổ biến.
 
 ---
@@ -34,6 +34,9 @@
 ### 2.4 Sơ đồ & đồng bộ lớp
 - Sơ đồ L1/L2/L3 hiển thị và chỉnh sửa.
 - Đồng bộ dữ liệu L1→L2→L3 theo quy tắc logic chuẩn (validation chặt chẽ).
+- Auto-layout theo **2 tầng** (macro Area + micro Device), ưu tiên bố cục top‑to‑bottom.
+- Overview mặc định **chỉ L1/flow**; L2/L3 chỉ hiển thị ở view riêng.
+- Liên kết khác Area bắt buộc qua **Waypoint area** (đuôi `_wp_`).
 
 ### 2.5 Xuất dữ liệu
 - Sinh PPTX/Excel theo layout mode đã chọn.

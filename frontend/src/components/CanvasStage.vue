@@ -486,6 +486,36 @@ const visibleDevices = computed(() => {
     })
 })
 
+const deviceAreaMap = computed(() => {
+  const map = new Map<string, string | null>()
+  props.devices.forEach(device => {
+    map.set(device.id, device.areaId || null)
+  })
+  return map
+})
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
+
+function computeAreaAnchor(
+  areaRect: { x: number; y: number; width: number; height: number },
+  fromPoint: { x: number; y: number },
+  targetPoint: { x: number; y: number }
+) {
+  const dx = targetPoint.x - fromPoint.x
+  const dy = targetPoint.y - fromPoint.y
+  const inset = 6
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    const x = dx >= 0 ? areaRect.x + areaRect.width : areaRect.x
+    const y = clamp(fromPoint.y, areaRect.y + inset, areaRect.y + areaRect.height - inset)
+    return { x, y }
+  }
+  const y = dy >= 0 ? areaRect.y + areaRect.height : areaRect.y
+  const x = clamp(fromPoint.x, areaRect.x + inset, areaRect.x + areaRect.width - inset)
+  return { x, y }
+}
+
 const visibleLinks = computed(() => {
   return props.links
     .map(link => {
@@ -500,10 +530,30 @@ const visibleLinks = computed(() => {
         x: toView.x + toView.width / 2,
         y: toView.y + toView.height / 2
       }
+      const fromAreaId = deviceAreaMap.value.get(link.fromDeviceId)
+      const toAreaId = deviceAreaMap.value.get(link.toDeviceId)
+      const fromArea = fromAreaId ? areaViewMap.value.get(fromAreaId) : null
+      const toArea = toAreaId ? areaViewMap.value.get(toAreaId) : null
+
+      let points = [fromCenter.x, fromCenter.y, toCenter.x, toCenter.y]
+      if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
+        const fromAnchor = computeAreaAnchor(fromArea, fromCenter, toCenter)
+        const toAnchor = computeAreaAnchor(toArea, toCenter, fromCenter)
+        const midX = (fromAnchor.x + toAnchor.x) / 2
+        points = [
+          fromCenter.x, fromCenter.y,
+          fromAnchor.x, fromAnchor.y,
+          midX, fromAnchor.y,
+          midX, toAnchor.y,
+          toAnchor.x, toAnchor.y,
+          toCenter.x, toCenter.y
+        ]
+      }
+
       return {
         id: link.id,
         config: {
-          points: [fromCenter.x, fromCenter.y, toCenter.x, toCenter.y],
+          points,
           stroke: '#2b2a28',
           strokeWidth: 1.5,
           dash: link.style === 'dashed' ? [8, 6] : link.style === 'dotted' ? [2, 4] : [],
@@ -517,13 +567,10 @@ const visibleLinks = computed(() => {
 // L2 Labels - VLAN info on devices
 const l2Labels = computed(() => {
   const mode = props.viewMode || 'L1'
-  if (mode !== 'L2' && mode !== 'overview') return []
+  if (mode !== 'L2') return []
   if (!props.l2Assignments || props.l2Assignments.length === 0) {
-    console.log('L2 labels: no assignments, mode=', mode)
     return []
   }
-
-  console.log('L2 labels: processing', props.l2Assignments.length, 'assignments, deviceViewMap size=', deviceViewMap.value.size)
 
   // Group assignments by device
   const byDevice = new Map<string, { vlans: Set<number>; modes: Set<string> }>()
@@ -534,8 +581,6 @@ const l2Labels = computed(() => {
     existing.modes.add(a.port_mode)
     byDevice.set(a.device_id, existing)
   })
-  console.log('L2 labels: grouped into', byDevice.size, 'devices')
-
   const labels: Array<{
     id: string
     group: { x: number; y: number }
@@ -564,7 +609,7 @@ const l2Labels = computed(() => {
 // L3 Labels - IP addresses on devices
 const l3Labels = computed(() => {
   const mode = props.viewMode || 'L1'
-  if (mode !== 'L3' && mode !== 'overview') return []
+  if (mode !== 'L3') return []
   if (!props.l3Addresses || props.l3Addresses.length === 0) return []
 
   // Group addresses by device

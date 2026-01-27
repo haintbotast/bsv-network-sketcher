@@ -11,13 +11,27 @@ export interface AutoLayoutOptions {
   node_spacing?: number
   crossing_iterations?: number
   apply_to_db?: boolean
+  group_by_area?: boolean
+  layout_scope?: 'area' | 'project'
+  anchor_routing?: boolean
+  overview_mode?: 'l1-only'
 }
 
 export interface DeviceLayout {
   id: string
+  area_id?: string | null
   x: number
   y: number
   layer: number
+}
+
+export interface AreaLayout {
+  id: string
+  name?: string
+  x: number
+  y: number
+  width: number
+  height: number
 }
 
 export interface LayoutStats {
@@ -29,7 +43,7 @@ export interface LayoutStats {
 
 export interface LayoutResult {
   devices: DeviceLayout[]
-  areas: null | any[]
+  areas: null | AreaLayout[]
   stats: LayoutStats
 }
 
@@ -51,6 +65,10 @@ export async function autoLayout(
     node_spacing: 0.5,
     crossing_iterations: 24,
     apply_to_db: false,
+    group_by_area: true,
+    layout_scope: 'area',
+    anchor_routing: true,
+    overview_mode: 'l1-only',
     ...options
   }
 

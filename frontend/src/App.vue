@@ -180,11 +180,20 @@
 
         <div class="dialog-body">
           <div class="form-section">
-            <label>Layout Direction</label>
+            <label>Hướng bố cục (macro Area)</label>
             <select v-model="autoLayoutOptions.direction" class="select">
               <option value="horizontal">Horizontal (Cisco style)</option>
               <option value="vertical">Vertical (ISO style)</option>
             </select>
+          </div>
+
+          <div class="form-section">
+            <label>Phạm vi bố cục</label>
+            <select v-model="autoLayoutOptions.layout_scope" class="select">
+              <option value="area">Trong Area (khuyến nghị)</option>
+              <option value="project">Toàn dự án (xếp lại Area)</option>
+            </select>
+            <p class="hint-text">Thiết bị trong Area luôn top‑to‑bottom theo AI Context.</p>
           </div>
 
           <div class="form-section">
@@ -362,7 +371,8 @@ const autoLayoutOptions = reactive({
   direction: 'horizontal' as 'horizontal' | 'vertical',
   layer_gap: 2.0,
   node_spacing: 0.5,
-  crossing_iterations: 24
+  crossing_iterations: 24,
+  layout_scope: 'area' as 'area' | 'project'
 })
 const autoLayoutResult = ref<LayoutResult | null>(null)
 const autoLayoutLoading = ref(false)
@@ -547,15 +557,18 @@ const activeProject = computed(() => projects.value.find(p => p.id === selectedP
 const canvasAreas = computed<AreaModel[]>(() => {
   return areas.value.map(area => {
     const style = area.style || defaultAreaStyle
-    const xUnits = area.position_x ?? (area.grid_col - 1) * GRID_FALLBACK_X
-    const yUnits = area.position_y ?? (area.grid_row - 1) * GRID_FALLBACK_Y
+    const preview = autoLayoutAreaMap.value?.get(area.id)
+    const xUnits = preview?.x ?? area.position_x ?? (area.grid_col - 1) * GRID_FALLBACK_X
+    const yUnits = preview?.y ?? area.position_y ?? (area.grid_row - 1) * GRID_FALLBACK_Y
+    const widthUnits = preview?.width ?? (area.width || 3)
+    const heightUnits = preview?.height ?? (area.height || 1.5)
     return {
       id: area.id,
       name: area.name,
       x: xUnits * UNIT_PX,
       y: yUnits * UNIT_PX,
-      width: (area.width || 3) * UNIT_PX,
-      height: (area.height || 1.5) * UNIT_PX,
+      width: widthUnits * UNIT_PX,
+      height: heightUnits * UNIT_PX,
       fill: rgbToHex(style.fill_color_rgb),
       stroke: rgbToHex(style.stroke_color_rgb)
     }
@@ -608,6 +621,15 @@ const autoLayoutCoordsMap = computed(() => {
   return map
 })
 
+const autoLayoutAreaMap = computed(() => {
+  if (!autoLayoutResult.value?.areas) return undefined
+  const map = new Map<string, { x: number; y: number; width: number; height: number }>()
+  autoLayoutResult.value.areas.forEach(area => {
+    map.set(area.id, { x: area.x, y: area.y, width: area.width, height: area.height })
+  })
+  return map
+})
+
 function rgbToHex(rgb: [number, number, number]) {
   return `#${rgb.map(value => value.toString(16).padStart(2, '0')).join('')}`
 }
@@ -645,11 +667,11 @@ async function setViewMode(mode: ViewMode) {
   if (!selectedProjectId.value) return
 
   // Lazy load L2 data
-  if ((mode === 'L2' || mode === 'L3' || mode === 'overview') && !l2Loaded.value) {
+  if (mode === 'L2' && !l2Loaded.value) {
     await fetchL2Data()
   }
   // Lazy load L3 data
-  if ((mode === 'L3' || mode === 'overview') && !l3Loaded.value) {
+  if (mode === 'L3' && !l3Loaded.value) {
     await fetchL3Data()
   }
 }
@@ -996,10 +1018,12 @@ watch(selectedProjectId, async (projectId) => {
     if (project) {
       layoutModeSelection.value = project.layout_mode
     }
+    autoLayoutResult.value = null
   } else {
     areas.value = []
     devices.value = []
     links.value = []
+    autoLayoutResult.value = null
   }
 })
 
@@ -1032,7 +1056,11 @@ async function handleAutoLayoutPreview() {
       layer_gap: autoLayoutOptions.layer_gap,
       node_spacing: autoLayoutOptions.node_spacing,
       crossing_iterations: autoLayoutOptions.crossing_iterations,
-      apply_to_db: false
+      apply_to_db: false,
+      group_by_area: true,
+      layout_scope: autoLayoutOptions.layout_scope,
+      anchor_routing: true,
+      overview_mode: 'l1-only'
     })
     autoLayoutResult.value = result
     setNotice(
@@ -1063,7 +1091,11 @@ async function handleAutoLayoutApply() {
       layer_gap: autoLayoutOptions.layer_gap,
       node_spacing: autoLayoutOptions.node_spacing,
       crossing_iterations: autoLayoutOptions.crossing_iterations,
-      apply_to_db: true
+      apply_to_db: true,
+      group_by_area: true,
+      layout_scope: autoLayoutOptions.layout_scope,
+      anchor_routing: true,
+      overview_mode: 'l1-only'
     })
     setNotice('Layout đã được áp dụng vào database!', 'success')
     // Reload project data to reflect new positions

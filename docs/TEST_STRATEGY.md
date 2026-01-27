@@ -2,10 +2,20 @@
 
 > **Phiên bản:** 1.1
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-01-23
+> **Cập nhật:** 2026-01-27
 > **Mục tiêu:** Quy định chiến lược kiểm thử và golden files.
 
 ## 1. Kiểm thử backend
+
+### 1.1 Kiểm thử layout (AI Context)
+- **group_by_area:** thiết bị không vượt biên Area; macro/micro layout tách tầng.
+- **top‑to‑bottom:** Core/Dist ở hàng trên, Access giữa, Endpoints dưới (ưu tiên cha ở trên con).
+- **_AIR_ spacing:** giữ thẳng cột, không chồng lấn.
+- **inter‑area:** link khác Area bắt buộc qua Waypoint area (`_wp_`).
+
+### 1.2 Kiểm thử overview/L2/L3
+- Overview chỉ L1/flow; L2/L3 không render nhãn trong overview.
+- L2/L3 view hiển thị nhãn đúng, không đè lên thiết bị (band nhãn).
 
 - Bao phủ kiểm tra liên lớp L1→L2→L3 (interface tồn tại, port-channel, virtual port).
 

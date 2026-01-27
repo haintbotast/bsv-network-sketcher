@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-23  
+> **Cập nhật:** 2026-01-27  
 > **Mục tiêu:** Định nghĩa các kiểm tra tối thiểu thay cho golden files, đảm bảo đúng logic và không vỡ bố cục.
 
 ---
@@ -50,6 +50,7 @@
 - **RB-004:** L2 assignment chỉ gán lên interface tồn tại.
 - **RB-005:** L3 address chỉ gán lên interface tồn tại.
 - **RB-006:** Không được thay đổi số lượng node/link so với input sau layout.
+- **RB-007:** Liên kết khác Area bắt buộc đi qua Waypoint area (đuôi `_wp_`).
 
 ---
 
@@ -76,6 +77,8 @@
 
 - **RB-201:** Hướng bố cục tuân theo layout mode đã chọn (cisco/iso/custom).
 - **RB-202:** Nếu `custom` thiếu tham số bố cục, fallback ISO và sinh WARN.
+- **RB-203:** Bố cục thiết bị trong Area tuân theo top‑to‑bottom tier (Core/Dist → Access → Endpoints).
+- **RB-204:** Overview chỉ hiển thị L1/flow (không render nhãn L2/L3).
 
 ---
 

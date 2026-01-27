@@ -210,12 +210,11 @@ def build_grouped_layout(
     """Compute layout per-area (macro Area + micro Device)."""
     AREA_MIN_WIDTH = 3.0
     AREA_MIN_HEIGHT = 1.5
-    AREA_GAP = 0.6
-    AREA_PADDING = 0.15
-    LABEL_BAND = 0.25
+    AREA_GAP = 0.8
+    AREA_PADDING = 0.25
+    LABEL_BAND = 0.35
 
-    # Resolve area sizes
-    area_sizes = {
+    area_meta = {
         a.id: {
             "width": a.width if a.width and a.width > 0 else AREA_MIN_WIDTH,
             "height": a.height if a.height and a.height > 0 else AREA_MIN_HEIGHT,
@@ -228,75 +227,33 @@ def build_grouped_layout(
         for a in areas
     }
 
-    def compute_area_grid_positions() -> dict[str, tuple[float, float]]:
-        rows: dict[int, list[str]] = {}
-        for area_id, meta in area_sizes.items():
-            rows.setdefault(meta["grid_row"], []).append(area_id)
-
-        positions: dict[str, tuple[float, float]] = {}
-        current_y = 0.0
-        for row in sorted(rows.keys()):
-            row_area_ids = rows[row]
-            row_area_ids.sort(key=lambda aid: area_sizes[aid]["grid_col"])
-            row_height = max(area_sizes[aid]["height"] for aid in row_area_ids)
-            current_x = 0.0
-            for aid in row_area_ids:
-                positions[aid] = (current_x, current_y)
-                current_x += area_sizes[aid]["width"] + AREA_GAP
-            current_y += row_height + AREA_GAP
-        return positions
-
-    area_positions: dict[str, tuple[float, float]] = {}
-    grid_positions = compute_area_grid_positions()
-
-    if layout_scope == "project":
-        area_positions = grid_positions
-    else:
-        for area_id, meta in area_sizes.items():
-            if meta["x"] is not None and meta["y"] is not None:
-                area_positions[area_id] = (meta["x"], meta["y"])
-            else:
-                area_positions[area_id] = grid_positions.get(area_id, (0.0, 0.0))
-
-    device_layouts: list[DeviceLayout] = []
-    area_layouts: list[AreaLayout] = []
-    stats_layers = []
-    stats_crossings = []
-    stats_times = []
-
     devices_by_area: dict[str, list] = {}
     for device in devices:
         if not device.area_id:
             continue
         devices_by_area.setdefault(device.area_id, []).append(device)
 
-    for area_id, meta in area_sizes.items():
-        area_x, area_y = area_positions.get(area_id, (0.0, 0.0))
-        area_width = meta["width"]
-        area_height = meta["height"]
+    micro_config = LayoutConfig(
+        direction="vertical",  # top-to-bottom per AI Context
+        layer_gap=config.layer_gap,
+        node_spacing=config.node_spacing,
+        crossing_iterations=config.crossing_iterations,
+    )
 
-        area_layouts.append(AreaLayout(
-            id=area_id,
-            name=meta["name"],
-            x=area_x,
-            y=area_y,
-            width=area_width,
-            height=area_height,
-        ))
-
+    micro_results: dict[str, dict] = {}
+    for area_id, meta in area_meta.items():
         area_devices = devices_by_area.get(area_id, [])
         if not area_devices:
+            meta["computed_width"] = meta["width"]
+            meta["computed_height"] = meta["height"]
             continue
 
         device_ids = {d.id for d in area_devices}
-        area_links = [l for l in links if l.from_device_id in device_ids and l.to_device_id in device_ids]
+        area_links = [
+            l for l in links
+            if l.from_device_id in device_ids and l.to_device_id in device_ids
+        ]
 
-        micro_config = LayoutConfig(
-            direction="vertical",  # top-to-bottom per AI Context
-            layer_gap=config.layer_gap,
-            node_spacing=config.node_spacing,
-            crossing_iterations=config.crossing_iterations,
-        )
         layout_result = auto_layout(area_devices, area_links, micro_config)
 
         if layout_result.devices:
@@ -309,18 +266,93 @@ def build_grouped_layout(
             max_x = micro_config.node_width
             max_y = micro_config.node_height
 
-        span_x = max_x - min_x
-        span_y = max_y - min_y
+        required_width = (max_x - min_x) + AREA_PADDING * 2
+        required_height = (max_y - min_y) + AREA_PADDING * 2 + LABEL_BAND
 
-        inner_width = max(area_width - AREA_PADDING * 2, micro_config.node_width)
-        inner_height = max(area_height - LABEL_BAND - AREA_PADDING * 2, micro_config.node_height)
+        meta["computed_width"] = max(meta["width"], required_width, AREA_MIN_WIDTH)
+        meta["computed_height"] = max(meta["height"], required_height, AREA_MIN_HEIGHT)
+
+        micro_results[area_id] = {
+            "layout": layout_result,
+            "min_x": min_x,
+            "min_y": min_y,
+        }
+
+    def compute_area_grid_positions() -> dict[str, tuple[float, float]]:
+        rows: dict[int, list[str]] = {}
+        for area_id, meta in area_meta.items():
+            rows.setdefault(meta["grid_row"], []).append(area_id)
+
+        positions: dict[str, tuple[float, float]] = {}
+        current_y = 0.0
+        for row in sorted(rows.keys()):
+            row_area_ids = rows[row]
+            row_area_ids.sort(key=lambda aid: area_meta[aid]["grid_col"])
+            row_height = max(area_meta[aid]["computed_height"] for aid in row_area_ids)
+            current_x = 0.0
+            for aid in row_area_ids:
+                positions[aid] = (current_x, current_y)
+                current_x += area_meta[aid]["computed_width"] + AREA_GAP
+            current_y += row_height + AREA_GAP
+        return positions
+
+    area_positions: dict[str, tuple[float, float]] = {}
+    grid_positions = compute_area_grid_positions()
+
+    if layout_scope == "project":
+        area_positions = grid_positions
+    else:
+        for area_id, meta in area_meta.items():
+            if meta["x"] is not None and meta["y"] is not None:
+                area_positions[area_id] = (meta["x"], meta["y"])
+            else:
+                area_positions[area_id] = grid_positions.get(area_id, (0.0, 0.0))
+
+    device_layouts: list[DeviceLayout] = []
+    area_layouts: list[AreaLayout] = []
+    stats_layers = []
+    stats_crossings = []
+    stats_times = []
+
+    if layout_scope == "project":
+        for area_id, meta in area_meta.items():
+            area_x, area_y = area_positions.get(area_id, (0.0, 0.0))
+            area_layouts.append(AreaLayout(
+                id=area_id,
+                name=meta["name"],
+                x=area_x,
+                y=area_y,
+                width=meta["computed_width"],
+                height=meta["computed_height"],
+            ))
+
+    for area_id, result in micro_results.items():
+        area_x, area_y = area_positions.get(area_id, (0.0, 0.0))
+        area_width = area_meta[area_id]["computed_width"]
+        area_height = area_meta[area_id]["computed_height"]
+
+        layout_result = result["layout"]
+        min_x = result["min_x"]
+        min_y = result["min_y"]
+
+        span_x = max(0.0, (area_width - AREA_PADDING * 2) - micro_config.node_width)
+        span_y = max(0.0, (area_height - LABEL_BAND - AREA_PADDING * 2) - micro_config.node_height)
+
+        layout_span_x = max(
+            micro_config.node_width,
+            max((d["x"] - min_x) for d in layout_result.devices) + micro_config.node_width
+        )
+        layout_span_y = max(
+            micro_config.node_height,
+            max((d["y"] - min_y) for d in layout_result.devices) + micro_config.node_height
+        )
 
         scale_x = 1.0
-        if span_x > micro_config.node_width and inner_width > micro_config.node_width:
-            scale_x = min(1.0, (inner_width - micro_config.node_width) / (span_x - micro_config.node_width))
+        if layout_span_x > micro_config.node_width and span_x > 0:
+            scale_x = min(1.0, span_x / (layout_span_x - micro_config.node_width))
         scale_y = 1.0
-        if span_y > micro_config.node_height and inner_height > micro_config.node_height:
-            scale_y = min(1.0, (inner_height - micro_config.node_height) / (span_y - micro_config.node_height))
+        if layout_span_y > micro_config.node_height and span_y > 0:
+            scale_y = min(1.0, span_y / (layout_span_y - micro_config.node_height))
         scale = min(scale_x, scale_y, 1.0)
 
         for d in layout_result.devices:
@@ -361,7 +393,7 @@ def build_grouped_layout(
 
     return {
         "devices": device_layouts,
-        "areas": area_layouts,
+        "areas": area_layouts if area_layouts else None,
         "stats": stats,
     }
 

@@ -486,6 +486,30 @@ const visibleDevices = computed(() => {
     })
 })
 
+const areaBounds = computed(() => {
+  let minX = 0
+  let minY = 0
+  let maxX = 0
+  let maxY = 0
+  let hasBounds = false
+  areaViewMap.value.forEach(rect => {
+    if (!hasBounds) {
+      minX = rect.x
+      minY = rect.y
+      maxX = rect.x + rect.width
+      maxY = rect.y + rect.height
+      hasBounds = true
+      return
+    }
+    minX = Math.min(minX, rect.x)
+    minY = Math.min(minY, rect.y)
+    maxX = Math.max(maxX, rect.x + rect.width)
+    maxY = Math.max(maxY, rect.y + rect.height)
+  })
+  if (!hasBounds) return null
+  return { minX, minY, maxX, maxY }
+})
+
 const deviceAreaMap = computed(() => {
   const map = new Map<string, string | null>()
   props.devices.forEach(device => {
@@ -539,15 +563,49 @@ const visibleLinks = computed(() => {
       if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
         const fromAnchor = computeAreaAnchor(fromArea, fromCenter, toCenter)
         const toAnchor = computeAreaAnchor(toArea, toCenter, fromCenter)
-        const midX = (fromAnchor.x + toAnchor.x) / 2
-        points = [
-          fromCenter.x, fromCenter.y,
-          fromAnchor.x, fromAnchor.y,
-          midX, fromAnchor.y,
-          midX, toAnchor.y,
-          toAnchor.x, toAnchor.y,
-          toCenter.x, toCenter.y
-        ]
+        const bounds = areaBounds.value
+        if (bounds) {
+          const corridorGap = 24
+          const dx = toCenter.x - fromCenter.x
+          const dy = toCenter.y - fromCenter.y
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            const topY = bounds.minY - corridorGap
+            const bottomY = bounds.maxY + corridorGap
+            const midY = (fromCenter.y + toCenter.y) / 2
+            const corridorY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
+            points = [
+              fromCenter.x, fromCenter.y,
+              fromAnchor.x, fromAnchor.y,
+              fromAnchor.x, corridorY,
+              toAnchor.x, corridorY,
+              toAnchor.x, toAnchor.y,
+              toCenter.x, toCenter.y
+            ]
+          } else {
+            const leftX = bounds.minX - corridorGap
+            const rightX = bounds.maxX + corridorGap
+            const midX = (fromCenter.x + toCenter.x) / 2
+            const corridorX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
+            points = [
+              fromCenter.x, fromCenter.y,
+              fromAnchor.x, fromAnchor.y,
+              corridorX, fromAnchor.y,
+              corridorX, toAnchor.y,
+              toAnchor.x, toAnchor.y,
+              toCenter.x, toCenter.y
+            ]
+          }
+        } else {
+          const midX = (fromAnchor.x + toAnchor.x) / 2
+          points = [
+            fromCenter.x, fromCenter.y,
+            fromAnchor.x, fromAnchor.y,
+            midX, fromAnchor.y,
+            midX, toAnchor.y,
+            toAnchor.x, toAnchor.y,
+            toCenter.x, toCenter.y
+          ]
+        }
       }
 
       return {

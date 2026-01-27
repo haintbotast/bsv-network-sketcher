@@ -51,6 +51,11 @@
 **Liên kết liên‑area:**
 - Bắt buộc đi qua **Waypoint area** (đuôi `_wp_`), không nối Area‑Area trực tiếp.
 - Link đi qua **anchor** trên biên Area để giảm cắt xuyên.
+- Ưu tiên tuyến **corridor** (ngoài biên Area) cho liên‑area để tránh đi xuyên vùng thiết bị.
+
+**Macro layout (Area):**
+- Kích thước Area có thể được **tính lại từ bounding thiết bị** + padding + band nhãn khi auto‑layout toàn dự án.
+- Khoảng cách giữa Area cần đủ lớn để tránh chồng lấn (đặt theo preset/gap chuẩn).
 
 ---
 

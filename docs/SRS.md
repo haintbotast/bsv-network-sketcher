@@ -35,6 +35,7 @@
 - Sơ đồ L1/L2/L3 hiển thị và chỉnh sửa.
 - Đồng bộ dữ liệu L1→L2→L3 theo quy tắc logic chuẩn (validation chặt chẽ).
 - Auto-layout theo **2 tầng** (macro Area + micro Device), ưu tiên bố cục top‑to‑bottom.
+- Auto-layout mặc định **chạy tự động khi mở project** và **tự chạy lại khi dữ liệu L1 thay đổi** (areas/devices/links); cho phép chạy lại qua UI khi cần.
 - Overview mặc định **chỉ L1/flow**; L2/L3 chỉ hiển thị ở view riêng.
 - Liên kết khác Area bắt buộc qua **Waypoint area** (đuôi `_wp_`).
 

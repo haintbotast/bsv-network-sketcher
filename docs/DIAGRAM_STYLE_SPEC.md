@@ -54,7 +54,9 @@
 - Ưu tiên tuyến **corridor** (ngoài biên Area) cho liên‑area để tránh đi xuyên vùng thiết bị.
 
 **Macro layout (Area):**
-- Kích thước Area có thể được **tính lại từ bounding thiết bị** + padding + band nhãn khi auto‑layout toàn dự án.
+- Kích thước Area được **tính lại từ bounding thiết bị** + padding + band nhãn khi auto‑layout toàn dự án (cho phép **co lại** nếu dư thừa).
+- Sắp xếp Area theo **tier**: Edge → Security → DMZ → Core → Distribution → Access/Office/Department → Servers.
+- Mỗi tier **tự xuống dòng (wrap)** theo hàng để tránh hàng quá dài.
 - Khoảng cách giữa Area cần đủ lớn để tránh chồng lấn (đặt theo preset/gap chuẩn).
 
 ---

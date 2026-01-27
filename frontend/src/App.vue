@@ -372,10 +372,13 @@ const autoLayoutOptions = reactive({
   layer_gap: 2.0,
   node_spacing: 0.5,
   crossing_iterations: 24,
-  layout_scope: 'area' as 'area' | 'project'
+  layout_scope: 'project' as 'area' | 'project'
 })
 const autoLayoutResult = ref<LayoutResult | null>(null)
 const autoLayoutLoading = ref(false)
+const autoLayoutAutoApplying = ref(false)
+const autoLayoutAutoAppliedProjects = new Set<string>()
+let autoLayoutTimer: number | null = null
 
 const selectedRowForActiveGrid = computed(() => {
   if (!selectedId.value) return null
@@ -837,8 +840,9 @@ async function handleAreaAdd(row: AreaRow) {
     setNotice('Vui lòng chọn project trước.', 'error')
     return
   }
+  const projectId = selectedProjectId.value
   try {
-    const created = await createArea(selectedProjectId.value, {
+    const created = await createArea(projectId, {
       name: row.name,
       grid_row: row.grid_row,
       grid_col: row.grid_col,
@@ -850,6 +854,7 @@ async function handleAreaAdd(row: AreaRow) {
     })
     const index = areas.value.findIndex(area => area.id === row.id)
     if (index >= 0) areas.value[index] = created
+    scheduleAutoLayout(projectId, true)
   } catch (error: any) {
     setNotice(error?.message || 'Tạo area thất bại.', 'error')
   }
@@ -857,10 +862,11 @@ async function handleAreaAdd(row: AreaRow) {
 
 function handleAreaChange(payload: { row: AreaRow }) {
   if (!selectedProjectId.value) return
+  const projectId = selectedProjectId.value
   if (payload.row.__temp) return
   scheduleUpdate(areaUpdateTimers, payload.row.id, async () => {
     try {
-      const updated = await updateArea(selectedProjectId.value as string, payload.row.id, {
+      const updated = await updateArea(projectId as string, payload.row.id, {
         name: payload.row.name,
         grid_row: payload.row.grid_row,
         grid_col: payload.row.grid_col,
@@ -872,6 +878,7 @@ function handleAreaChange(payload: { row: AreaRow }) {
       })
       const index = areas.value.findIndex(area => area.id === payload.row.id)
       if (index >= 0) areas.value[index] = updated
+      scheduleAutoLayout(projectId, true)
     } catch (error: any) {
       setNotice(error?.message || 'Cập nhật area thất bại.', 'error')
     }
@@ -880,9 +887,11 @@ function handleAreaChange(payload: { row: AreaRow }) {
 
 async function handleAreaRemove(row: AreaRow) {
   if (!selectedProjectId.value) return
+  const projectId = selectedProjectId.value
   if (row.__temp) return
   try {
-    await deleteArea(selectedProjectId.value, row.id)
+    await deleteArea(projectId, row.id)
+    scheduleAutoLayout(projectId, true)
   } catch (error: any) {
     setNotice(error?.message || 'Xóa area thất bại.', 'error')
   }
@@ -893,12 +902,13 @@ async function handleDeviceAdd(row: DeviceRow) {
     setNotice('Vui lòng chọn project trước.', 'error')
     return
   }
+  const projectId = selectedProjectId.value
   if (!row.area_name) {
     setNotice('Cần chọn area cho device.', 'error')
     return
   }
   try {
-    const created = await createDevice(selectedProjectId.value, {
+    const created = await createDevice(projectId, {
       name: row.name,
       area_name: row.area_name,
       device_type: row.device_type,
@@ -910,6 +920,7 @@ async function handleDeviceAdd(row: DeviceRow) {
     })
     const index = devices.value.findIndex(device => device.id === row.id)
     if (index >= 0) devices.value[index] = created
+    scheduleAutoLayout(projectId, true)
   } catch (error: any) {
     setNotice(error?.message || 'Tạo device thất bại.', 'error')
   }
@@ -917,10 +928,11 @@ async function handleDeviceAdd(row: DeviceRow) {
 
 function handleDeviceChange(payload: { row: DeviceRow }) {
   if (!selectedProjectId.value) return
+  const projectId = selectedProjectId.value
   if (payload.row.__temp) return
   scheduleUpdate(deviceUpdateTimers, payload.row.id, async () => {
     try {
-      const updated = await updateDevice(selectedProjectId.value as string, payload.row.id, {
+      const updated = await updateDevice(projectId as string, payload.row.id, {
         name: payload.row.name,
         area_name: payload.row.area_name || undefined,
         device_type: payload.row.device_type,
@@ -932,6 +944,7 @@ function handleDeviceChange(payload: { row: DeviceRow }) {
       })
       const index = devices.value.findIndex(device => device.id === payload.row.id)
       if (index >= 0) devices.value[index] = updated
+      scheduleAutoLayout(projectId, true)
     } catch (error: any) {
       setNotice(error?.message || 'Cập nhật device thất bại.', 'error')
     }
@@ -940,9 +953,11 @@ function handleDeviceChange(payload: { row: DeviceRow }) {
 
 async function handleDeviceRemove(row: DeviceRow) {
   if (!selectedProjectId.value) return
+  const projectId = selectedProjectId.value
   if (row.__temp) return
   try {
-    await deleteDevice(selectedProjectId.value, row.id)
+    await deleteDevice(projectId, row.id)
+    scheduleAutoLayout(projectId, true)
   } catch (error: any) {
     setNotice(error?.message || 'Xóa device thất bại.', 'error')
   }
@@ -953,12 +968,13 @@ async function handleLinkAdd(row: LinkRow) {
     setNotice('Vui lòng chọn project trước.', 'error')
     return
   }
+  const projectId = selectedProjectId.value
   if (!row.from_device_name || !row.to_device_name) {
     setNotice('Cần chọn thiết bị đầu/cuối cho link.', 'error')
     return
   }
   try {
-    const created = await createLink(selectedProjectId.value, {
+    const created = await createLink(projectId, {
       from_device: row.from_device_name,
       from_port: row.from_port,
       to_device: row.to_device_name,
@@ -968,6 +984,7 @@ async function handleLinkAdd(row: LinkRow) {
     })
     const index = links.value.findIndex(link => link.id === row.id)
     if (index >= 0) links.value[index] = created
+    scheduleAutoLayout(projectId, true)
   } catch (error: any) {
     setNotice(error?.message || 'Tạo link thất bại.', 'error')
   }
@@ -975,10 +992,11 @@ async function handleLinkAdd(row: LinkRow) {
 
 function handleLinkChange(payload: { row: LinkRow }) {
   if (!selectedProjectId.value) return
+  const projectId = selectedProjectId.value
   if (payload.row.__temp) return
   scheduleUpdate(linkUpdateTimers, payload.row.id, async () => {
     try {
-      const updated = await updateLink(selectedProjectId.value as string, payload.row.id, {
+      const updated = await updateLink(projectId as string, payload.row.id, {
         from_device: payload.row.from_device_name || undefined,
         from_port: payload.row.from_port,
         to_device: payload.row.to_device_name || undefined,
@@ -988,6 +1006,7 @@ function handleLinkChange(payload: { row: LinkRow }) {
       })
       const index = links.value.findIndex(link => link.id === payload.row.id)
       if (index >= 0) links.value[index] = updated
+      scheduleAutoLayout(projectId, true)
     } catch (error: any) {
       setNotice(error?.message || 'Cập nhật link thất bại.', 'error')
     }
@@ -996,9 +1015,11 @@ function handleLinkChange(payload: { row: LinkRow }) {
 
 async function handleLinkRemove(row: LinkRow) {
   if (!selectedProjectId.value) return
+  const projectId = selectedProjectId.value
   if (row.__temp) return
   try {
-    await deleteLink(selectedProjectId.value, row.id)
+    await deleteLink(projectId, row.id)
+    scheduleAutoLayout(projectId, true)
   } catch (error: any) {
     setNotice(error?.message || 'Xóa link thất bại.', 'error')
   }
@@ -1019,6 +1040,7 @@ watch(selectedProjectId, async (projectId) => {
       layoutModeSelection.value = project.layout_mode
     }
     autoLayoutResult.value = null
+    scheduleAutoLayout(projectId)
   } else {
     areas.value = []
     devices.value = []
@@ -1036,6 +1058,7 @@ watch(layoutModeSelection, async (value) => {
     const updated = await updateProject(activeProject.value.id, { layout_mode: value })
     projects.value = projects.value.map(project => (project.id === updated.id ? updated : project))
     setNotice('Đã cập nhật layout mode.', 'success')
+    scheduleAutoLayout(updated.id, true)
   } catch (error: any) {
     setNotice(error?.message || 'Cập nhật layout mode thất bại.', 'error')
     layoutModeSelection.value = activeProject.value.layout_mode
@@ -1043,6 +1066,57 @@ watch(layoutModeSelection, async (value) => {
     layoutModeUpdating.value = false
   }
 })
+
+function computeAutoLayoutTuning() {
+  const deviceCount = devices.value.length
+  const density = Math.min(1, Math.max(0, (deviceCount - 20) / 60))
+  const direction = layoutModeSelection.value === 'iso' ? 'vertical' : 'horizontal'
+  const layer_gap = Number((1.6 + density * 1.0).toFixed(2))
+  const node_spacing = Number((0.45 + density * 0.25).toFixed(2))
+  const crossing_iterations = deviceCount > 60 ? 32 : deviceCount > 30 ? 24 : 16
+  return { direction, layer_gap, node_spacing, crossing_iterations }
+}
+
+function scheduleAutoLayout(projectId: string, force = false) {
+  if (autoLayoutTimer) window.clearTimeout(autoLayoutTimer)
+  autoLayoutTimer = window.setTimeout(() => {
+    autoLayoutTimer = null
+    runAutoLayoutAuto(projectId, force)
+  }, 800)
+}
+
+async function runAutoLayoutAuto(projectId: string, force = false) {
+  if (autoLayoutAutoApplying.value) return
+  if (!force && autoLayoutAutoAppliedProjects.has(projectId)) return
+  if (!devices.value.length) return
+
+  const hasAreas = areas.value.length > 0
+  if (!hasAreas && !links.value.length) return
+
+  autoLayoutAutoApplying.value = true
+  try {
+    const tuning = computeAutoLayoutTuning()
+    await autoLayout(projectId, {
+      direction: tuning.direction,
+      layer_gap: tuning.layer_gap,
+      node_spacing: tuning.node_spacing,
+      crossing_iterations: tuning.crossing_iterations,
+      apply_to_db: true,
+      group_by_area: hasAreas,
+      layout_scope: 'project',
+      anchor_routing: true,
+      overview_mode: 'l1-only'
+    })
+    autoLayoutAutoAppliedProjects.add(projectId)
+    await loadProjectData(projectId)
+    await invalidateLayoutCache(projectId)
+    setNotice('Auto-layout đã được áp dụng tự động.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Auto-layout tự động thất bại.', 'error')
+  } finally {
+    autoLayoutAutoApplying.value = false
+  }
+}
 
 async function handleAutoLayoutPreview() {
   if (!selectedProjectId.value) {

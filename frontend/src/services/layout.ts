@@ -66,7 +66,7 @@ export async function autoLayout(
     crossing_iterations: 24,
     apply_to_db: false,
     group_by_area: true,
-    layout_scope: 'area',
+    layout_scope: 'project',
     anchor_routing: true,
     overview_mode: 'l1-only',
     ...options

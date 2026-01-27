@@ -213,6 +213,132 @@ def build_grouped_layout(
     AREA_GAP = 0.8
     AREA_PADDING = 0.25
     LABEL_BAND = 0.35
+    MAX_ROW_WIDTH_BASE = 12.0
+
+    def normalize(text: str | None) -> str:
+        return (text or "").strip().lower()
+
+    def detect_area_tier(name: str | None) -> int | None:
+        label = normalize(name)
+        tier_hints = [
+            (0, ["edge", "wan", "internet"]),
+            (1, ["security", "firewall", "fw", "ids", "ips", "waf", "vpn"]),
+            (2, ["dmz", "proxy"]),
+            (3, ["core"]),
+            (4, ["distribution", "dist"]),
+            (5, ["access", "office", "department", "project", "projects", "it"]),
+            (6, ["server", "servers", "storage", "nas", "dc", "data center", "datacenter"]),
+        ]
+        for tier, keywords in tier_hints:
+            if any(keyword in label for keyword in keywords):
+                return tier
+        return None
+
+    def detect_device_tier(device) -> int:
+        name = normalize(getattr(device, "name", ""))
+        dtype = normalize(getattr(device, "device_type", ""))
+        tier_keywords = [
+            (0, ["edge", "wan", "internet", "isp"]),
+            (1, ["firewall", "fw", "ids", "ips", "waf", "security", "vpn"]),
+            (2, ["dmz", "proxy"]),
+            (3, ["core"]),
+            (4, ["distribution", "dist"]),
+            (5, ["access", "acc"]),
+            (6, ["server", "storage", "nas", "san"]),
+        ]
+        for tier, keywords in tier_keywords:
+            if any(keyword in name for keyword in keywords):
+                return tier
+        if dtype == "firewall":
+            return 1
+        if dtype == "router":
+            return 0
+        if dtype == "switch":
+            return 4
+        if dtype in {"server", "storage"}:
+            return 6
+        if dtype == "ap":
+            return 5
+        if dtype in {"pc", "printer", "camera", "ipphone", "phone", "endpoint"}:
+            return 6
+        return 5
+
+    def compute_max_row_width(area_ids: list[str]) -> float:
+        if not area_ids:
+            return MAX_ROW_WIDTH_BASE
+        total_width = sum(area_meta[aid]["computed_width"] for aid in area_ids)
+        avg_width = total_width / len(area_ids)
+        target_cols = max(1, int(round(len(area_ids) ** 0.5)))
+        return max(MAX_ROW_WIDTH_BASE, avg_width * target_cols + AREA_GAP * (target_cols - 1))
+
+    def pack_rows(area_ids: list[str]) -> list[list[str]]:
+        max_width = compute_max_row_width(area_ids)
+        rows: list[list[str]] = []
+        current: list[str] = []
+        current_width = 0.0
+        for aid in area_ids:
+            width = area_meta[aid]["computed_width"]
+            if current and current_width + AREA_GAP + width > max_width:
+                rows.append(current)
+                current = [aid]
+                current_width = width
+            else:
+                if current:
+                    current_width += AREA_GAP + width
+                else:
+                    current_width = width
+                current.append(aid)
+        if current:
+            rows.append(current)
+        return rows
+
+    def row_width(row: list[str]) -> float:
+        if not row:
+            return 0.0
+        return sum(area_meta[aid]["computed_width"] for aid in row) + AREA_GAP * (len(row) - 1)
+
+    def row_height(row: list[str]) -> float:
+        if not row:
+            return 0.0
+        return max(area_meta[aid]["computed_height"] for aid in row)
+
+    def compute_macro_positions(area_tiers: dict[int, list[str]]) -> dict[str, tuple[float, float]]:
+        positions: dict[str, tuple[float, float]] = {}
+        ordered_tiers = sorted(area_tiers.keys())
+
+        if config.direction == "horizontal":
+            current_x = 0.0
+            for tier in ordered_tiers:
+                area_ids = area_tiers[tier]
+                rows = pack_rows(area_ids)
+                row_widths = [row_width(row) for row in rows]
+                row_heights = [row_height(row) for row in rows]
+                tier_width = max(row_widths) if row_widths else 0.0
+                row_y = 0.0
+                for row, height in zip(rows, row_heights):
+                    current_row_x = current_x
+                    for aid in row:
+                        positions[aid] = (current_row_x, row_y)
+                        current_row_x += area_meta[aid]["computed_width"] + AREA_GAP
+                    row_y += height + AREA_GAP
+                current_x += tier_width + AREA_GAP
+        else:
+            current_y = 0.0
+            for tier in ordered_tiers:
+                area_ids = area_tiers[tier]
+                rows = pack_rows(area_ids)
+                row_heights = [row_height(row) for row in rows]
+                row_y = current_y
+                for row, height in zip(rows, row_heights):
+                    current_row_x = 0.0
+                    for aid in row:
+                        positions[aid] = (current_row_x, row_y)
+                        current_row_x += area_meta[aid]["computed_width"] + AREA_GAP
+                    row_y += height + AREA_GAP
+                tier_height = sum(row_heights) + AREA_GAP * max(0, len(row_heights) - 1)
+                current_y += tier_height + AREA_GAP
+
+        return positions
 
     area_meta = {
         a.id: {
@@ -244,8 +370,12 @@ def build_grouped_layout(
     for area_id, meta in area_meta.items():
         area_devices = devices_by_area.get(area_id, [])
         if not area_devices:
-            meta["computed_width"] = meta["width"]
-            meta["computed_height"] = meta["height"]
+            if layout_scope == "project":
+                meta["computed_width"] = AREA_MIN_WIDTH
+                meta["computed_height"] = AREA_MIN_HEIGHT
+            else:
+                meta["computed_width"] = meta["width"]
+                meta["computed_height"] = meta["height"]
             continue
 
         device_ids = {d.id for d in area_devices}
@@ -269,8 +399,12 @@ def build_grouped_layout(
         required_width = (max_x - min_x) + AREA_PADDING * 2
         required_height = (max_y - min_y) + AREA_PADDING * 2 + LABEL_BAND
 
-        meta["computed_width"] = max(meta["width"], required_width, AREA_MIN_WIDTH)
-        meta["computed_height"] = max(meta["height"], required_height, AREA_MIN_HEIGHT)
+        if layout_scope == "project":
+            meta["computed_width"] = max(required_width, AREA_MIN_WIDTH)
+            meta["computed_height"] = max(required_height, AREA_MIN_HEIGHT)
+        else:
+            meta["computed_width"] = max(meta["width"], required_width, AREA_MIN_WIDTH)
+            meta["computed_height"] = max(meta["height"], required_height, AREA_MIN_HEIGHT)
 
         micro_results[area_id] = {
             "layout": layout_result,
@@ -278,35 +412,37 @@ def build_grouped_layout(
             "min_y": min_y,
         }
 
-    def compute_area_grid_positions() -> dict[str, tuple[float, float]]:
-        rows: dict[int, list[str]] = {}
-        for area_id, meta in area_meta.items():
-            rows.setdefault(meta["grid_row"], []).append(area_id)
+    area_tiers: dict[int, list[str]] = {}
+    for area_id, meta in area_meta.items():
+        area_hint = detect_area_tier(meta["name"])
+        device_tiers = [detect_device_tier(d) for d in devices_by_area.get(area_id, [])]
+        device_hint = min(device_tiers) if device_tiers else None
 
-        positions: dict[str, tuple[float, float]] = {}
-        current_y = 0.0
-        for row in sorted(rows.keys()):
-            row_area_ids = rows[row]
-            row_area_ids.sort(key=lambda aid: area_meta[aid]["grid_col"])
-            row_height = max(area_meta[aid]["computed_height"] for aid in row_area_ids)
-            current_x = 0.0
-            for aid in row_area_ids:
-                positions[aid] = (current_x, current_y)
-                current_x += area_meta[aid]["computed_width"] + AREA_GAP
-            current_y += row_height + AREA_GAP
-        return positions
+        if area_hint is not None and device_hint is not None:
+            tier = min(area_hint, device_hint)
+        elif area_hint is not None:
+            tier = area_hint
+        elif device_hint is not None:
+            tier = device_hint
+        else:
+            tier = 5
+
+        area_tiers.setdefault(tier, []).append(area_id)
+
+    for tier, area_ids in area_tiers.items():
+        area_ids.sort(key=lambda aid: normalize(area_meta[aid]["name"]))
+
+    macro_positions = compute_macro_positions(area_tiers)
 
     area_positions: dict[str, tuple[float, float]] = {}
-    grid_positions = compute_area_grid_positions()
-
     if layout_scope == "project":
-        area_positions = grid_positions
+        area_positions = macro_positions
     else:
         for area_id, meta in area_meta.items():
             if meta["x"] is not None and meta["y"] is not None:
                 area_positions[area_id] = (meta["x"], meta["y"])
             else:
-                area_positions[area_id] = grid_positions.get(area_id, (0.0, 0.0))
+                area_positions[area_id] = macro_positions.get(area_id, (0.0, 0.0))
 
     device_layouts: list[DeviceLayout] = []
     area_layouts: list[AreaLayout] = []

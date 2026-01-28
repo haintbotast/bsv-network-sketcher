@@ -19,7 +19,7 @@
       </v-layer>
 
       <!-- L1 View: Areas with minimized visuals -->
-      <v-layer v-if="viewMode === 'L1' || viewMode === 'overview'" ref="areaLayerRef">
+      <v-layer ref="areaLayerRef">
         <v-group
           v-for="area in visibleAreas"
           :key="area.id"
@@ -32,7 +32,7 @@
       </v-layer>
 
       <!-- L2 View: VLAN grouping boxes -->
-      <v-layer v-if="viewMode === 'L2'" ref="vlanLayerRef">
+      <v-layer ref="vlanLayerRef">
         <v-group v-for="group in visibleVlanGroups" :key="group.id">
           <v-rect :config="group.rect" />
           <v-text :config="group.label" />
@@ -40,7 +40,7 @@
       </v-layer>
 
       <!-- L3 View: Subnet grouping boxes -->
-      <v-layer v-if="viewMode === 'L3'" ref="subnetLayerRef">
+      <v-layer ref="subnetLayerRef">
         <v-group v-for="group in visibleSubnetGroups" :key="group.id">
           <v-rect :config="group.rect" />
           <v-text :config="group.label" />

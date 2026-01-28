@@ -104,6 +104,8 @@
           :l2-assignments="l2Assignments"
           :l3-addresses="l3Addresses"
           :auto-layout-coords="autoLayoutCoordsMap"
+          :vlan-groups="vlanGroupsFromLayout"
+          :subnet-groups="subnetGroupsFromLayout"
           @select="handleSelect"
           @update:viewport="updateViewport"
         />
@@ -633,6 +635,14 @@ const autoLayoutAreaMap = computed(() => {
   return map
 })
 
+const vlanGroupsFromLayout = computed(() => {
+  return autoLayoutResult.value?.vlan_groups || []
+})
+
+const subnetGroupsFromLayout = computed(() => {
+  return autoLayoutResult.value?.subnet_groups || []
+})
+
 function rgbToHex(rgb: [number, number, number]) {
   return `#${rgb.map(value => value.toString(16).padStart(2, '0')).join('')}`
 }
@@ -1153,14 +1163,15 @@ async function handleAutoLayoutPreview() {
       node_spacing: autoLayoutOptions.node_spacing,
       crossing_iterations: autoLayoutOptions.crossing_iterations,
       apply_to_db: false,
-      group_by_area: true,
+      group_by_area: viewMode.value === 'L1',  // Only group by area for L1 view
       layout_scope: autoLayoutOptions.layout_scope,
       anchor_routing: true,
-      overview_mode: 'l1-only'
+      overview_mode: 'l1-only',
+      view_mode: viewMode.value === 'overview' ? 'L1' : viewMode.value  // Default overview to L1
     })
     autoLayoutResult.value = result
     setNotice(
-      `Preview: ${result.devices.length} devices, ${result.stats.total_layers} layers, ${result.stats.total_crossings} crossings`,
+      `Preview (${viewMode.value}): ${result.devices.length} devices, ${result.stats.total_layers} layers, ${result.stats.total_crossings} crossings`,
       'success'
     )
   } catch (error: any) {
@@ -1188,12 +1199,13 @@ async function handleAutoLayoutApply() {
       node_spacing: autoLayoutOptions.node_spacing,
       crossing_iterations: autoLayoutOptions.crossing_iterations,
       apply_to_db: true,
-      group_by_area: true,
+      group_by_area: viewMode.value === 'L1',  // Only group by area for L1 view
       layout_scope: autoLayoutOptions.layout_scope,
       anchor_routing: true,
-      overview_mode: 'l1-only'
+      overview_mode: 'l1-only',
+      view_mode: viewMode.value === 'overview' ? 'L1' : viewMode.value  // Default overview to L1
     })
-    setNotice('Layout đã được áp dụng vào database!', 'success')
+    setNotice(`Layout (${viewMode.value}) đã được áp dụng vào database!`, 'success')
     // Reload project data to reflect new positions
     await loadProjectData(selectedProjectId.value)
     // Invalidate cache

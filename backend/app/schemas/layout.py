@@ -52,6 +52,10 @@ class AutoLayoutOptions(BaseModel):
         default="l1-only",
         description="Overview rendering mode hint (frontend)."
     )
+    view_mode: str = Field(
+        default="L1",
+        description="View mode: 'L1' (physical), 'L2' (VLAN grouping), or 'L3' (subnet grouping)."
+    )
 
     class Config:
         json_schema_extra = {
@@ -114,6 +118,58 @@ class AreaLayout(BaseModel):
         }
 
 
+class VlanGroupLayout(BaseModel):
+    """VLAN group layout result (L2 view)."""
+
+    vlan_id: int = Field(description="VLAN ID")
+    name: str = Field(description="VLAN name")
+    x: float = Field(description="X coordinate (inches)")
+    y: float = Field(description="Y coordinate (inches)")
+    width: float = Field(description="Width (inches)")
+    height: float = Field(description="Height (inches)")
+    device_ids: list[str] = Field(description="List of device IDs in this VLAN")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "vlan_id": 10,
+                "name": "VLAN 10",
+                "x": 2.0,
+                "y": 3.0,
+                "width": 4.0,
+                "height": 2.5,
+                "device_ids": ["dev1", "dev2", "dev3"]
+            }
+        }
+
+
+class SubnetGroupLayout(BaseModel):
+    """Subnet group layout result (L3 view)."""
+
+    subnet: str = Field(description="Subnet CIDR (e.g., 10.0.0.0/24)")
+    name: str = Field(description="Subnet name")
+    x: float = Field(description="X coordinate (inches)")
+    y: float = Field(description="Y coordinate (inches)")
+    width: float = Field(description="Width (inches)")
+    height: float = Field(description="Height (inches)")
+    device_ids: list[str] = Field(description="List of device IDs in this subnet")
+    router_id: Optional[str] = Field(default=None, description="Router device ID for this subnet")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "subnet": "10.0.0.0/24",
+                "name": "10.0.0.0/24",
+                "x": 0.0,
+                "y": 5.0,
+                "width": 3.5,
+                "height": 2.0,
+                "device_ids": ["pc1", "pc2"],
+                "router_id": "router1"
+            }
+        }
+
+
 class LayoutStats(BaseModel):
     """Layout computation statistics."""
 
@@ -139,7 +195,15 @@ class LayoutResult(BaseModel):
     devices: list[DeviceLayout] = Field(description="Device layouts")
     areas: Optional[list[AreaLayout]] = Field(
         default=None,
-        description="Area layouts (optional)"
+        description="Area layouts (optional, L1 view)"
+    )
+    vlan_groups: Optional[list[VlanGroupLayout]] = Field(
+        default=None,
+        description="VLAN group layouts (optional, L2 view)"
+    )
+    subnet_groups: Optional[list[SubnetGroupLayout]] = Field(
+        default=None,
+        description="Subnet group layouts (optional, L3 view)"
     )
     stats: LayoutStats = Field(description="Layout statistics")
 
@@ -151,6 +215,8 @@ class LayoutResult(BaseModel):
                     {"id": "def456", "x": 4.5, "y": 1.0, "layer": 3}
                 ],
                 "areas": None,
+                "vlan_groups": None,
+                "subnet_groups": None,
                 "stats": {
                     "total_layers": 5,
                     "total_crossings": 3,

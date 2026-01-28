@@ -17,6 +17,8 @@ from app.schemas.layout import (
     DeviceLayout,
     LayoutStats,
     AreaLayout,
+    VlanGroupLayout,
+    SubnetGroupLayout,
 )
 
 
@@ -54,11 +56,46 @@ async def compute_auto_layout(
         raise HTTPException(status_code=404, detail="No links found in project")
     links = links or []
 
+    # Load data based on view_mode
+    view_mode = options.view_mode
     areas = []
-    if options.group_by_area:
+    l2_assignments = []
+    l2_segments = []
+    l3_addresses = []
+
+    if view_mode == "L1" and options.group_by_area:
         areas = await area_service.get_areas(db, project_id)
         if not areas:
             raise HTTPException(status_code=404, detail="No areas found in project")
+    elif view_mode == "L2":
+        # Load L2 assignments and segments
+        from app.db.models import InterfaceL2Assignment, L2Segment
+        from sqlalchemy import select
+
+        result = await db.execute(
+            select(InterfaceL2Assignment).where(InterfaceL2Assignment.project_id == project_id)
+        )
+        l2_assignments = result.scalars().all()
+
+        result = await db.execute(
+            select(L2Segment).where(L2Segment.project_id == project_id)
+        )
+        l2_segments = result.scalars().all()
+
+        if not l2_assignments:
+            raise HTTPException(status_code=404, detail="No L2 assignments found in project")
+    elif view_mode == "L3":
+        # Load L3 addresses
+        from app.db.models import L3Address
+        from sqlalchemy import select
+
+        result = await db.execute(
+            select(L3Address).where(L3Address.project_id == project_id)
+        )
+        l3_addresses = result.scalars().all()
+
+        if not l3_addresses:
+            raise HTTPException(status_code=404, detail="No L3 addresses found in project")
 
     # Check cache
     cache = get_cache()
@@ -70,8 +107,18 @@ async def compute_auto_layout(
         "crossing_iterations": options.crossing_iterations,
         "group_by_area": options.group_by_area,
         "layout_scope": options.layout_scope,
+        "view_mode": options.view_mode,
     }
-    topology_hash = cache.compute_topology_hash(devices, links, options_hash, areas if options.group_by_area else None)
+
+    # Different cache keys for different views
+    if view_mode == "L1":
+        topology_hash = cache.compute_topology_hash(devices, links, options_hash, areas if options.group_by_area else None)
+    elif view_mode == "L2":
+        topology_hash = cache.compute_topology_hash(devices, links, options_hash, l2_assignments)
+    elif view_mode == "L3":
+        topology_hash = cache.compute_topology_hash(devices, links, options_hash, l3_addresses)
+    else:
+        topology_hash = cache.compute_topology_hash(devices, links, options_hash, None)
 
     cached_result = cache.get(project_id, topology_hash)
     if cached_result and not options.apply_to_db:
@@ -87,24 +134,37 @@ async def compute_auto_layout(
     )
 
     try:
-        if options.group_by_area:
-            response = build_grouped_layout(devices, links, areas, config, options.layout_scope)
+        if view_mode == "L1":
+            if options.group_by_area:
+                response = compute_layout_l1(devices, links, areas, config, options.layout_scope)
+            else:
+                layout_result = auto_layout(devices, links, config)
+                response = {
+                    "devices": [
+                        DeviceLayout(
+                            id=d["id"],
+                            area_id=None,
+                            x=d["x"],
+                            y=d["y"],
+                            layer=d["layer"],
+                        )
+                        for d in layout_result.devices
+                    ],
+                    "areas": None,
+                    "vlan_groups": None,
+                    "subnet_groups": None,
+                    "stats": LayoutStats(**layout_result.stats),
+                }
+        elif view_mode == "L2":
+            response = compute_layout_l2(devices, links, l2_assignments, l2_segments, config)
+            response["areas"] = None
+            response["subnet_groups"] = None
+        elif view_mode == "L3":
+            response = compute_layout_l3(devices, links, l3_addresses, config)
+            response["areas"] = None
+            response["vlan_groups"] = None
         else:
-            layout_result = auto_layout(devices, links, config)
-            response = {
-                "devices": [
-                    DeviceLayout(
-                        id=d["id"],
-                        area_id=None,
-                        x=d["x"],
-                        y=d["y"],
-                        layer=d["layer"],
-                    )
-                    for d in layout_result.devices
-                ],
-                "areas": None,
-                "stats": LayoutStats(**layout_result.stats),
-            }
+            raise HTTPException(status_code=400, detail=f"Unknown view_mode: {view_mode}")
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -116,10 +176,28 @@ async def compute_auto_layout(
 
     # Apply to database if requested
     if options.apply_to_db:
-        if options.group_by_area:
-            await apply_grouped_layout_to_db(db, response["devices"], response.get("areas"), options.layout_scope)
-        else:
-            await apply_layout_to_db(db, layout_result.devices)
+        if view_mode == "L1":
+            if options.group_by_area:
+                await apply_grouped_layout_to_db(db, response["devices"], response.get("areas"), options.layout_scope)
+            else:
+                # Convert DeviceLayout to dict for apply_layout_to_db
+                device_dicts = [
+                    {"id": d.id, "x": d.x, "y": d.y, "layer": d.layer}
+                    for d in response["devices"]
+                ]
+                await apply_layout_to_db(db, device_dicts)
+        elif view_mode in ("L2", "L3"):
+            # For L2/L3 views, only apply device positions (no areas)
+            for layout in response["devices"]:
+                from app.db.models import Device
+                from sqlalchemy import select
+
+                result = await db.execute(select(Device).where(Device.id == layout.id))
+                device = result.scalar_one_or_none()
+                if device:
+                    device.position_x = layout.x
+                    device.position_y = layout.y
+            await db.commit()
 
     return LayoutResult(**response)
 
@@ -200,18 +278,18 @@ async def apply_layout_to_db(db: AsyncSession, device_layouts: list[dict]) -> No
     await db.commit()
 
 
-def build_grouped_layout(
+def compute_layout_l1(
     devices: list,
     links: list,
     areas: list,
     config: LayoutConfig,
     layout_scope: str,
 ) -> dict:
-    """Compute layout per-area (macro Area + micro Device)."""
+    """Compute L1 layout: area-based with minimized area visuals (compact spacing)."""
     AREA_MIN_WIDTH = 3.0
     AREA_MIN_HEIGHT = 1.5
-    AREA_GAP = 0.8
-    AREA_PADDING = 0.25
+    AREA_GAP = 0.5  # Reduced from 0.8 for compactness
+    AREA_PADDING = 0.15  # Reduced from 0.25 for compactness
     LABEL_BAND = 0.35
     MAX_ROW_WIDTH_BASE = 12.0
 
@@ -599,6 +677,346 @@ def build_grouped_layout(
     return {
         "devices": device_layouts,
         "areas": area_layouts if area_layouts else None,
+        "stats": stats,
+    }
+
+
+def compute_layout_l2(
+    devices: list,
+    links: list,
+    l2_assignments: list,
+    l2_segments: list,
+    config: LayoutConfig,
+) -> dict:
+    """Compute L2 layout: VLAN grouping boxes (NS-like L2 view)."""
+    GROUP_MIN_WIDTH = 3.0
+    GROUP_MIN_HEIGHT = 1.5
+    GROUP_GAP = 0.5
+    GROUP_PADDING = 0.15
+    LABEL_BAND = 0.35
+
+    # Create VLAN mapping
+    vlan_map = {seg.id: {"vlan_id": seg.vlan_id, "name": seg.name} for seg in l2_segments}
+
+    # Group devices by VLAN ID (from L2 assignments)
+    vlan_devices: dict[int, set[str]] = {}
+    for assignment in l2_assignments:
+        segment = vlan_map.get(assignment.l2_segment_id)
+        if not segment:
+            continue
+        vlan_id = segment["vlan_id"]
+        vlan_devices.setdefault(vlan_id, set()).add(assignment.device_id)
+
+    # Convert sets to lists
+    vlan_device_lists = {vlan_id: list(dev_set) for vlan_id, dev_set in vlan_devices.items()}
+
+    # Layout devices within each VLAN group
+    vlan_group_layouts: list[dict] = []
+    device_layouts: list[DeviceLayout] = []
+    stats_layers = []
+    stats_crossings = []
+    stats_times = []
+
+    for vlan_id, device_ids in vlan_device_lists.items():
+        if not device_ids:
+            continue
+
+        # Get devices for this VLAN
+        group_devices = [d for d in devices if d.id in device_ids]
+        if not group_devices:
+            continue
+
+        # Get links within this VLAN
+        device_id_set = set(device_ids)
+        group_links = [
+            l for l in links
+            if l.from_device_id in device_id_set and l.to_device_id in device_id_set
+        ]
+
+        # Layout devices using Sugiyama
+        layout_result = auto_layout(group_devices, group_links, config)
+
+        # Compute bounding box
+        if layout_result.devices:
+            min_x = min(d["x"] for d in layout_result.devices)
+            min_y = min(d["y"] for d in layout_result.devices)
+            max_x = max(d["x"] for d in layout_result.devices) + config.node_width
+            max_y = max(d["y"] for d in layout_result.devices) + config.node_height
+        else:
+            min_x = min_y = 0.0
+            max_x = config.node_width
+            max_y = config.node_height
+
+        group_width = max(GROUP_MIN_WIDTH, (max_x - min_x) + GROUP_PADDING * 2)
+        group_height = max(GROUP_MIN_HEIGHT, (max_y - min_y) + GROUP_PADDING * 2 + LABEL_BAND)
+
+        # Find VLAN name
+        vlan_name = next(
+            (seg["name"] for seg in vlan_map.values() if seg["vlan_id"] == vlan_id),
+            f"VLAN {vlan_id}"
+        )
+
+        vlan_group_layouts.append({
+            "vlan_id": vlan_id,
+            "name": vlan_name,
+            "width": group_width,
+            "height": group_height,
+            "device_ids": device_ids,
+            "layout": layout_result,
+            "min_x": min_x,
+            "min_y": min_y,
+        })
+
+        stats_layers.append(layout_result.stats["total_layers"])
+        stats_crossings.append(layout_result.stats["total_crossings"])
+        stats_times.append(layout_result.stats["execution_time_ms"])
+
+    # Pack VLAN groups (simple grid packing)
+    vlan_group_layouts.sort(key=lambda g: g["vlan_id"])
+
+    max_row_width = 15.0  # Wider for VLAN groups
+    current_x = 0.0
+    current_y = 0.0
+    current_row_height = 0.0
+
+    vlan_group_results: list[VlanGroupLayout] = []
+
+    for group in vlan_group_layouts:
+        group_width = group["width"]
+        group_height = group["height"]
+
+        # Check if need new row
+        if current_x > 0 and current_x + GROUP_GAP + group_width > max_row_width:
+            # New row
+            current_y += current_row_height + GROUP_GAP
+            current_x = 0.0
+            current_row_height = 0.0
+
+        group_x = current_x
+        group_y = current_y
+
+        # Place devices within this group
+        for d in group["layout"].devices:
+            device_layouts.append(DeviceLayout(
+                id=d["id"],
+                area_id=None,
+                x=group_x + GROUP_PADDING + (d["x"] - group["min_x"]),
+                y=group_y + LABEL_BAND + GROUP_PADDING + (d["y"] - group["min_y"]),
+                layer=d["layer"],
+            ))
+
+        # Record VLAN group position
+        vlan_group_results.append(VlanGroupLayout(
+            vlan_id=group["vlan_id"],
+            name=group["name"],
+            x=group_x,
+            y=group_y,
+            width=group_width,
+            height=group_height,
+            device_ids=group["device_ids"],
+        ))
+
+        # Advance position
+        current_x += group_width + GROUP_GAP
+        current_row_height = max(current_row_height, group_height)
+
+    stats = LayoutStats(
+        total_layers=max(stats_layers) if stats_layers else 0,
+        total_crossings=sum(stats_crossings) if stats_crossings else 0,
+        execution_time_ms=sum(stats_times) if stats_times else 0,
+        algorithm="sugiyama_vlan_grouped",
+    )
+
+    return {
+        "devices": device_layouts,
+        "vlan_groups": vlan_group_results,
+        "stats": stats,
+    }
+
+
+def compute_layout_l3(
+    devices: list,
+    links: list,
+    l3_addresses: list,
+    config: LayoutConfig,
+) -> dict:
+    """Compute L3 layout: routers on top, subnet groups below (NS-like L3 view)."""
+    import ipaddress
+
+    GROUP_MIN_WIDTH = 3.0
+    GROUP_MIN_HEIGHT = 1.5
+    GROUP_GAP = 0.5
+    GROUP_PADDING = 0.15
+    LABEL_BAND = 0.35
+    ROUTER_GAP = 1.0
+
+    # Map device_id -> subnets
+    device_subnets: dict[str, set[str]] = {}
+    subnet_devices: dict[str, set[str]] = {}
+
+    for addr in l3_addresses:
+        try:
+            # Compute subnet base
+            ip = ipaddress.ip_interface(f"{addr.ip_address}/{addr.prefix_length}")
+            subnet_str = str(ip.network)
+
+            device_subnets.setdefault(addr.device_id, set()).add(subnet_str)
+            subnet_devices.setdefault(subnet_str, set()).add(addr.device_id)
+        except Exception:
+            # Skip invalid IPs
+            continue
+
+    # Identify routers (devices with multiple subnets)
+    router_ids = [dev_id for dev_id, subnets in device_subnets.items() if len(subnets) > 1]
+    endpoint_ids = [dev_id for dev_id, subnets in device_subnets.items() if len(subnets) == 1]
+
+    # Get router devices
+    routers = [d for d in devices if d.id in router_ids]
+
+    # Layout routers horizontally at the top
+    router_x = 0.0
+    router_y = 0.0
+    router_layouts: list[DeviceLayout] = []
+
+    for router in routers:
+        router_layouts.append(DeviceLayout(
+            id=router.id,
+            area_id=None,
+            x=router_x,
+            y=router_y,
+            layer=0,
+        ))
+        router_x += config.node_width + ROUTER_GAP
+
+    # Group endpoints by subnet (exclude routers from subnet groups)
+    subnet_groups_data: list[dict] = []
+    device_layouts: list[DeviceLayout] = []
+    stats_layers = []
+    stats_crossings = []
+    stats_times = []
+
+    for subnet, dev_ids in subnet_devices.items():
+        # Filter out routers (they're in top row)
+        group_device_ids = [dev_id for dev_id in dev_ids if dev_id in endpoint_ids]
+        if not group_device_ids:
+            continue
+
+        group_devices = [d for d in devices if d.id in group_device_ids]
+        if not group_devices:
+            continue
+
+        # Get links within this subnet
+        device_id_set = set(group_device_ids)
+        group_links = [
+            l for l in links
+            if l.from_device_id in device_id_set and l.to_device_id in device_id_set
+        ]
+
+        # Layout devices using Sugiyama
+        layout_result = auto_layout(group_devices, group_links, config)
+
+        # Compute bounding box
+        if layout_result.devices:
+            min_x = min(d["x"] for d in layout_result.devices)
+            min_y = min(d["y"] for d in layout_result.devices)
+            max_x = max(d["x"] for d in layout_result.devices) + config.node_width
+            max_y = max(d["y"] for d in layout_result.devices) + config.node_height
+        else:
+            min_x = min_y = 0.0
+            max_x = config.node_width
+            max_y = config.node_height
+
+        group_width = max(GROUP_MIN_WIDTH, (max_x - min_x) + GROUP_PADDING * 2)
+        group_height = max(GROUP_MIN_HEIGHT, (max_y - min_y) + GROUP_PADDING * 2 + LABEL_BAND)
+
+        # Find router for this subnet (first router with this subnet)
+        router_id = None
+        for rid in router_ids:
+            if subnet in device_subnets.get(rid, set()):
+                router_id = rid
+                break
+
+        subnet_groups_data.append({
+            "subnet": subnet,
+            "name": subnet,
+            "width": group_width,
+            "height": group_height,
+            "device_ids": group_device_ids,
+            "router_id": router_id,
+            "layout": layout_result,
+            "min_x": min_x,
+            "min_y": min_y,
+        })
+
+        stats_layers.append(layout_result.stats["total_layers"])
+        stats_crossings.append(layout_result.stats["total_crossings"])
+        stats_times.append(layout_result.stats["execution_time_ms"])
+
+    # Pack subnet groups below routers
+    subnet_groups_data.sort(key=lambda g: g["subnet"])
+
+    # Start below routers
+    router_row_height = config.node_height if routers else 0.0
+    max_row_width = 15.0
+    current_x = 0.0
+    current_y = router_row_height + (GROUP_GAP * 2 if routers else 0.0)
+    current_row_height = 0.0
+
+    subnet_group_results: list[SubnetGroupLayout] = []
+
+    for group in subnet_groups_data:
+        group_width = group["width"]
+        group_height = group["height"]
+
+        # Check if need new row
+        if current_x > 0 and current_x + GROUP_GAP + group_width > max_row_width:
+            # New row
+            current_y += current_row_height + GROUP_GAP
+            current_x = 0.0
+            current_row_height = 0.0
+
+        group_x = current_x
+        group_y = current_y
+
+        # Place devices within this group
+        for d in group["layout"].devices:
+            device_layouts.append(DeviceLayout(
+                id=d["id"],
+                area_id=None,
+                x=group_x + GROUP_PADDING + (d["x"] - group["min_x"]),
+                y=group_y + LABEL_BAND + GROUP_PADDING + (d["y"] - group["min_y"]),
+                layer=d["layer"],
+            ))
+
+        # Record subnet group position
+        subnet_group_results.append(SubnetGroupLayout(
+            subnet=group["subnet"],
+            name=group["name"],
+            x=group_x,
+            y=group_y,
+            width=group_width,
+            height=group_height,
+            device_ids=group["device_ids"],
+            router_id=group["router_id"],
+        ))
+
+        # Advance position
+        current_x += group_width + GROUP_GAP
+        current_row_height = max(current_row_height, group_height)
+
+    # Combine router layouts and device layouts
+    all_device_layouts = router_layouts + device_layouts
+
+    stats = LayoutStats(
+        total_layers=max(stats_layers) if stats_layers else 0,
+        total_crossings=sum(stats_crossings) if stats_crossings else 0,
+        execution_time_ms=sum(stats_times) if stats_times else 0,
+        algorithm="sugiyama_subnet_grouped",
+    )
+
+    return {
+        "devices": all_device_layouts,
+        "subnet_groups": subnet_group_results,
         "stats": stats,
     }
 

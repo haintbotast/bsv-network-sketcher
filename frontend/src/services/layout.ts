@@ -15,6 +15,7 @@ export interface AutoLayoutOptions {
   layout_scope?: 'area' | 'project'
   anchor_routing?: boolean
   overview_mode?: 'l1-only'
+  view_mode?: 'L1' | 'L2' | 'L3'
 }
 
 export interface DeviceLayout {
@@ -34,6 +35,27 @@ export interface AreaLayout {
   height: number
 }
 
+export interface VlanGroupLayout {
+  vlan_id: number
+  name: string
+  x: number
+  y: number
+  width: number
+  height: number
+  device_ids: string[]
+}
+
+export interface SubnetGroupLayout {
+  subnet: string
+  name: string
+  x: number
+  y: number
+  width: number
+  height: number
+  device_ids: string[]
+  router_id?: string | null
+}
+
 export interface LayoutStats {
   total_layers: number
   total_crossings: number
@@ -44,6 +66,8 @@ export interface LayoutStats {
 export interface LayoutResult {
   devices: DeviceLayout[]
   areas: null | AreaLayout[]
+  vlan_groups?: null | VlanGroupLayout[]
+  subnet_groups?: null | SubnetGroupLayout[]
   stats: LayoutStats
 }
 
@@ -69,6 +93,7 @@ export async function autoLayout(
     layout_scope: 'project',
     anchor_routing: true,
     overview_mode: 'l1-only',
+    view_mode: 'L1',
     ...options
   }
 

@@ -267,8 +267,8 @@ const visibleAreas = computed(() => {
       const isSubZone = SUB_ZONES.has(zone)
       const fontSize = isSubZone ? 12 : 14
 
-      // L1 view: minimize area opacity for compact NS-like appearance
-      const areaOpacity = props.viewMode === 'L1' ? 0.05 : 0.15
+      // L1 view: areas fully visible with clear borders (NS gốc style)
+      const areaOpacity = 0.95
 
       return {
         id: area.id,
@@ -298,7 +298,7 @@ const visibleAreas = computed(() => {
           text: area.name,
           fontSize,
           fill: '#3f3a33',
-          opacity: props.viewMode === 'L1' ? 0.4 : 1.0,
+          opacity: 1.0,
           wrap: 'none',
           ellipsis: true,
           align: labelAlign

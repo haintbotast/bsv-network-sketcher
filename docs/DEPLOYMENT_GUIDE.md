@@ -115,13 +115,50 @@ npm run dev -- --port 5173 > logs/vite.log 2>&1 &
 
 ---
 
-## 3.1. Sync code từ source sang deploy
+## 3.4. Hot deploy khi đang phát triển
+
+Khi backend và frontend dev server đang chạy, bạn có thể cập nhật code mà không cần restart:
+
+### Frontend hot reload (Vite HMR)
 
 ```bash
-rsync -av --exclude='node_modules' --exclude='.venv' --exclude='__pycache__' \
-  --exclude='*.pyc' --exclude='.git' --exclude='*.db' \
+# Sync frontend code từ source sang deploy
+rsync -av --delete \
+  --exclude='node_modules' --exclude='dist' --exclude='logs' \
+  /home/<user>/Projects/bsv/bsv-network-sketcher/frontend/ \
+  /opt/bsv-ns-deploy/frontend/
+
+# Vite dev server sẽ tự động hot reload (HMR)
+# Kiểm tra log: tail -f /opt/bsv-ns-deploy/frontend/logs/vite.log
+```
+
+### Backend reload (Uvicorn --reload)
+
+```bash
+# Sync backend code từ source sang deploy
+rsync -av --delete \
+  --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' \
+  --exclude='data' --exclude='logs' --exclude='exports' \
+  /home/<user>/Projects/bsv/bsv-network-sketcher/backend/ \
+  /opt/bsv-ns-deploy/backend/
+
+# Uvicorn với --reload sẽ tự động restart khi phát hiện thay đổi
+# Kiểm tra log: tail -f /opt/bsv-ns-deploy/backend/logs/uvicorn.log
+```
+
+### Sync toàn bộ dự án
+
+```bash
+rsync -av --exclude='node_modules' --exclude='venv' --exclude='__pycache__' \
+  --exclude='*.pyc' --exclude='.git' --exclude='*.db' --exclude='dist' \
+  --exclude='logs' --exclude='exports' \
   /home/<user>/Projects/bsv/bsv-network-sketcher/ /opt/bsv-ns-deploy/
 ```
+
+**Lưu ý:**
+- Sử dụng `--delete` để xóa file không còn tồn tại trong source
+- Exclude các thư mục build/runtime để tránh mất dữ liệu
+- Frontend HMR nhanh hơn (~100ms), backend reload chậm hơn (~1-2s)
 
 ---
 

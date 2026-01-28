@@ -215,26 +215,58 @@ def build_grouped_layout(
     LABEL_BAND = 0.35
     MAX_ROW_WIDTH_BASE = 12.0
 
+    # Tier characteristics for enhanced layout (11 tiers: 0-10)
+    TIER_CHARACTERISTICS = {
+        0: {"max_areas_per_row": 2, "width_factor": 1.5, "priority": "wide"},
+        1: {"max_areas_per_row": 2, "width_factor": 1.5, "priority": "wide"},
+        2: {"max_areas_per_row": 2, "width_factor": 1.3, "priority": "wide"},
+        3: {"max_areas_per_row": 2, "width_factor": 1.4, "priority": "wide"},
+        4: {"max_areas_per_row": 2, "width_factor": 1.3, "priority": "wide"},
+        5: {"max_areas_per_row": 3, "width_factor": 1.2, "priority": "medium"},
+        6: {"max_areas_per_row": 3, "width_factor": 1.1, "priority": "medium"},
+        7: {"max_areas_per_row": 4, "width_factor": 1.0, "priority": "narrow"},
+        8: {"max_areas_per_row": 4, "width_factor": 1.0, "priority": "narrow"},
+        9: {"max_areas_per_row": 4, "width_factor": 1.0, "priority": "narrow"},
+        10: {"max_areas_per_row": 3, "width_factor": 1.2, "priority": "medium"},
+    }
+
     def normalize(text: str | None) -> str:
         return (text or "").strip().lower()
 
     def detect_area_tier(name: str | None) -> int | None:
+        """Detect area tier with enhanced granularity (0-10)."""
         label = normalize(name)
         tier_hints = [
-            (0, ["edge", "wan", "internet"]),
+            # Tier 0: Edge/WAN
+            (0, ["edge", "wan", "internet", "isp"]),
+            # Tier 1: Security
             (1, ["security", "firewall", "fw", "ids", "ips", "waf", "vpn"]),
+            # Tier 2: DMZ
             (2, ["dmz", "proxy"]),
+            # Tier 3: Core
             (3, ["core"]),
+            # Tier 4: Distribution
             (4, ["distribution", "dist"]),
-            (5, ["access", "office", "department", "project", "projects", "it"]),
-            (6, ["server", "servers", "storage", "nas", "dc", "data center", "datacenter"]),
+            # Tier 5: Campus (large sites)
+            (5, ["campus", "hq", "headquarters", "main"]),
+            # Tier 6: Branch (remote sites)
+            (6, ["branch", "site", "remote"]),
+            # Tier 7: Office (floor-level)
+            (7, ["office", "floor", "building"]),
+            # Tier 8: Department
+            (8, ["department", "dept"]),
+            # Tier 9: Project
+            (9, ["project", "proj", "it"]),
+            # Tier 10: Servers
+            (10, ["server", "servers", "storage", "nas", "dc", "data center", "datacenter"]),
         ]
         for tier, keywords in tier_hints:
             if any(keyword in label for keyword in keywords):
                 return tier
-        return None
+        return None  # Will fallback to device tier or default tier 7
 
     def detect_device_tier(device) -> int:
+        """Detect device tier with enhanced granularity (0-10)."""
         name = normalize(getattr(device, "name", ""))
         dtype = normalize(getattr(device, "device_type", ""))
         tier_keywords = [
@@ -243,12 +275,17 @@ def build_grouped_layout(
             (2, ["dmz", "proxy"]),
             (3, ["core"]),
             (4, ["distribution", "dist"]),
-            (5, ["access", "acc"]),
-            (6, ["server", "storage", "nas", "san"]),
+            (5, ["campus"]),
+            (6, ["branch"]),
+            (7, ["office", "floor"]),
+            (8, ["department", "dept"]),
+            (9, ["project", "proj"]),
+            (10, ["server", "storage", "nas", "san", "datacenter", "dc"]),
         ]
         for tier, keywords in tier_keywords:
             if any(keyword in name for keyword in keywords):
                 return tier
+        # Fallback by device_type
         if dtype == "firewall":
             return 1
         if dtype == "router":
@@ -256,23 +293,55 @@ def build_grouped_layout(
         if dtype == "switch":
             return 4
         if dtype in {"server", "storage"}:
-            return 6
+            return 10
         if dtype == "ap":
-            return 5
+            return 7  # Access points typically at office level
         if dtype in {"pc", "printer", "camera", "ipphone", "phone", "endpoint"}:
-            return 6
-        return 5
+            return 10  # Endpoints grouped with servers for simplicity
+        return 7  # Default: office tier
 
-    def compute_max_row_width(area_ids: list[str]) -> float:
+    def compute_max_row_width_per_tier(area_ids: list[str], tier: int) -> float:
+        """
+        Compute max row width tailored to tier characteristics.
+
+        Strategy:
+        1. Ensure 2 widest areas can fit in one row
+        2. Apply tier-specific width factor
+        3. Optimize for target columns per tier
+        """
         if not area_ids:
             return MAX_ROW_WIDTH_BASE
-        total_width = sum(area_meta[aid]["computed_width"] for aid in area_ids)
-        avg_width = total_width / len(area_ids)
-        target_cols = max(1, int(round(len(area_ids) ** 0.5)))
-        return max(MAX_ROW_WIDTH_BASE, avg_width * target_cols + AREA_GAP * (target_cols - 1))
 
-    def pack_rows(area_ids: list[str]) -> list[list[str]]:
-        max_width = compute_max_row_width(area_ids)
+        # Get tier characteristics
+        tier_config = TIER_CHARACTERISTICS.get(tier, {
+            "max_areas_per_row": 3,
+            "width_factor": 1.0,
+            "priority": "medium"
+        })
+
+        widths = [area_meta[aid]["computed_width"] for aid in area_ids]
+        widths_sorted = sorted(widths, reverse=True)
+
+        # Strategy 1: Ensure 2 widest areas can fit
+        if len(widths_sorted) >= 2:
+            min_width_for_two = widths_sorted[0] + widths_sorted[1] + AREA_GAP
+        else:
+            min_width_for_two = widths_sorted[0] if widths_sorted else AREA_MIN_WIDTH
+
+        # Strategy 2: Apply tier-specific factor
+        base_width = MAX_ROW_WIDTH_BASE * tier_config["width_factor"]
+
+        # Strategy 3: Optimize for target columns
+        avg_width = sum(widths) / len(widths)
+        target_cols = min(tier_config["max_areas_per_row"], len(area_ids))
+        suggested_width = avg_width * target_cols + AREA_GAP * (target_cols - 1)
+
+        # Return max of all strategies
+        return max(base_width, min_width_for_two, suggested_width)
+
+    def pack_rows(area_ids: list[str], tier: int) -> list[list[str]]:
+        """Pack areas into rows using tier-specific max width."""
+        max_width = compute_max_row_width_per_tier(area_ids, tier)
         rows: list[list[str]] = []
         current: list[str] = []
         current_width = 0.0
@@ -310,7 +379,7 @@ def build_grouped_layout(
             current_x = 0.0
             for tier in ordered_tiers:
                 area_ids = area_tiers[tier]
-                rows = pack_rows(area_ids)
+                rows = pack_rows(area_ids, tier)  # Pass tier parameter
                 row_widths = [row_width(row) for row in rows]
                 row_heights = [row_height(row) for row in rows]
                 tier_width = max(row_widths) if row_widths else 0.0
@@ -326,7 +395,7 @@ def build_grouped_layout(
             current_y = 0.0
             for tier in ordered_tiers:
                 area_ids = area_tiers[tier]
-                rows = pack_rows(area_ids)
+                rows = pack_rows(area_ids, tier)  # Pass tier parameter
                 row_heights = [row_height(row) for row in rows]
                 row_y = current_y
                 for row, height in zip(rows, row_heights):
@@ -425,7 +494,7 @@ def build_grouped_layout(
         elif device_hint is not None:
             tier = device_hint
         else:
-            tier = 5
+            tier = 7  # Default: office tier (most common)
 
         area_tiers.setdefault(tier, []).append(area_id)
 

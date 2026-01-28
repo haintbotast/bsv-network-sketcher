@@ -109,7 +109,7 @@
         />
       </main>
 
-      <aside class="panel right">
+      <aside v-show="showRightPanel" class="panel right">
         <div class="grid-tabs">
           <button type="button" :class="{ active: activeGrid === 'areas' }" @click="activeGrid = 'areas'">Areas</button>
           <button type="button" :class="{ active: activeGrid === 'devices' }" @click="activeGrid = 'devices'">Devices</button>
@@ -643,8 +643,30 @@ function updateViewport(value: Viewport) {
   viewport.scale = value.scale
 }
 
-function handleSelect(payload: { id: string }) {
+function handleSelect(payload: { id: string; type?: 'device' | 'area' }) {
   selectedId.value = payload.id
+
+  // Auto-switch to relevant tab when selecting an object
+  if (panelMode.value === 'selection' && payload.id) {
+    if (payload.type === 'device') {
+      activeGrid.value = 'devices'
+    } else if (payload.type === 'area') {
+      activeGrid.value = 'areas'
+    } else {
+      // Infer type from data
+      const isArea = areas.value.some(a => a.id === payload.id)
+      const isDevice = devices.value.some(d => d.id === payload.id)
+      const isLink = links.value.some(l => l.id === payload.id)
+
+      if (isArea) {
+        activeGrid.value = 'areas'
+      } else if (isDevice) {
+        activeGrid.value = 'devices'
+      } else if (isLink) {
+        activeGrid.value = 'links'
+      }
+    }
+  }
 }
 
 function zoomIn() {

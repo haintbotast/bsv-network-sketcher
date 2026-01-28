@@ -31,6 +31,13 @@ https://github.com/cisco-open/network-sketcher
 
 **Áp dụng cho web app:**
 - Auto‑layout phải theo **2 tầng**: macro (Area) + micro (thiết bị trong Area).
+- Macro sử dụng **11-tier hierarchy (0-10)** để phân tầng chi tiết:
+  - Tier 0-4: Infrastructure (Edge, Security, DMZ, Core, Distribution)
+  - Tier 5-6: Sites (Campus, Branch)
+  - Tier 7-9: Local (Office, Department, Project)
+  - Tier 10: Servers/Storage
+- Mỗi tier có **width factor** và **max areas per row** riêng để tối ưu bố cục.
+- Default tier: **7 (Office)** - phổ biến nhất cho các area không xác định được.
 - Overview mặc định **chỉ L1/flow** để giữ sạch bố cục; L2/L3 chỉ hiển thị ở view riêng.
 
 ### 13.1 Tổng quan tệp nguồn

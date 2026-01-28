@@ -23,6 +23,7 @@
           v-for="area in visibleAreas"
           :key="area.id"
           :config="area.group"
+          @click="() => emitSelect(area.id, 'area')"
         >
           <v-rect :config="area.rect" />
           <v-text :config="area.label" />

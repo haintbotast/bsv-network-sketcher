@@ -55,9 +55,25 @@
 
 **Macro layout (Area):**
 - Kích thước Area được **tính lại từ bounding thiết bị** + padding + band nhãn khi auto‑layout toàn dự án (cho phép **co lại** nếu dư thừa).
-- Sắp xếp Area theo **tier**: Edge → Security → DMZ → Core → Distribution → Access/Office/Department → Servers.
-- Mỗi tier **tự xuống dòng (wrap)** theo hàng để tránh hàng quá dài.
-- Khoảng cách giữa Area cần đủ lớn để tránh chồng lấn (đặt theo preset/gap chuẩn).
+- Sắp xếp Area theo **11 tiers** (0-10):
+  - **Tier 0: Edge/WAN** (ISP, Internet, Edge routers)
+  - **Tier 1: Security** (Firewalls, IDS/IPS, VPN)
+  - **Tier 2: DMZ** (DMZ servers, proxy)
+  - **Tier 3: Core** (Core switches, core routers)
+  - **Tier 4: Distribution** (Distribution switches)
+  - **Tier 5: Campus** (Campus-wide access, HQ, main sites)
+  - **Tier 6: Branch** (Branch sites, remote offices)
+  - **Tier 7: Office** (Office floors, building access) - **mặc định**
+  - **Tier 8: Department** (Department-specific networks)
+  - **Tier 9: Project** (Project-specific networks)
+  - **Tier 10: Servers** (Datacenter, servers, storage)
+- Mỗi tier có **width factor** riêng:
+  - Tier 0-4 (Infrastructure): rộng hơn (1.3-1.5x), tối đa 2 areas/hàng
+  - Tier 5-6 (Campus/Branch): vừa phải (1.1-1.2x), tối đa 3 areas/hàng
+  - Tier 7-9 (Office/Dept/Project): hẹp hơn (1.0x), tối đa 4 areas/hàng
+  - Tier 10 (Servers): vừa phải (1.2x), tối đa 3 areas/hàng
+- Mỗi tier **tự xuống dòng (wrap)** theo hàng dựa trên max width của tier đó.
+- Khoảng cách giữa Area: 0.8 inch (AREA_GAP).
 
 ---
 

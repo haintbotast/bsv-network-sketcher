@@ -138,7 +138,7 @@ async def compute_auto_layout(
             if options.group_by_area:
                 response = compute_layout_l1(devices, links, areas, config, options.layout_scope)
             else:
-                layout_result = simple_layer_layout(devices, config)
+                layout_result = simple_layer_layout(devices, links, config)
                 response = {
                     "devices": [
                         DeviceLayout(
@@ -531,7 +531,7 @@ def compute_layout_l1(
             if l.from_device_id in device_ids and l.to_device_id in device_ids
         ]
 
-        layout_result = simple_layer_layout(area_devices, micro_config)
+        layout_result = simple_layer_layout(area_devices, area_links, micro_config)
 
         if layout_result.devices:
             min_x = min(d["x"] for d in layout_result.devices)
@@ -654,7 +654,13 @@ def compute_layout_l1(
     # Handle devices without area (fallback to global)
     no_area_devices = [d for d in devices if not d.area_id]
     if no_area_devices:
-        layout_result = simple_layer_layout(no_area_devices, config)
+        # Get links for no-area devices
+        no_area_device_ids = {d.id for d in no_area_devices}
+        no_area_links = [
+            l for l in links
+            if l.from_device_id in no_area_device_ids and l.to_device_id in no_area_device_ids
+        ]
+        layout_result = simple_layer_layout(no_area_devices, no_area_links, config)
         for d in layout_result.devices:
             device_layouts.append(DeviceLayout(
                 id=d["id"],
@@ -734,7 +740,7 @@ def compute_layout_l2(
         ]
 
         # Layout devices using simple layer layout (NS gốc style)
-        layout_result = simple_layer_layout(group_devices, config)
+        layout_result = simple_layer_layout(group_devices, group_links, config)
 
         # Compute bounding box
         if layout_result.devices:
@@ -913,7 +919,7 @@ def compute_layout_l3(
         ]
 
         # Layout devices using simple layer layout (NS gốc style)
-        layout_result = simple_layer_layout(group_devices, config)
+        layout_result = simple_layer_layout(group_devices, group_links, config)
 
         # Compute bounding box
         if layout_result.devices:
@@ -1021,12 +1027,13 @@ def compute_layout_l3(
     }
 
 
-def simple_layer_layout(devices: list, config: LayoutConfig):
+def simple_layer_layout(devices: list, links: list, config: LayoutConfig):
     """
-    Simple layer-based layout (NS gốc style).
+    Simple layer-based layout with topology-aware positioning (NS gốc style).
 
     Replaces Sugiyama algorithm with simple layering based on device_type.
-    Devices are arranged in layers (top-to-bottom) and grid-packed (left-to-right).
+    Devices are arranged in layers (top-to-bottom), with topology-aware ordering
+    within each layer to place connected devices close together.
 
     Layer assignment (from NS gốc analysis):
     - Layer 0 (top): Firewall, Router (core)
@@ -1034,8 +1041,11 @@ def simple_layer_layout(devices: list, config: LayoutConfig):
     - Layer 2 (middle-bottom): Server, Storage
     - Layer 3 (bottom): AP, PC, Unknown (endpoints)
 
+    Within each layer, devices are ordered by connectivity to minimize crossings.
+
     Args:
         devices: List of Device model instances
+        links: List of L1Link model instances (for topology-aware ordering)
         config: LayoutConfig with node_width, node_height, node_spacing
 
     Returns:
@@ -1043,6 +1053,8 @@ def simple_layer_layout(devices: list, config: LayoutConfig):
     """
     from app.services.layout_engine import LayoutResult
     import time
+    from collections import deque
+
     start_time = time.time()
 
     # Device type to layer mapping (NS gốc style)
@@ -1059,12 +1071,81 @@ def simple_layer_layout(devices: list, config: LayoutConfig):
 
     # Group devices by layer
     layers: dict[int, list] = {}
+    device_id_to_device = {d.id: d for d in devices}
+
     for device in devices:
         device_type = getattr(device, "device_type", "Unknown")
         layer_idx = DEVICE_TYPE_LAYERS.get(device_type, 3)
         layers.setdefault(layer_idx, []).append(device)
 
-    # Layout devices layer by layer (top-to-bottom)
+    # Build adjacency graph for topology-aware ordering
+    adjacency: dict[str, set[str]] = {d.id: set() for d in devices}
+    for link in links:
+        if link.from_device_id in adjacency and link.to_device_id in adjacency:
+            adjacency[link.from_device_id].add(link.to_device_id)
+            adjacency[link.to_device_id].add(link.from_device_id)
+
+    def topology_aware_order(layer_devices: list, prev_layer_devices: list = None) -> list:
+        """
+        Order devices within a layer based on connectivity.
+
+        If prev_layer_devices is provided, prioritize connections to previous layer.
+        Otherwise, use BFS from most connected device.
+        """
+        if len(layer_devices) <= 1:
+            return layer_devices
+
+        device_ids = {d.id for d in layer_devices}
+        visited = set()
+        ordered = []
+
+        # Find starting device (most connected to previous layer, or most connected overall)
+        if prev_layer_devices:
+            prev_layer_ids = {d.id for d in prev_layer_devices}
+            # Start with device most connected to previous layer
+            start_device = max(
+                layer_devices,
+                key=lambda d: len(adjacency[d.id] & prev_layer_ids)
+            )
+        else:
+            # Start with most connected device
+            start_device = max(
+                layer_devices,
+                key=lambda d: len(adjacency[d.id] & device_ids)
+            )
+
+        # BFS traversal to order devices
+        queue = deque([start_device])
+        visited.add(start_device.id)
+
+        while queue:
+            current = queue.popleft()
+            ordered.append(current)
+
+            # Find neighbors in same layer, sort by connection count
+            neighbors = [
+                device_id_to_device[neighbor_id]
+                for neighbor_id in adjacency[current.id]
+                if neighbor_id in device_ids and neighbor_id not in visited
+            ]
+
+            # Sort neighbors by connection count (descending)
+            neighbors.sort(key=lambda d: len(adjacency[d.id] & device_ids), reverse=True)
+
+            for neighbor in neighbors:
+                if neighbor.id not in visited:
+                    visited.add(neighbor.id)
+                    queue.append(neighbor)
+
+        # Add any unconnected devices at the end
+        for device in layer_devices:
+            if device.id not in visited:
+                ordered.append(device)
+                visited.add(device.id)
+
+        return ordered
+
+    # Layout devices layer by layer (top-to-bottom) with topology-aware ordering
     device_layouts = []
     current_y = 0.0
     layer_gap = config.layer_gap
@@ -1072,17 +1153,18 @@ def simple_layer_layout(devices: list, config: LayoutConfig):
     node_width = config.node_width
     node_height = config.node_height
 
+    prev_layer_devices = None
+
     for layer_idx in sorted(layers.keys()):
         layer_devices = layers[layer_idx]
-        num_devices = len(layer_devices)
 
-        # Calculate total width for this layer
-        total_width = num_devices * node_width + (num_devices - 1) * node_spacing
+        # Order devices by topology
+        ordered_devices = topology_aware_order(layer_devices, prev_layer_devices)
 
-        # Start x position (left-aligned, or can be center-aligned)
+        num_devices = len(ordered_devices)
         current_x = 0.0
 
-        for i, device in enumerate(layer_devices):
+        for device in ordered_devices:
             device_layouts.append({
                 "id": device.id,
                 "x": current_x,
@@ -1093,17 +1175,18 @@ def simple_layer_layout(devices: list, config: LayoutConfig):
 
         # Move to next layer
         current_y += node_height + layer_gap
+        prev_layer_devices = ordered_devices
 
     # Compute stats
     execution_time_ms = int((time.time() - start_time) * 1000)
     total_layers = len(layers)
-    total_crossings = 0  # Simple layout has no crossings
+    total_crossings = 0  # Would need link crossing analysis
 
     stats = {
         "total_layers": total_layers,
         "total_crossings": total_crossings,
         "execution_time_ms": execution_time_ms,
-        "algorithm": "simple_layer_layout",
+        "algorithm": "simple_layer_topology_aware",
     }
 
     return LayoutResult(

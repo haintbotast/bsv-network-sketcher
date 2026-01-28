@@ -688,8 +688,11 @@ const visibleLinks = computed(() => {
       const fromArea = fromAreaId ? areaViewMap.value.get(fromAreaId) : null
       const toArea = toAreaId ? areaViewMap.value.get(toAreaId) : null
 
-      let points = [fromCenter.x, fromCenter.y, toCenter.x, toCenter.y]
+      let points: number[] = []
+
+      // Orthogonal routing for all links (NS gốc style)
       if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
+        // Inter-area links: use corridor routing
         const fromAnchor = computeAreaAnchor(fromArea, fromCenter, toCenter)
         const toAnchor = computeAreaAnchor(toArea, toCenter, fromCenter)
         const bounds = areaBounds.value
@@ -732,6 +735,33 @@ const visibleLinks = computed(() => {
             midX, fromAnchor.y,
             midX, toAnchor.y,
             toAnchor.x, toAnchor.y,
+            toCenter.x, toCenter.y
+          ]
+        }
+      } else {
+        // Intra-area links: orthogonal (Manhattan) routing
+        const dx = toCenter.x - fromCenter.x
+        const dy = toCenter.y - fromCenter.y
+
+        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+          // Very close: direct line
+          points = [fromCenter.x, fromCenter.y, toCenter.x, toCenter.y]
+        } else if (Math.abs(dx) >= Math.abs(dy)) {
+          // Horizontal dominant: go horizontal first
+          const midX = fromCenter.x + dx / 2
+          points = [
+            fromCenter.x, fromCenter.y,
+            midX, fromCenter.y,
+            midX, toCenter.y,
+            toCenter.x, toCenter.y
+          ]
+        } else {
+          // Vertical dominant: go vertical first
+          const midY = fromCenter.y + dy / 2
+          points = [
+            fromCenter.x, fromCenter.y,
+            fromCenter.x, midY,
+            toCenter.x, midY,
             toCenter.x, toCenter.y
           ]
         }

@@ -18,7 +18,8 @@
         <v-rect :config="gridConfig" />
       </v-layer>
 
-      <v-layer ref="areaLayerRef">
+      <!-- L1 View: Areas with minimized visuals -->
+      <v-layer v-if="viewMode === 'L1' || viewMode === 'overview'" ref="areaLayerRef">
         <v-group
           v-for="area in visibleAreas"
           :key="area.id"
@@ -27,6 +28,22 @@
         >
           <v-rect :config="area.rect" />
           <v-text :config="area.label" />
+        </v-group>
+      </v-layer>
+
+      <!-- L2 View: VLAN grouping boxes -->
+      <v-layer v-if="viewMode === 'L2'" ref="vlanLayerRef">
+        <v-group v-for="group in visibleVlanGroups" :key="group.id">
+          <v-rect :config="group.rect" />
+          <v-text :config="group.label" />
+        </v-group>
+      </v-layer>
+
+      <!-- L3 View: Subnet grouping boxes -->
+      <v-layer v-if="viewMode === 'L3'" ref="subnetLayerRef">
+        <v-group v-for="group in visibleSubnetGroups" :key="group.id">
+          <v-rect :config="group.rect" />
+          <v-text :config="group.label" />
         </v-group>
       </v-layer>
 
@@ -91,6 +108,25 @@ const props = defineProps<{
   l2Assignments?: L2AssignmentRecord[]
   l3Addresses?: L3AddressRecord[]
   autoLayoutCoords?: Map<string, { x: number; y: number }> // Auto-layout coords (logical units/inches)
+  vlanGroups?: Array<{
+    vlan_id: number
+    name: string
+    x: number
+    y: number
+    width: number
+    height: number
+    device_ids: string[]
+  }>
+  subnetGroups?: Array<{
+    subnet: string
+    name: string
+    x: number
+    y: number
+    width: number
+    height: number
+    device_ids: string[]
+    router_id?: string | null
+  }>
 }>()
 
 const emit = defineEmits<{
@@ -192,6 +228,11 @@ const childAreasByParent = computed(() => {
 })
 
 const visibleAreas = computed(() => {
+  // Hide areas in L2/L3 views (they're replaced by VLAN/subnet groups)
+  if (props.viewMode === 'L2' || props.viewMode === 'L3') {
+    return []
+  }
+
   const visible = props.areas
     .filter(area => areaViewMap.value.has(area.id))
     .sort((a, b) => {
@@ -226,6 +267,9 @@ const visibleAreas = computed(() => {
       const isSubZone = SUB_ZONES.has(zone)
       const fontSize = isSubZone ? 12 : 14
 
+      // L1 view: minimize area opacity for compact NS-like appearance
+      const areaOpacity = props.viewMode === 'L1' ? 0.05 : 0.15
+
       return {
         id: area.id,
         group: {
@@ -242,6 +286,7 @@ const visibleAreas = computed(() => {
           width: rect.width,
           height: rect.height,
           fill: area.fill,
+          opacity: areaOpacity,
           stroke: area.stroke,
           strokeWidth: hasChildren ? 2 : 1.5,
           cornerRadius: 10
@@ -253,6 +298,7 @@ const visibleAreas = computed(() => {
           text: area.name,
           fontSize,
           fill: '#3f3a33',
+          opacity: props.viewMode === 'L1' ? 0.4 : 1.0,
           wrap: 'none',
           ellipsis: true,
           align: labelAlign
@@ -260,6 +306,88 @@ const visibleAreas = computed(() => {
       }
     })
   return visible
+})
+
+// VLAN Groups for L2 view
+const visibleVlanGroups = computed(() => {
+  if (props.viewMode !== 'L2' || !props.vlanGroups || props.vlanGroups.length === 0) {
+    return []
+  }
+
+  return props.vlanGroups.map(group => {
+    const logicalRect = {
+      x: group.x,
+      y: group.y,
+      width: group.width,
+      height: group.height
+    }
+    const viewRect = logicalRectToView(logicalRect, props.viewport)
+
+    return {
+      id: `vlan-${group.vlan_id}`,
+      vlan_id: group.vlan_id,
+      rect: {
+        x: viewRect.x,
+        y: viewRect.y,
+        width: viewRect.width,
+        height: viewRect.height,
+        fill: '#e3f2fd',
+        opacity: 0.3,
+        stroke: '#1976d2',
+        strokeWidth: 2,
+        cornerRadius: 8
+      },
+      label: {
+        x: viewRect.x + 10,
+        y: viewRect.y + 10,
+        text: group.name,
+        fontSize: 14,
+        fill: '#1976d2',
+        fontStyle: 'bold'
+      }
+    }
+  })
+})
+
+// Subnet Groups for L3 view
+const visibleSubnetGroups = computed(() => {
+  if (props.viewMode !== 'L3' || !props.subnetGroups || props.subnetGroups.length === 0) {
+    return []
+  }
+
+  return props.subnetGroups.map(group => {
+    const logicalRect = {
+      x: group.x,
+      y: group.y,
+      width: group.width,
+      height: group.height
+    }
+    const viewRect = logicalRectToView(logicalRect, props.viewport)
+
+    return {
+      id: `subnet-${group.subnet}`,
+      subnet: group.subnet,
+      rect: {
+        x: viewRect.x,
+        y: viewRect.y,
+        width: viewRect.width,
+        height: viewRect.height,
+        fill: '#f3e5f5',
+        opacity: 0.3,
+        stroke: '#7b1fa2',
+        strokeWidth: 2,
+        cornerRadius: 8
+      },
+      label: {
+        x: viewRect.x + 10,
+        y: viewRect.y + 10,
+        text: group.name,
+        fontSize: 14,
+        fill: '#7b1fa2',
+        fontStyle: 'bold'
+      }
+    }
+  })
 })
 
 const DEVICE_GAP = 12

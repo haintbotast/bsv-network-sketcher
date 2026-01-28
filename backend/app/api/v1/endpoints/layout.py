@@ -138,7 +138,7 @@ async def compute_auto_layout(
             if options.group_by_area:
                 response = compute_layout_l1(devices, links, areas, config, options.layout_scope)
             else:
-                layout_result = auto_layout(devices, links, config)
+                layout_result = simple_layer_layout(devices, config)
                 response = {
                     "devices": [
                         DeviceLayout(
@@ -531,7 +531,7 @@ def compute_layout_l1(
             if l.from_device_id in device_ids and l.to_device_id in device_ids
         ]
 
-        layout_result = auto_layout(area_devices, area_links, micro_config)
+        layout_result = simple_layer_layout(area_devices, micro_config)
 
         if layout_result.devices:
             min_x = min(d["x"] for d in layout_result.devices)
@@ -654,7 +654,7 @@ def compute_layout_l1(
     # Handle devices without area (fallback to global)
     no_area_devices = [d for d in devices if not d.area_id]
     if no_area_devices:
-        layout_result = auto_layout(no_area_devices, links, config)
+        layout_result = simple_layer_layout(no_area_devices, config)
         for d in layout_result.devices:
             device_layouts.append(DeviceLayout(
                 id=d["id"],
@@ -671,7 +671,7 @@ def compute_layout_l1(
         total_layers=max(stats_layers) if stats_layers else 0,
         total_crossings=sum(stats_crossings) if stats_crossings else 0,
         execution_time_ms=sum(stats_times) if stats_times else 0,
-        algorithm="sugiyama_grouped",
+        algorithm="simple_layer_grouped",
     )
 
     return {
@@ -733,8 +733,8 @@ def compute_layout_l2(
             if l.from_device_id in device_id_set and l.to_device_id in device_id_set
         ]
 
-        # Layout devices using Sugiyama
-        layout_result = auto_layout(group_devices, group_links, config)
+        # Layout devices using simple layer layout (NS gốc style)
+        layout_result = simple_layer_layout(group_devices, config)
 
         # Compute bounding box
         if layout_result.devices:
@@ -824,7 +824,7 @@ def compute_layout_l2(
         total_layers=max(stats_layers) if stats_layers else 0,
         total_crossings=sum(stats_crossings) if stats_crossings else 0,
         execution_time_ms=sum(stats_times) if stats_times else 0,
-        algorithm="sugiyama_vlan_grouped",
+        algorithm="simple_layer_vlan_grouped",
     )
 
     return {
@@ -912,8 +912,8 @@ def compute_layout_l3(
             if l.from_device_id in device_id_set and l.to_device_id in device_id_set
         ]
 
-        # Layout devices using Sugiyama
-        layout_result = auto_layout(group_devices, group_links, config)
+        # Layout devices using simple layer layout (NS gốc style)
+        layout_result = simple_layer_layout(group_devices, config)
 
         # Compute bounding box
         if layout_result.devices:
@@ -1011,7 +1011,7 @@ def compute_layout_l3(
         total_layers=max(stats_layers) if stats_layers else 0,
         total_crossings=sum(stats_crossings) if stats_crossings else 0,
         execution_time_ms=sum(stats_times) if stats_times else 0,
-        algorithm="sugiyama_subnet_grouped",
+        algorithm="simple_layer_subnet_grouped",
     )
 
     return {
@@ -1019,6 +1019,97 @@ def compute_layout_l3(
         "subnet_groups": subnet_group_results,
         "stats": stats,
     }
+
+
+def simple_layer_layout(devices: list, config: LayoutConfig):
+    """
+    Simple layer-based layout (NS gốc style).
+
+    Replaces Sugiyama algorithm with simple layering based on device_type.
+    Devices are arranged in layers (top-to-bottom) and grid-packed (left-to-right).
+
+    Layer assignment (from NS gốc analysis):
+    - Layer 0 (top): Firewall, Router (core)
+    - Layer 1 (middle-top): Switch (distribution/aggregation)
+    - Layer 2 (middle-bottom): Server, Storage
+    - Layer 3 (bottom): AP, PC, Unknown (endpoints)
+
+    Args:
+        devices: List of Device model instances
+        config: LayoutConfig with node_width, node_height, node_spacing
+
+    Returns:
+        LayoutResult with devices list and stats dict
+    """
+    from app.services.layout_engine import LayoutResult
+    import time
+    start_time = time.time()
+
+    # Device type to layer mapping (NS gốc style)
+    DEVICE_TYPE_LAYERS = {
+        "Firewall": 0,
+        "Router": 0,
+        "Switch": 1,
+        "Server": 2,
+        "Storage": 2,
+        "AP": 3,
+        "PC": 3,
+        "Unknown": 3,
+    }
+
+    # Group devices by layer
+    layers: dict[int, list] = {}
+    for device in devices:
+        device_type = getattr(device, "device_type", "Unknown")
+        layer_idx = DEVICE_TYPE_LAYERS.get(device_type, 3)
+        layers.setdefault(layer_idx, []).append(device)
+
+    # Layout devices layer by layer (top-to-bottom)
+    device_layouts = []
+    current_y = 0.0
+    layer_gap = config.layer_gap
+    node_spacing = config.node_spacing
+    node_width = config.node_width
+    node_height = config.node_height
+
+    for layer_idx in sorted(layers.keys()):
+        layer_devices = layers[layer_idx]
+        num_devices = len(layer_devices)
+
+        # Calculate total width for this layer
+        total_width = num_devices * node_width + (num_devices - 1) * node_spacing
+
+        # Start x position (left-aligned, or can be center-aligned)
+        current_x = 0.0
+
+        for i, device in enumerate(layer_devices):
+            device_layouts.append({
+                "id": device.id,
+                "x": current_x,
+                "y": current_y,
+                "layer": layer_idx,
+            })
+            current_x += node_width + node_spacing
+
+        # Move to next layer
+        current_y += node_height + layer_gap
+
+    # Compute stats
+    execution_time_ms = int((time.time() - start_time) * 1000)
+    total_layers = len(layers)
+    total_crossings = 0  # Simple layout has no crossings
+
+    stats = {
+        "total_layers": total_layers,
+        "total_crossings": total_crossings,
+        "execution_time_ms": execution_time_ms,
+        "algorithm": "simple_layer_layout",
+    }
+
+    return LayoutResult(
+        devices=device_layouts,
+        stats=stats,
+    )
 
 
 async def apply_grouped_layout_to_db(

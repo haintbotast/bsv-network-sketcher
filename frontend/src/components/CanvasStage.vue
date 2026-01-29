@@ -735,9 +735,18 @@ const zoomScale = computed(() => {
   return baseScale > 0 ? props.viewport.scale / baseScale : 1
 })
 
+const cameraOffset = computed(() => ({
+  x: props.viewport.offsetX - layoutViewport.value.offsetX,
+  y: props.viewport.offsetY - layoutViewport.value.offsetY
+}))
+
 const layerTranslation = computed(() => {
-  if (!isPanning.value) return { x: 0, y: 0 }
-  return panTranslation.value
+  const base = cameraOffset.value
+  if (!isPanning.value) return base
+  return {
+    x: base.x + panTranslation.value.x,
+    y: base.y + panTranslation.value.y
+  }
 })
 
 const layerTransform = computed(() => ({
@@ -2053,17 +2062,6 @@ onBeforeUnmount(() => {
     zoomCommitTimer = null
   }
 })
-
-watch(
-  () => [props.viewport.offsetX, props.viewport.offsetY],
-  ([offsetX, offsetY]) => {
-    layoutViewport.value = {
-      ...layoutViewport.value,
-      offsetX,
-      offsetY
-    }
-  }
-)
 
 watch(
   () => props.viewport.scale,

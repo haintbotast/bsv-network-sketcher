@@ -51,17 +51,19 @@
   **Lưu ý:** UI hiện không hiển thị Overview; dùng L1 thay thế.
 - **L2/L3:** chỉ hiển thị nhãn L2/L3 trong view tương ứng; có **band nhãn** để không chồng lên thiết bị.
 - **Khi pan/drag:** UI có thể **tạm ẩn nhãn port/L2/L3** để tối ưu hiệu năng; nhãn hiển thị lại khi dừng kéo.
-- **Khi zoom:** UI ưu tiên **scale nhanh** và **chỉ tái tính toán sau khi dừng zoom** để giảm giật/lag.
+- **Khi zoom:** UI ưu tiên **scale nhanh** và **không tái tính toán** trong lúc zoom; chỉ tính lại khi dữ liệu/layout đổi.
 
 **Liên kết liên‑area:**
 - Bắt buộc đi qua **Waypoint area** (đuôi `_wp_`), không nối Area‑Area trực tiếp.
 - Link đi qua **anchor** trên biên Area để giảm cắt xuyên.
 - Ưu tiên tuyến **corridor** (ngoài biên Area) cho liên‑area để tránh đi xuyên vùng thiết bị.
 - Routing link ưu tiên **tránh vật cản** (area/device) và **giảm chồng lấn**; nếu không bị cản thì giữ đường thẳng ngắn nhất.
+- Liên‑area **tách lane rộng hơn** so với bundle nội‑area để giảm chồng/đè.
 
 **Macro layout (Area):**
 - Kích thước Area được **tính lại từ bounding thiết bị** + padding + band nhãn khi auto‑layout toàn dự án (cho phép **co lại** nếu dư thừa).
 - Trong cùng tier, **được phép hoán vị theo kết nối** (barycenter + local swap) để giảm đường vòng liên‑area, nhưng **không đổi thứ tự tier theo trục dọc**.
+- Barycenter có thể chạy **nhiều vòng** để ưu tiên rút ngắn liên‑area khi số lượng Area lớn.
 - Sắp xếp Area theo **11 tiers** (0-10):
   - **Tier 0: Edge/WAN** (ISP, Internet, Edge routers)
   - **Tier 1: Security** (Firewalls, IDS/IPS, VPN)

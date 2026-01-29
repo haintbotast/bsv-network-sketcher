@@ -161,9 +161,7 @@ const panBaseOffset = ref<{ x: number; y: number } | null>(null)
 const panTranslation = ref({ x: 0, y: 0 })
 const pendingTranslation = ref<{ x: number; y: number } | null>(null)
 let panRaf = 0
-let zoomCommitTimer: number | null = null
 const layoutViewport = ref<Viewport>({ ...props.viewport })
-const ZOOM_COMMIT_MS = 140
 
 const gridLayerRef = ref()
 const areaLayerRef = ref()
@@ -1287,7 +1285,7 @@ const buildVisibleLinks = (useCache: boolean) => {
     areaCenters.set(id, { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 })
   })
 
-  const laneGroups = new Map<string, Array<{ id: string; order: number }>>()
+  const laneGroups = new Map<string, Array<{ id: string; order: number; portBias: number }>>()
   const laneAxisByPair = new Map<string, 'x' | 'y'>()
 
   const getPairKey = (fromArea: string, toArea: string) =>
@@ -1325,9 +1323,24 @@ const buildVisibleLinks = (useCache: boolean) => {
       const order = axis === 'y'
         ? (fromAnchor.y + toAnchor.y) / 2
         : (fromAnchor.x + toAnchor.x) / 2
+      const fromOrder = link.fromPort
+        ? devicePortOrder.value.get(link.fromDeviceId)?.get(link.fromPort)
+        : null
+      const toOrder = link.toPort
+        ? devicePortOrder.value.get(link.toDeviceId)?.get(link.toPort)
+        : null
+      const fromCount = link.fromPort
+        ? (devicePortList.value.get(link.fromDeviceId)?.length ?? 0)
+        : 0
+      const toCount = link.toPort
+        ? (devicePortList.value.get(link.toDeviceId)?.length ?? 0)
+        : 0
+      const fromNorm = fromOrder != null && fromCount > 1 ? fromOrder / (fromCount - 1) : null
+      const toNorm = toOrder != null && toCount > 1 ? toOrder / (toCount - 1) : null
+      const portBias = ((fromNorm ?? 0.5) + (toNorm ?? 0.5)) / 2
       const key = getPairKey(fromAreaId, toAreaId)
       const list = laneGroups.get(key) || []
-      list.push({ id: link.id, order })
+      list.push({ id: link.id, order, portBias })
       laneGroups.set(key, list)
     }
 
@@ -1348,7 +1361,13 @@ const buildVisibleLinks = (useCache: boolean) => {
 
   const laneIndex = new Map<string, { index: number; total: number }>()
   laneGroups.forEach(list => {
-    list.sort((a, b) => a.order - b.order)
+    list.sort((a, b) => {
+      const primary = a.order - b.order
+      if (primary !== 0) return primary
+      const secondary = a.portBias - b.portBias
+      if (secondary !== 0) return secondary
+      return a.id.localeCompare(b.id)
+    })
     list.forEach((entry, idx) => {
       laneIndex.set(entry.id, { index: idx, total: list.length })
     })
@@ -1386,8 +1405,10 @@ const buildVisibleLinks = (useCache: boolean) => {
       const bundleOffset = bundle && bundle.total > 1
         ? (bundle.index - (bundle.total - 1) / 2) * (renderTuning.value.bundle_gap * scale)
         : 0
+      const interAreaBundleGap = renderTuning.value.bundle_gap * scale
+        * (areaBundle && areaBundle.total > 4 ? 1.9 : 1.6)
       const areaBundleOffset = areaBundle && areaBundle.total > 1
-        ? (areaBundle.index - (areaBundle.total - 1) / 2) * (renderTuning.value.bundle_gap * scale)
+        ? (areaBundle.index - (areaBundle.total - 1) / 2) * interAreaBundleGap
         : 0
       const interBundleOffset = areaBundleOffset + bundleOffset * 0.5
       const bundleStub = renderTuning.value.bundle_stub * scale
@@ -2057,27 +2078,7 @@ onBeforeUnmount(() => {
     observer.unobserve(containerRef.value)
   }
   observer = null
-  if (zoomCommitTimer) {
-    clearTimeout(zoomCommitTimer)
-    zoomCommitTimer = null
-  }
 })
-
-watch(
-  () => props.viewport.scale,
-  (scale) => {
-    if (zoomCommitTimer) {
-      clearTimeout(zoomCommitTimer)
-    }
-    zoomCommitTimer = setTimeout(() => {
-      layoutViewport.value = {
-        ...layoutViewport.value,
-        scale
-      }
-      zoomCommitTimer = null
-    }, ZOOM_COMMIT_MS)
-  }
-)
 
 watch([visibleAreas, visibleDevices, visibleLinks, linkPortLabels, l2Labels, l3Labels, stageSize], () => {
   batchDraw()
@@ -2109,11 +2110,6 @@ watch(
   }
 )
 
-watch(isPanning, (value, prev) => {
-  if (!value && prev) {
-    refreshLinkCache()
-  }
-})
 </script>
 
 <style scoped>

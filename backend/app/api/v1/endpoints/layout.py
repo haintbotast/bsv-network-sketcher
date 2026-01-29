@@ -982,6 +982,9 @@ def compute_layout_l1(
             cost += weight * abs(index_map[aid] - index_map[neighbor])
         return cost
 
+    REFINE_TIER_PASSES = 3
+    LOCAL_SWAP_PASSES = 4
+
     def refine_tier_by_barycenter(area_ids: list[str], index_map: dict[str, int]) -> list[str]:
         if len(area_ids) <= 1:
             return area_ids
@@ -1011,7 +1014,7 @@ def compute_layout_l1(
         ordered = sorted(area_ids, key=sort_key)
 
         # Local swap refinement to reduce weighted distance
-        for _ in range(2):
+        for _ in range(LOCAL_SWAP_PASSES):
             index_map_local = {aid: idx for idx, aid in enumerate(ordered)}
             swapped = False
             for idx in range(len(ordered) - 1):
@@ -1038,7 +1041,7 @@ def compute_layout_l1(
         prev_tier_ids = area_tiers[tier]
 
     # Refine area order within each tier using barycenter + local swaps
-    for _ in range(2):
+    for _ in range(REFINE_TIER_PASSES):
         index_map = build_index_map(area_tiers)
         for tier in ordered_tiers:
             area_tiers[tier] = refine_tier_by_barycenter(area_tiers[tier], index_map)

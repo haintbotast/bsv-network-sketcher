@@ -19,7 +19,7 @@
 **Hiển thị tối thiểu:**
 - `layout.default_mode`, `layout.allowed_modes`
 - `layout_tuning` (layer_gap, node_spacing, area_gap, area_padding, label_band)
-- `render_tuning` (bundle_gap, area_clearance, anchor_offset, label_gap_x/y, corridor_gap)
+- `render_tuning` (bundle_gap, bundle_stub, area_clearance, area_anchor_offset, port_label_offset, label_gap_x/y, corridor_gap)
 - `style.default_theme`, preset size
 - `validation` rule cơ bản + `validation.layout_checks`
 - `export` default format + include metadata

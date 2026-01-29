@@ -12,23 +12,23 @@ from app.db.models import AdminConfig
 
 DEFAULT_ADMIN_CONFIG: Dict[str, Any] = {
     "layout_tuning": {
-        "layer_gap": 1.4,
-        "node_spacing": 0.7,
-        "area_gap": 0.9,
-        "area_padding": 0.3,
-        "label_band": 0.45,
+        "layer_gap": 1.5,
+        "node_spacing": 0.8,
+        "area_gap": 1.1,
+        "area_padding": 0.35,
+        "label_band": 0.5,
         "max_row_width_base": 12.0,
     },
     "render_tuning": {
         "port_edge_inset": 6,
-        "port_label_offset": 10,
-        "bundle_gap": 14,
-        "bundle_stub": 14,
-        "area_clearance": 14,
-        "area_anchor_offset": 12,
-        "label_gap_x": 6,
-        "label_gap_y": 4,
-        "corridor_gap": 32,
+        "port_label_offset": 12,
+        "bundle_gap": 18,
+        "bundle_stub": 18,
+        "area_clearance": 18,
+        "area_anchor_offset": 18,
+        "label_gap_x": 8,
+        "label_gap_y": 6,
+        "corridor_gap": 40,
     },
 }
 

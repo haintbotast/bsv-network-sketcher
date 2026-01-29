@@ -9,11 +9,6 @@ from typing import Optional
 class AutoLayoutOptions(BaseModel):
     """Request schema for auto-layout."""
 
-    algorithm: str = Field(default="sugiyama", description="Layout algorithm to use")
-    direction: str = Field(
-        default="horizontal",
-        description="Layout direction: 'horizontal' (cisco) or 'vertical' (iso)"
-    )
     layer_gap: float = Field(
         default=2.0,
         ge=0.5,
@@ -25,12 +20,6 @@ class AutoLayoutOptions(BaseModel):
         ge=0.2,
         le=2.0,
         description="Spacing between nodes in same layer (inches)"
-    )
-    crossing_iterations: int = Field(
-        default=24,
-        ge=1,
-        le=100,
-        description="Number of crossing reduction iterations"
     )
     apply_to_db: bool = Field(
         default=False,
@@ -60,11 +49,8 @@ class AutoLayoutOptions(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "algorithm": "sugiyama",
-                "direction": "horizontal",
                 "layer_gap": 2.0,
                 "node_spacing": 0.5,
-                "crossing_iterations": 24,
                 "apply_to_db": False,
                 "group_by_area": True,
                 "layout_scope": "area",
@@ -184,7 +170,7 @@ class LayoutStats(BaseModel):
                 "total_layers": 5,
                 "total_crossings": 3,
                 "execution_time_ms": 85,
-                "algorithm": "sugiyama"
+                "algorithm": "simple_layer_grouped"
             }
         }
 
@@ -221,7 +207,7 @@ class LayoutResult(BaseModel):
                     "total_layers": 5,
                     "total_crossings": 3,
                     "execution_time_ms": 85,
-                    "algorithm": "sugiyama"
+                    "algorithm": "simple_layer_grouped"
                 }
             }
         }

@@ -5,11 +5,8 @@
 import { apiRequest } from './api'
 
 export interface AutoLayoutOptions {
-  algorithm?: string
-  direction?: 'horizontal' | 'vertical'
   layer_gap?: number
   node_spacing?: number
-  crossing_iterations?: number
   apply_to_db?: boolean
   group_by_area?: boolean
   layout_scope?: 'area' | 'project'
@@ -83,11 +80,8 @@ export async function autoLayout(
   options: AutoLayoutOptions = {}
 ): Promise<LayoutResult> {
   const defaultOptions: AutoLayoutOptions = {
-    algorithm: 'sugiyama',
-    direction: 'horizontal',
     layer_gap: 2.0,
     node_spacing: 0.5,
-    crossing_iterations: 24,
     apply_to_db: false,
     group_by_area: true,
     layout_scope: 'project',

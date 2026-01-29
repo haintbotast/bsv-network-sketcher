@@ -9,7 +9,8 @@ from app.db.session import get_db
 from app.services import device as device_service
 from app.services import link as link_service
 from app.services import area as area_service
-from app.services.layout_engine import auto_layout, LayoutConfig
+from app.services.layout_models import LayoutConfig
+from app.services.simple_layer_layout import simple_layer_layout
 from app.services.layout_cache import get_cache
 from app.schemas.layout import (
     AutoLayoutOptions,
@@ -32,7 +33,7 @@ async def compute_auto_layout(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Compute auto-layout for project using Sugiyama algorithm.
+    Compute auto-layout for project using simple layer topology-aware algorithm.
 
     Args:
         project_id: Project ID
@@ -100,11 +101,8 @@ async def compute_auto_layout(
     # Check cache
     cache = get_cache()
     options_hash = {
-        "algorithm": options.algorithm,
-        "direction": options.direction,
         "layer_gap": options.layer_gap,
         "node_spacing": options.node_spacing,
-        "crossing_iterations": options.crossing_iterations,
         "group_by_area": options.group_by_area,
         "layout_scope": options.layout_scope,
         "view_mode": options.view_mode,
@@ -127,10 +125,8 @@ async def compute_auto_layout(
 
     # Compute layout
     config = LayoutConfig(
-        direction=options.direction,
         layer_gap=options.layer_gap,
         node_spacing=options.node_spacing,
-        crossing_iterations=options.crossing_iterations,
     )
 
     try:
@@ -496,21 +492,36 @@ def compute_layout_l1(
             "x": a.position_x,
             "y": a.position_y,
             "name": a.name,
+            "extra_padding": 0.0,
         }
         for a in areas
     }
 
     devices_by_area: dict[str, list] = {}
+    device_area_map: dict[str, str] = {}
     for device in devices:
         if not device.area_id:
             continue
         devices_by_area.setdefault(device.area_id, []).append(device)
+        device_area_map[device.id] = device.area_id
 
+    # Area connectivity graph (used for ordering and sizing)
+    area_link_weights: dict[str, dict[str, int]] = {aid: {} for aid in area_meta}
+    area_external_links: dict[str, int] = {aid: 0 for aid in area_meta}
+    for link in links:
+        from_area = device_area_map.get(link.from_device_id)
+        to_area = device_area_map.get(link.to_device_id)
+        if not from_area or not to_area or from_area == to_area:
+            continue
+        area_link_weights[from_area][to_area] = area_link_weights[from_area].get(to_area, 0) + 1
+        area_link_weights[to_area][from_area] = area_link_weights[to_area].get(from_area, 0) + 1
+        area_external_links[from_area] += 1
+        area_external_links[to_area] += 1
+
+    # Micro layout config (top-to-bottom per AI Context)
     micro_config = LayoutConfig(
-        direction="vertical",  # top-to-bottom per AI Context
         layer_gap=config.layer_gap,
         node_spacing=config.node_spacing,
-        crossing_iterations=config.crossing_iterations,
     )
 
     micro_results: dict[str, dict] = {}
@@ -543,8 +554,16 @@ def compute_layout_l1(
             max_x = micro_config.node_width
             max_y = micro_config.node_height
 
-        required_width = (max_x - min_x) + AREA_PADDING * 2
-        required_height = (max_y - min_y) + AREA_PADDING * 2 + LABEL_BAND
+        external_links = area_external_links.get(area_id, 0)
+        device_count = len(area_devices)
+        link_padding = min(0.04 * external_links, 0.4)
+        density_padding = min(0.015 * max(device_count - 6, 0), 0.2)
+        extra_padding = min(link_padding + density_padding, 0.5)
+        meta["extra_padding"] = extra_padding
+
+        padding = AREA_PADDING + extra_padding
+        required_width = (max_x - min_x) + padding * 2
+        required_height = (max_y - min_y) + padding * 2 + LABEL_BAND
 
         if layout_scope == "project":
             meta["computed_width"] = max(required_width, AREA_MIN_WIDTH)
@@ -576,8 +595,55 @@ def compute_layout_l1(
 
         area_tiers.setdefault(tier, []).append(area_id)
 
-    for tier, area_ids in area_tiers.items():
-        area_ids.sort(key=lambda aid: normalize(area_meta[aid]["name"]))
+    def order_areas_by_connectivity(area_ids: list[str], prev_tier_ids: list[str]) -> list[str]:
+        if len(area_ids) <= 1:
+            return area_ids
+        area_set = set(area_ids)
+        prev_set = set(prev_tier_ids)
+
+        def weight_to_prev(aid: str) -> int:
+            if not prev_set:
+                return 0
+            return sum(weight for neighbor, weight in area_link_weights.get(aid, {}).items() if neighbor in prev_set)
+
+        def degree_in_set(aid: str) -> int:
+            return sum(weight for neighbor, weight in area_link_weights.get(aid, {}).items() if neighbor in area_set)
+
+        def name_key(aid: str) -> str:
+            return normalize(area_meta[aid]["name"])
+
+        def sort_key(aid: str) -> tuple[int, int, str]:
+            return (-weight_to_prev(aid), -degree_in_set(aid), name_key(aid))
+
+        start = min(area_ids, key=sort_key)
+        ordered: list[str] = []
+        visited = set()
+        queue = [start]
+        visited.add(start)
+
+        while queue:
+            current = queue.pop(0)
+            ordered.append(current)
+            neighbors = [
+                n for n in area_link_weights.get(current, {})
+                if n in area_set and n not in visited
+            ]
+            neighbors.sort(key=sort_key)
+            for neighbor in neighbors:
+                visited.add(neighbor)
+                queue.append(neighbor)
+
+        remaining = [aid for aid in area_ids if aid not in visited]
+        remaining.sort(key=sort_key)
+        ordered.extend(remaining)
+        return ordered
+
+    ordered_tiers = sorted(area_tiers.keys())
+    prev_tier_ids: list[str] = []
+    for tier in ordered_tiers:
+        area_ids = area_tiers[tier]
+        area_tiers[tier] = order_areas_by_connectivity(area_ids, prev_tier_ids)
+        prev_tier_ids = area_tiers[tier]
 
     macro_positions = compute_macro_positions(area_tiers)
 
@@ -618,8 +684,9 @@ def compute_layout_l1(
         min_x = result["min_x"]
         min_y = result["min_y"]
 
-        span_x = max(0.0, (area_width - AREA_PADDING * 2) - micro_config.node_width)
-        span_y = max(0.0, (area_height - LABEL_BAND - AREA_PADDING * 2) - micro_config.node_height)
+        padding = AREA_PADDING + area_meta[area_id].get("extra_padding", 0.0)
+        span_x = max(0.0, (area_width - padding * 2) - micro_config.node_width)
+        span_y = max(0.0, (area_height - LABEL_BAND - padding * 2) - micro_config.node_height)
 
         layout_span_x = max(
             micro_config.node_width,
@@ -642,8 +709,8 @@ def compute_layout_l1(
             device_layouts.append(DeviceLayout(
                 id=d["id"],
                 area_id=area_id,
-                x=area_x + AREA_PADDING + (d["x"] - min_x) * scale,
-                y=area_y + LABEL_BAND + AREA_PADDING + (d["y"] - min_y) * scale,
+                x=area_x + padding + (d["x"] - min_x) * scale,
+                y=area_y + LABEL_BAND + padding + (d["y"] - min_y) * scale,
                 layer=d["layer"],
             ))
 
@@ -1025,174 +1092,6 @@ def compute_layout_l3(
         "subnet_groups": subnet_group_results,
         "stats": stats,
     }
-
-
-def simple_layer_layout(devices: list, links: list, config: LayoutConfig):
-    """
-    Simple layer-based layout with topology-aware positioning (NS gốc style).
-
-    Replaces Sugiyama algorithm with simple layering based on device_type.
-    Devices are arranged in layers (top-to-bottom), with topology-aware ordering
-    within each layer to place connected devices close together.
-
-    Layer assignment (from NS gốc analysis):
-    - Layer 0 (top): Firewall, Router (core)
-    - Layer 1 (middle-top): Switch (distribution/aggregation)
-    - Layer 2 (middle-bottom): Server, Storage
-    - Layer 3 (bottom): AP, PC, Unknown (endpoints)
-
-    Within each layer, devices are ordered by connectivity to minimize crossings.
-
-    Args:
-        devices: List of Device model instances
-        links: List of L1Link model instances (for topology-aware ordering)
-        config: LayoutConfig with node_width, node_height, node_spacing
-
-    Returns:
-        LayoutResult with devices list and stats dict
-    """
-    from app.services.layout_engine import LayoutResult
-    import time
-    from collections import deque
-
-    start_time = time.time()
-
-    # Device type to layer mapping (NS gốc style)
-    DEVICE_TYPE_LAYERS = {
-        "Firewall": 0,
-        "Router": 0,
-        "Switch": 1,
-        "Server": 2,
-        "Storage": 2,
-        "AP": 3,
-        "PC": 3,
-        "Unknown": 3,
-    }
-
-    # Group devices by layer
-    layers: dict[int, list] = {}
-    device_id_to_device = {d.id: d for d in devices}
-
-    for device in devices:
-        device_type = getattr(device, "device_type", "Unknown")
-        layer_idx = DEVICE_TYPE_LAYERS.get(device_type, 3)
-        layers.setdefault(layer_idx, []).append(device)
-
-    # Build adjacency graph for topology-aware ordering
-    adjacency: dict[str, set[str]] = {d.id: set() for d in devices}
-    for link in links:
-        if link.from_device_id in adjacency and link.to_device_id in adjacency:
-            adjacency[link.from_device_id].add(link.to_device_id)
-            adjacency[link.to_device_id].add(link.from_device_id)
-
-    def topology_aware_order(layer_devices: list, prev_layer_devices: list = None) -> list:
-        """
-        Order devices within a layer based on connectivity.
-
-        If prev_layer_devices is provided, prioritize connections to previous layer.
-        Otherwise, use BFS from most connected device.
-        """
-        if len(layer_devices) <= 1:
-            return layer_devices
-
-        device_ids = {d.id for d in layer_devices}
-        visited = set()
-        ordered = []
-
-        # Find starting device (most connected to previous layer, or most connected overall)
-        if prev_layer_devices:
-            prev_layer_ids = {d.id for d in prev_layer_devices}
-            # Start with device most connected to previous layer
-            start_device = max(
-                layer_devices,
-                key=lambda d: len(adjacency[d.id] & prev_layer_ids)
-            )
-        else:
-            # Start with most connected device
-            start_device = max(
-                layer_devices,
-                key=lambda d: len(adjacency[d.id] & device_ids)
-            )
-
-        # BFS traversal to order devices
-        queue = deque([start_device])
-        visited.add(start_device.id)
-
-        while queue:
-            current = queue.popleft()
-            ordered.append(current)
-
-            # Find neighbors in same layer, sort by connection count
-            neighbors = [
-                device_id_to_device[neighbor_id]
-                for neighbor_id in adjacency[current.id]
-                if neighbor_id in device_ids and neighbor_id not in visited
-            ]
-
-            # Sort neighbors by connection count (descending)
-            neighbors.sort(key=lambda d: len(adjacency[d.id] & device_ids), reverse=True)
-
-            for neighbor in neighbors:
-                if neighbor.id not in visited:
-                    visited.add(neighbor.id)
-                    queue.append(neighbor)
-
-        # Add any unconnected devices at the end
-        for device in layer_devices:
-            if device.id not in visited:
-                ordered.append(device)
-                visited.add(device.id)
-
-        return ordered
-
-    # Layout devices layer by layer (top-to-bottom) with topology-aware ordering
-    device_layouts = []
-    current_y = 0.0
-    layer_gap = config.layer_gap
-    node_spacing = config.node_spacing
-    node_width = config.node_width
-    node_height = config.node_height
-
-    prev_layer_devices = None
-
-    for layer_idx in sorted(layers.keys()):
-        layer_devices = layers[layer_idx]
-
-        # Order devices by topology
-        ordered_devices = topology_aware_order(layer_devices, prev_layer_devices)
-
-        num_devices = len(ordered_devices)
-        current_x = 0.0
-
-        for device in ordered_devices:
-            device_layouts.append({
-                "id": device.id,
-                "x": current_x,
-                "y": current_y,
-                "layer": layer_idx,
-            })
-            current_x += node_width + node_spacing
-
-        # Move to next layer
-        current_y += node_height + layer_gap
-        prev_layer_devices = ordered_devices
-
-    # Compute stats
-    execution_time_ms = int((time.time() - start_time) * 1000)
-    total_layers = len(layers)
-    total_crossings = 0  # Would need link crossing analysis
-
-    stats = {
-        "total_layers": total_layers,
-        "total_crossings": total_crossings,
-        "execution_time_ms": execution_time_ms,
-        "algorithm": "simple_layer_topology_aware",
-    }
-
-    return LayoutResult(
-        devices=device_layouts,
-        stats=stats,
-    )
 
 
 async def apply_grouped_layout_to_db(

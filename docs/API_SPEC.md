@@ -96,6 +96,7 @@ POST /projects/{project_id}/invalidate-layout-cache
 **Request (gợi ý):**
 ```json
 {
+  "algorithm": "simple_layer_topology_aware",
   "direction": "horizontal|vertical",
   "layer_gap": 2.0,
   "node_spacing": 0.5,
@@ -113,7 +114,7 @@ POST /projects/{project_id}/invalidate-layout-cache
 {
   "devices": [{ "id": "...", "x": 1.2, "y": 0.5, "layer": 2, "area_id": "..." }],
   "areas": [{ "id": "...", "x": 0.0, "y": 0.0, "width": 3.0, "height": 1.5 }],
-  "stats": { "total_layers": 5, "total_crossings": 12, "execution_time_ms": 120, "algorithm": "sugiyama" }
+  "stats": { "total_layers": 5, "total_crossings": 8, "execution_time_ms": 120, "algorithm": "simple_layer_grouped" }
 }
 ```
 

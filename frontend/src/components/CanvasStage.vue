@@ -14,12 +14,12 @@
       @touchmove="onPointerMove"
       @touchend="onPointerUp"
     >
-      <v-layer ref="gridLayerRef" :config="layerTranslation">
+      <v-layer ref="gridLayerRef" :config="layerTransform">
         <v-rect :config="gridConfig" />
       </v-layer>
 
       <!-- L1 View: Areas with minimized visuals -->
-      <v-layer ref="areaLayerRef" :config="layerTranslation">
+      <v-layer ref="areaLayerRef" :config="layerTransform">
         <v-group
           v-for="area in visibleAreas"
           :key="area.id"
@@ -32,7 +32,7 @@
       </v-layer>
 
       <!-- L2/L3 grouping boxes (keep under links/devices) -->
-      <v-layer ref="groupLayerRef" :config="layerTranslation">
+      <v-layer ref="groupLayerRef" :config="layerTransform">
         <v-group v-for="group in visibleVlanGroups" :key="group.id">
           <v-rect :config="group.rect" />
           <v-text :config="group.label" />
@@ -43,7 +43,7 @@
         </v-group>
       </v-layer>
 
-      <v-layer ref="linkLayerRef" :config="layerTranslation">
+      <v-layer ref="linkLayerRef" :config="layerTransform">
         <v-line
           v-for="link in visibleLinks"
           :key="link.id"
@@ -51,7 +51,7 @@
         />
       </v-layer>
 
-      <v-layer ref="deviceLayerRef" :config="layerTranslation">
+      <v-layer ref="deviceLayerRef" :config="layerTransform">
         <v-group
           v-for="device in visibleDevices"
           :key="device.id"
@@ -64,7 +64,7 @@
       </v-layer>
 
       <!-- L2/L3 Overlay Layer -->
-      <v-layer ref="overlayLayerRef" :config="layerTranslation">
+      <v-layer ref="overlayLayerRef" :config="layerTransform">
         <!-- L1 Port Labels -->
         <v-group
           v-for="label in linkPortLabels"
@@ -161,6 +161,9 @@ const panBaseOffset = ref<{ x: number; y: number } | null>(null)
 const panTranslation = ref({ x: 0, y: 0 })
 const pendingTranslation = ref<{ x: number; y: number } | null>(null)
 let panRaf = 0
+let zoomCommitTimer: number | null = null
+const layoutViewport = ref<Viewport>({ ...props.viewport })
+const ZOOM_COMMIT_MS = 140
 
 const gridLayerRef = ref()
 const areaLayerRef = ref()
@@ -189,7 +192,7 @@ const gridConfig = computed(() => ({
   name: 'grid-bg'
 }))
 
-const visibleBounds = computed(() => getVisibleBounds(stageSize.value, props.viewport))
+const visibleBounds = computed(() => getVisibleBounds(stageSize.value, layoutViewport.value))
 
 const AREA_PADDING = 12
 const TEXT_PADDING = 10
@@ -200,7 +203,7 @@ const LABEL_GAP_SUB = 18
 const areaViewMap = computed(() => {
   const map = new Map<string, { x: number; y: number; width: number; height: number }>()
   props.areas.forEach(area => {
-    const rect = logicalRectToView(area, props.viewport)
+    const rect = logicalRectToView(area, layoutViewport.value)
     map.set(area.id, rect)
   })
   return map
@@ -358,7 +361,7 @@ const visibleVlanGroups = computed(() => {
       width: group.width,
       height: group.height
     }
-    const viewRect = logicalRectToView(logicalRect, props.viewport)
+    const viewRect = logicalRectToView(logicalRect, layoutViewport.value)
 
     return {
       id: `vlan-${group.vlan_id}`,
@@ -404,7 +407,7 @@ const visibleSubnetGroups = computed(() => {
       width: group.width,
       height: group.height
     }
-    const viewRect = logicalRectToView(logicalRect, props.viewport)
+    const viewRect = logicalRectToView(logicalRect, layoutViewport.value)
 
     return {
       id: `subnet-${group.subnet}`,
@@ -504,7 +507,7 @@ const deviceViewMap = computed(() => {
     const autoCoords = props.autoLayoutCoords?.get(device.id)
     if (autoCoords) {
       const deviceWithAutoCoords = { ...device, x: autoCoords.x * 120, y: autoCoords.y * 120 }
-      const rect = logicalRectToView(deviceWithAutoCoords, props.viewport)
+      const rect = logicalRectToView(deviceWithAutoCoords, layoutViewport.value)
       map.set(device.id, rect)
       return
     }
@@ -512,13 +515,13 @@ const deviceViewMap = computed(() => {
     // Priority 2: Database positions (from applied auto-layout or manual positioning)
     // If device has non-zero position_x/position_y from DB, use them directly
     if (device.x !== 0 || device.y !== 0) {
-      const rect = logicalRectToView(device, props.viewport)
+      const rect = logicalRectToView(device, layoutViewport.value)
       map.set(device.id, rect)
       return
     }
 
     // Priority 3: Fallback to tier-based positioning (for devices without positions)
-    const rect = logicalRectToView(device, props.viewport)
+    const rect = logicalRectToView(device, layoutViewport.value)
     const list = devicesByArea.get(device.areaId) || []
     list.push({ device, rect })
     devicesByArea.set(device.areaId, list)
@@ -727,10 +730,22 @@ const deviceBounds = computed(() => {
 
 const diagramBounds = computed(() => areaBounds.value || deviceBounds.value)
 
+const zoomScale = computed(() => {
+  const baseScale = layoutViewport.value.scale || 1
+  return baseScale > 0 ? props.viewport.scale / baseScale : 1
+})
+
 const layerTranslation = computed(() => {
   if (!isPanning.value) return { x: 0, y: 0 }
   return panTranslation.value
 })
+
+const layerTransform = computed(() => ({
+  x: layerTranslation.value.x,
+  y: layerTranslation.value.y,
+  scaleX: zoomScale.value,
+  scaleY: zoomScale.value
+}))
 
 const deviceAreaMap = computed(() => {
   const map = new Map<string, string | null>()
@@ -1172,13 +1187,13 @@ function computeAreaAnchor(
 }
 
 const buildVisibleLinks = (useCache: boolean) => {
-  const scale = clamp(props.viewport.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
+  const scale = clamp(layoutViewport.value.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
   if (useCache) {
     const cachedViewport = linkRouteCacheViewport.value
-    if (cachedViewport && cachedViewport.scale === props.viewport.scale) {
+    if (cachedViewport && cachedViewport.scale === layoutViewport.value.scale) {
       const cached = linkRouteCache.value
-      const dx = props.viewport.offsetX - cachedViewport.offsetX
-      const dy = props.viewport.offsetY - cachedViewport.offsetY
+      const dx = layoutViewport.value.offsetX - cachedViewport.offsetX
+      const dy = layoutViewport.value.offsetY - cachedViewport.offsetY
       let canUseCache = cached.size === props.links.length && cached.size > 0
       const shifted = props.links
         .map(link => {
@@ -1606,7 +1621,7 @@ const linkPortLabels = computed(() => {
   if (isPanning.value) return []
   if ((props.viewMode || 'L1') !== 'L1') return []
   const linkMap = new Map(visibleLinks.value.map(link => [link.id, link]))
-  const labelScale = clamp(props.viewport.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
+  const labelScale = clamp(layoutViewport.value.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
   const labelHeight = PORT_LABEL_HEIGHT * labelScale
   const labelPadding = PORT_LABEL_PADDING * labelScale
   const labelOffset = renderTuning.value.port_label_offset * labelScale
@@ -2033,7 +2048,38 @@ onBeforeUnmount(() => {
     observer.unobserve(containerRef.value)
   }
   observer = null
+  if (zoomCommitTimer) {
+    clearTimeout(zoomCommitTimer)
+    zoomCommitTimer = null
+  }
 })
+
+watch(
+  () => [props.viewport.offsetX, props.viewport.offsetY],
+  ([offsetX, offsetY]) => {
+    layoutViewport.value = {
+      ...layoutViewport.value,
+      offsetX,
+      offsetY
+    }
+  }
+)
+
+watch(
+  () => props.viewport.scale,
+  (scale) => {
+    if (zoomCommitTimer) {
+      clearTimeout(zoomCommitTimer)
+    }
+    zoomCommitTimer = setTimeout(() => {
+      layoutViewport.value = {
+        ...layoutViewport.value,
+        scale
+      }
+      zoomCommitTimer = null
+    }, ZOOM_COMMIT_MS)
+  }
+)
 
 watch([visibleAreas, visibleDevices, visibleLinks, linkPortLabels, l2Labels, l3Labels, stageSize], () => {
   batchDraw()
@@ -2044,7 +2090,7 @@ const refreshLinkCache = () => {
   const result = buildVisibleLinks(false)
   if (result.cache) {
     linkRouteCache.value = result.cache
-    linkRouteCacheViewport.value = { ...props.viewport }
+    linkRouteCacheViewport.value = { ...layoutViewport.value }
   }
 }
 
@@ -2054,9 +2100,9 @@ watch(
     () => props.areas,
     () => props.devices,
     () => props.viewMode,
-    () => props.viewport.scale,
-    () => props.viewport.offsetX,
-    () => props.viewport.offsetY,
+    () => layoutViewport.value.scale,
+    () => layoutViewport.value.offsetX,
+    () => layoutViewport.value.offsetY,
     renderTuning
   ],
   () => {

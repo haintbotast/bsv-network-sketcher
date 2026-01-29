@@ -155,6 +155,9 @@ const stageSize = ref({ width: 300, height: 200 })
 let observer: ResizeObserver | null = null
 const isPanning = ref(false)
 const lastPointer = ref<{ x: number; y: number } | null>(null)
+const panOffset = ref<{ x: number; y: number } | null>(null)
+const pendingPan = ref<{ x: number; y: number } | null>(null)
+let panRaf = 0
 
 const gridLayerRef = ref()
 const areaLayerRef = ref()
@@ -1591,6 +1594,7 @@ const visibleLinks = computed(() => {
 })
 
 const linkPortLabels = computed(() => {
+  if (isPanning.value) return []
   if ((props.viewMode || 'L1') !== 'L1') return []
   const linkMap = new Map(visibleLinks.value.map(link => [link.id, link]))
   const labelScale = clamp(props.viewport.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
@@ -1809,6 +1813,7 @@ const linkPortLabels = computed(() => {
 // L2 Labels - VLAN info on devices
 const l2Labels = computed(() => {
   const mode = props.viewMode || 'L1'
+  if (isPanning.value) return []
   if (mode !== 'L2') return []
   if (!props.l2Assignments || props.l2Assignments.length === 0) {
     return []
@@ -1851,6 +1856,7 @@ const l2Labels = computed(() => {
 // L3 Labels - IP addresses on devices
 const l3Labels = computed(() => {
   const mode = props.viewMode || 'L1'
+  if (isPanning.value) return []
   if (mode !== 'L3') return []
   if (!props.l3Addresses || props.l3Addresses.length === 0) return []
 
@@ -1937,6 +1943,8 @@ function onPointerDown(event: any) {
   if (!pointer) return
   isPanning.value = true
   lastPointer.value = { x: pointer.x, y: pointer.y }
+  panOffset.value = { x: props.viewport.offsetX, y: props.viewport.offsetY }
+  pendingPan.value = null
 }
 
 function onPointerMove(event: any) {
@@ -1950,8 +1958,8 @@ function onPointerMove(event: any) {
 
   // Clamp pan to keep diagram visible (allow 20% overflow)
   const MARGIN = 200  // Pixels of margin
-  let newOffsetX = props.viewport.offsetX + dx
-  let newOffsetY = props.viewport.offsetY + dy
+  let newOffsetX = (panOffset.value?.x ?? props.viewport.offsetX) + dx
+  let newOffsetY = (panOffset.value?.y ?? props.viewport.offsetY) + dy
 
   const bounds = diagramBounds.value
   if (bounds && stageSize.value.width > 0 && stageSize.value.height > 0) {
@@ -1969,16 +1977,37 @@ function onPointerMove(event: any) {
     newOffsetY = Math.max(minOffsetY, Math.min(maxOffsetY, newOffsetY))
   }
 
-  emit('update:viewport', {
-    ...props.viewport,
-    offsetX: newOffsetX,
-    offsetY: newOffsetY
-  })
+  panOffset.value = { x: newOffsetX, y: newOffsetY }
+  pendingPan.value = { x: newOffsetX, y: newOffsetY }
+  if (!panRaf) {
+    panRaf = requestAnimationFrame(() => {
+      panRaf = 0
+      if (!pendingPan.value) return
+      emit('update:viewport', {
+        ...props.viewport,
+        offsetX: pendingPan.value.x,
+        offsetY: pendingPan.value.y
+      })
+    })
+  }
 }
 
 function onPointerUp() {
   isPanning.value = false
   lastPointer.value = null
+  panOffset.value = null
+  if (pendingPan.value) {
+    emit('update:viewport', {
+      ...props.viewport,
+      offsetX: pendingPan.value.x,
+      offsetY: pendingPan.value.y
+    })
+  }
+  pendingPan.value = null
+  if (panRaf) {
+    cancelAnimationFrame(panRaf)
+    panRaf = 0
+  }
 }
 
 onMounted(() => {

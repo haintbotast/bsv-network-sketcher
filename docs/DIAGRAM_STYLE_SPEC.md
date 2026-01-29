@@ -50,6 +50,7 @@
 - **Overview (nếu bật):** chỉ L1/flow; không render nhãn L2/L3 để tránh đè chữ/đường.  
   **Lưu ý:** UI hiện không hiển thị Overview; dùng L1 thay thế.
 - **L2/L3:** chỉ hiển thị nhãn L2/L3 trong view tương ứng; có **band nhãn** để không chồng lên thiết bị.
+- **Khi pan/drag:** UI có thể **tạm ẩn nhãn port/L2/L3** để tối ưu hiệu năng; nhãn hiển thị lại khi dừng kéo.
 
 **Liên kết liên‑area:**
 - Bắt buộc đi qua **Waypoint area** (đuôi `_wp_`), không nối Area‑Area trực tiếp.

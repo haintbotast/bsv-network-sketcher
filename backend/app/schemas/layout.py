@@ -10,7 +10,7 @@ class AutoLayoutOptions(BaseModel):
     """Request schema for auto-layout."""
 
     layer_gap: float = Field(
-        default=2.0,
+        default=1.0,
         ge=0.5,
         le=5.0,
         description="Gap between layers in inches"

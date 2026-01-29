@@ -182,20 +182,12 @@
 
         <div class="dialog-body">
           <div class="form-section">
-            <label>Hướng bố cục (macro Area)</label>
-            <select v-model="autoLayoutOptions.direction" class="select">
-              <option value="horizontal">Horizontal (Cisco style)</option>
-              <option value="vertical">Vertical (ISO style)</option>
-            </select>
-          </div>
-
-          <div class="form-section">
             <label>Phạm vi bố cục</label>
             <select v-model="autoLayoutOptions.layout_scope" class="select">
               <option value="area">Trong Area (khuyến nghị)</option>
               <option value="project">Toàn dự án (xếp lại Area)</option>
             </select>
-            <p class="hint-text">Thiết bị trong Area luôn top‑to‑bottom theo AI Context.</p>
+            <p class="hint-text">Thiết bị trong Area luôn top‑to‑bottom theo NS gốc.</p>
           </div>
 
           <div class="form-section">
@@ -218,18 +210,6 @@
               max="2.0"
               step="0.1"
               v-model.number="autoLayoutOptions.node_spacing"
-              class="slider"
-            />
-          </div>
-
-          <div class="form-section">
-            <label>Crossing Iterations ({{ autoLayoutOptions.crossing_iterations }})</label>
-            <input
-              type="range"
-              min="1"
-              max="100"
-              step="1"
-              v-model.number="autoLayoutOptions.crossing_iterations"
               class="slider"
             />
           </div>
@@ -370,10 +350,8 @@ const l3Loaded = ref(false)
 // Auto Layout state
 const showAutoLayoutDialog = ref(false)
 const autoLayoutOptions = reactive({
-  direction: 'horizontal' as 'horizontal' | 'vertical',
-  layer_gap: 2.0,
+  layer_gap: 1.0,
   node_spacing: 0.5,
-  crossing_iterations: 24,
   layout_scope: 'project' as 'area' | 'project'
 })
 const autoLayoutResult = ref<LayoutResult | null>(null)
@@ -1102,11 +1080,10 @@ watch(layoutModeSelection, async (value) => {
 function computeAutoLayoutTuning() {
   const deviceCount = devices.value.length
   const density = Math.min(1, Math.max(0, (deviceCount - 20) / 60))
-  const direction = layoutModeSelection.value === 'iso' ? 'vertical' : 'horizontal'
-  const layer_gap = Number((1.6 + density * 1.0).toFixed(2))
-  const node_spacing = Number((0.45 + density * 0.25).toFixed(2))
-  const crossing_iterations = deviceCount > 60 ? 32 : deviceCount > 30 ? 24 : 16
-  return { direction, layer_gap, node_spacing, crossing_iterations }
+  // Layout luôn top-to-bottom, auto-tune layer_gap dựa trên density
+  const layer_gap = Number((0.8 + density * 1.0).toFixed(2))  // 0.8-1.8 inches
+  const node_spacing = Number((0.45 + density * 0.25).toFixed(2))  // 0.45-0.7 inches
+  return { layer_gap, node_spacing }
 }
 
 function scheduleAutoLayout(projectId: string, force = false) {
@@ -1129,10 +1106,8 @@ async function runAutoLayoutAuto(projectId: string, force = false) {
   try {
     const tuning = computeAutoLayoutTuning()
     await autoLayout(projectId, {
-      direction: tuning.direction,
       layer_gap: tuning.layer_gap,
       node_spacing: tuning.node_spacing,
-      crossing_iterations: tuning.crossing_iterations,
       apply_to_db: true,
       group_by_area: hasAreas,
       layout_scope: 'project',
@@ -1158,10 +1133,8 @@ async function handleAutoLayoutPreview() {
   autoLayoutLoading.value = true
   try {
     const result = await autoLayout(selectedProjectId.value, {
-      direction: autoLayoutOptions.direction,
       layer_gap: autoLayoutOptions.layer_gap,
       node_spacing: autoLayoutOptions.node_spacing,
-      crossing_iterations: autoLayoutOptions.crossing_iterations,
       apply_to_db: false,
       group_by_area: viewMode.value === 'L1',  // Only group by area for L1 view
       layout_scope: autoLayoutOptions.layout_scope,
@@ -1194,10 +1167,8 @@ async function handleAutoLayoutApply() {
   autoLayoutLoading.value = true
   try {
     await autoLayout(selectedProjectId.value, {
-      direction: autoLayoutOptions.direction,
       layer_gap: autoLayoutOptions.layer_gap,
       node_spacing: autoLayoutOptions.node_spacing,
-      crossing_iterations: autoLayoutOptions.crossing_iterations,
       apply_to_db: true,
       group_by_area: viewMode.value === 'L1',  // Only group by area for L1 view
       layout_scope: autoLayoutOptions.layout_scope,

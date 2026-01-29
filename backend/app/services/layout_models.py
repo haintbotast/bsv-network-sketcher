@@ -10,7 +10,7 @@ from dataclasses import dataclass
 @dataclass
 class LayoutConfig:
     """Configuration for layout algorithm."""
-    layer_gap: float = 2.0  # Gap between layers (inch)
+    layer_gap: float = 1.0  # Gap between layers (inch)
     node_spacing: float = 0.5  # Spacing between nodes in same layer (inch)
     node_width: float = 1.2  # Default node width (inch)
     node_height: float = 0.5  # Default node height (inch)

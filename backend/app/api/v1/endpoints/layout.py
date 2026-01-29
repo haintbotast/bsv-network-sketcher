@@ -449,37 +449,21 @@ def compute_layout_l1(
         positions: dict[str, tuple[float, float]] = {}
         ordered_tiers = sorted(area_tiers.keys())
 
-        if config.direction == "horizontal":
-            current_x = 0.0
-            for tier in ordered_tiers:
-                area_ids = area_tiers[tier]
-                rows = pack_rows(area_ids, tier)  # Pass tier parameter
-                row_widths = [row_width(row) for row in rows]
-                row_heights = [row_height(row) for row in rows]
-                tier_width = max(row_widths) if row_widths else 0.0
-                row_y = 0.0
-                for row, height in zip(rows, row_heights):
-                    current_row_x = current_x
-                    for aid in row:
-                        positions[aid] = (current_row_x, row_y)
-                        current_row_x += area_meta[aid]["computed_width"] + AREA_GAP
-                    row_y += height + AREA_GAP
-                current_x += tier_width + AREA_GAP
-        else:
-            current_y = 0.0
-            for tier in ordered_tiers:
-                area_ids = area_tiers[tier]
-                rows = pack_rows(area_ids, tier)  # Pass tier parameter
-                row_heights = [row_height(row) for row in rows]
-                row_y = current_y
-                for row, height in zip(rows, row_heights):
-                    current_row_x = 0.0
-                    for aid in row:
-                        positions[aid] = (current_row_x, row_y)
-                        current_row_x += area_meta[aid]["computed_width"] + AREA_GAP
-                    row_y += height + AREA_GAP
-                tier_height = sum(row_heights) + AREA_GAP * max(0, len(row_heights) - 1)
-                current_y += tier_height + AREA_GAP
+        # Layout luôn là top-to-bottom (vertical) theo NS gốc
+        current_y = 0.0
+        for tier in ordered_tiers:
+            area_ids = area_tiers[tier]
+            rows = pack_rows(area_ids, tier)  # Pass tier parameter
+            row_heights = [row_height(row) for row in rows]
+            row_y = current_y
+            for row, height in zip(rows, row_heights):
+                current_row_x = 0.0
+                for aid in row:
+                    positions[aid] = (current_row_x, row_y)
+                    current_row_x += area_meta[aid]["computed_width"] + AREA_GAP
+                row_y += height + AREA_GAP
+            tier_height = sum(row_heights) + AREA_GAP * max(0, len(row_heights) - 1)
+            current_y += tier_height + AREA_GAP
 
         return positions
 

@@ -85,10 +85,6 @@
           <button type="button" :class="{ active: viewMode === 'L3' }" @click="setViewMode('L3')">L3</button>
           <button type="button" :class="{ active: viewMode === 'overview' }" @click="setViewMode('overview')">Tổng quan</button>
           <span class="toolbar-divider"></span>
-          <button type="button" class="primary" @click="showAutoLayoutDialog = true" :disabled="!activeProject">
-            Auto Layout
-          </button>
-          <span class="toolbar-divider"></span>
           <button type="button" class="ghost" @click="toggleRightPanel">
             {{ showRightPanel ? 'Ẩn panel' : 'Hiện panel' }}
           </button>
@@ -103,9 +99,6 @@
           :view-mode="viewMode"
           :l2-assignments="l2Assignments"
           :l3-addresses="l3Addresses"
-          :auto-layout-coords="autoLayoutCoordsMap"
-          :vlan-groups="vlanGroupsFromLayout"
-          :subnet-groups="subnetGroupsFromLayout"
           @select="handleSelect"
           @update:viewport="updateViewport"
         />
@@ -171,84 +164,6 @@
         </div>
       </aside>
     </section>
-
-    <!-- Auto Layout Dialog -->
-    <div v-if="showAutoLayoutDialog" class="dialog-overlay" @click.self="showAutoLayoutDialog = false">
-      <div class="dialog-box">
-        <div class="dialog-header">
-          <h2>Auto Layout (Topology-Aware)</h2>
-          <button type="button" class="ghost-close" @click="showAutoLayoutDialog = false">✕</button>
-        </div>
-
-        <div class="dialog-body">
-          <div class="form-section">
-            <label>Phạm vi bố cục</label>
-            <select v-model="autoLayoutOptions.layout_scope" class="select">
-              <option value="area">Trong Area (khuyến nghị)</option>
-              <option value="project">Toàn dự án (xếp lại Area)</option>
-            </select>
-            <p class="hint-text">Thiết bị trong Area luôn top‑to‑bottom theo NS gốc.</p>
-          </div>
-
-          <div class="form-section">
-            <label>Layer Gap ({{ autoLayoutOptions.layer_gap.toFixed(1) }} inches)</label>
-            <input
-              type="range"
-              min="0.5"
-              max="5.0"
-              step="0.1"
-              v-model.number="autoLayoutOptions.layer_gap"
-              class="slider"
-            />
-          </div>
-
-          <div class="form-section">
-            <label>Node Spacing ({{ autoLayoutOptions.node_spacing.toFixed(1) }} inches)</label>
-            <input
-              type="range"
-              min="0.2"
-              max="2.0"
-              step="0.1"
-              v-model.number="autoLayoutOptions.node_spacing"
-              class="slider"
-            />
-          </div>
-
-          <div v-if="autoLayoutResult" class="layout-stats">
-            <h3>Layout Statistics</h3>
-            <ul>
-              <li>Total Layers: {{ autoLayoutResult.stats.total_layers }}</li>
-              <li>Edge Crossings: {{ autoLayoutResult.stats.total_crossings }}</li>
-              <li>Execution Time: {{ autoLayoutResult.stats.execution_time_ms }}ms</li>
-              <li>Algorithm: {{ autoLayoutResult.stats.algorithm }}</li>
-              <li>Devices Positioned: {{ autoLayoutResult.devices.length }}</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="dialog-footer">
-          <button
-            type="button"
-            class="primary"
-            @click="handleAutoLayoutPreview"
-            :disabled="!activeProject || autoLayoutLoading"
-          >
-            {{ autoLayoutLoading ? 'Computing...' : 'Preview Layout' }}
-          </button>
-          <button
-            type="button"
-            class="primary"
-            @click="handleAutoLayoutApply"
-            :disabled="!activeProject || !autoLayoutResult || autoLayoutLoading"
-          >
-            Apply to Database
-          </button>
-          <button type="button" class="ghost" @click="showAutoLayoutDialog = false">
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -347,15 +262,7 @@ const l3Addresses = ref<L3AddressRecord[]>([])
 const l2Loaded = ref(false)
 const l3Loaded = ref(false)
 
-// Auto Layout state
-const showAutoLayoutDialog = ref(false)
-const autoLayoutOptions = reactive({
-  layer_gap: 1.0,
-  node_spacing: 0.5,
-  layout_scope: 'project' as 'area' | 'project'
-})
-const autoLayoutResult = ref<LayoutResult | null>(null)
-const autoLayoutLoading = ref(false)
+// Auto Layout (auto mode only - manual dialog removed)
 const autoLayoutAutoApplying = ref(false)
 const autoLayoutAutoAppliedProjects = new Set<string>()
 let autoLayoutTimer: number | null = null
@@ -540,11 +447,10 @@ const activeProject = computed(() => projects.value.find(p => p.id === selectedP
 const canvasAreas = computed<AreaModel[]>(() => {
   return areas.value.map(area => {
     const style = area.style || defaultAreaStyle
-    const preview = autoLayoutAreaMap.value?.get(area.id)
-    const xUnits = preview?.x ?? area.position_x ?? (area.grid_col - 1) * GRID_FALLBACK_X
-    const yUnits = preview?.y ?? area.position_y ?? (area.grid_row - 1) * GRID_FALLBACK_Y
-    const widthUnits = preview?.width ?? (area.width || 3)
-    const heightUnits = preview?.height ?? (area.height || 1.5)
+    const xUnits = area.position_x ?? (area.grid_col - 1) * GRID_FALLBACK_X
+    const yUnits = area.position_y ?? (area.grid_row - 1) * GRID_FALLBACK_Y
+    const widthUnits = area.width || 3
+    const heightUnits = area.height || 1.5
     return {
       id: area.id,
       name: area.name,
@@ -595,31 +501,7 @@ const canvasLinks = computed<LinkModel[]>(() => {
     .filter(Boolean) as LinkModel[]
 })
 
-const autoLayoutCoordsMap = computed(() => {
-  if (!autoLayoutResult.value) return undefined
-  const map = new Map<string, { x: number; y: number }>()
-  autoLayoutResult.value.devices.forEach(device => {
-    map.set(device.id, { x: device.x, y: device.y })
-  })
-  return map
-})
-
-const autoLayoutAreaMap = computed(() => {
-  if (!autoLayoutResult.value?.areas) return undefined
-  const map = new Map<string, { x: number; y: number; width: number; height: number }>()
-  autoLayoutResult.value.areas.forEach(area => {
-    map.set(area.id, { x: area.x, y: area.y, width: area.width, height: area.height })
-  })
-  return map
-})
-
-const vlanGroupsFromLayout = computed(() => {
-  return autoLayoutResult.value?.vlan_groups || []
-})
-
-const subnetGroupsFromLayout = computed(() => {
-  return autoLayoutResult.value?.subnet_groups || []
-})
+// Auto-layout preview removed - auto mode applies directly to DB
 
 function rgbToHex(rgb: [number, number, number]) {
   return `#${rgb.map(value => value.toString(16).padStart(2, '0')).join('')}`
@@ -1049,13 +931,11 @@ watch(selectedProjectId, async (projectId) => {
     if (project) {
       layoutModeSelection.value = project.layout_mode
     }
-    autoLayoutResult.value = null
     scheduleAutoLayout(projectId)
   } else {
     areas.value = []
     devices.value = []
     links.value = []
-    autoLayoutResult.value = null
   }
 })
 
@@ -1125,71 +1005,7 @@ async function runAutoLayoutAuto(projectId: string, force = false) {
   }
 }
 
-async function handleAutoLayoutPreview() {
-  if (!selectedProjectId.value) {
-    setNotice('Vui lòng chọn project trước.', 'error')
-    return
-  }
-  autoLayoutLoading.value = true
-  try {
-    const result = await autoLayout(selectedProjectId.value, {
-      layer_gap: autoLayoutOptions.layer_gap,
-      node_spacing: autoLayoutOptions.node_spacing,
-      apply_to_db: false,
-      group_by_area: viewMode.value === 'L1',  // Only group by area for L1 view
-      layout_scope: autoLayoutOptions.layout_scope,
-      anchor_routing: true,
-      overview_mode: 'l1-only',
-      view_mode: viewMode.value === 'overview' ? 'L1' : viewMode.value  // Default overview to L1
-    })
-    autoLayoutResult.value = result
-    setNotice(
-      `Preview (${viewMode.value}): ${result.devices.length} devices, ${result.stats.total_layers} layers, ${result.stats.total_crossings} crossings`,
-      'success'
-    )
-  } catch (error: any) {
-    setNotice(error?.message || 'Auto-layout preview thất bại.', 'error')
-    autoLayoutResult.value = null
-  } finally {
-    autoLayoutLoading.value = false
-  }
-}
-
-async function handleAutoLayoutApply() {
-  if (!selectedProjectId.value) {
-    setNotice('Vui lòng chọn project trước.', 'error')
-    return
-  }
-  if (!autoLayoutResult.value) {
-    setNotice('Vui lòng preview layout trước khi apply.', 'error')
-    return
-  }
-  autoLayoutLoading.value = true
-  try {
-    await autoLayout(selectedProjectId.value, {
-      layer_gap: autoLayoutOptions.layer_gap,
-      node_spacing: autoLayoutOptions.node_spacing,
-      apply_to_db: true,
-      group_by_area: viewMode.value === 'L1',  // Only group by area for L1 view
-      layout_scope: autoLayoutOptions.layout_scope,
-      anchor_routing: true,
-      overview_mode: 'l1-only',
-      view_mode: viewMode.value === 'overview' ? 'L1' : viewMode.value  // Default overview to L1
-    })
-    setNotice(`Layout (${viewMode.value}) đã được áp dụng vào database!`, 'success')
-    // Reload project data to reflect new positions
-    await loadProjectData(selectedProjectId.value)
-    // Invalidate cache
-    await invalidateLayoutCache(selectedProjectId.value)
-    // Close dialog
-    showAutoLayoutDialog.value = false
-    autoLayoutResult.value = null
-  } catch (error: any) {
-    setNotice(error?.message || 'Áp dụng layout thất bại.', 'error')
-  } finally {
-    autoLayoutLoading.value = false
-  }
-}
+// Manual auto-layout preview/apply functions removed - auto mode only
 
 onMounted(() => {
   fetchHealth()
@@ -1497,150 +1313,5 @@ onMounted(() => {
     width: 100%;
     margin-left: 0;
   }
-}
-
-/* Auto Layout Dialog */
-.dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.dialog-box {
-  background: var(--panel);
-  border-radius: 18px;
-  border: 1px solid var(--panel-border);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-  width: 90%;
-  max-width: 520px;
-  max-height: 90vh;
-  overflow: auto;
-}
-
-.dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(28, 28, 28, 0.08);
-}
-
-.dialog-header h2 {
-  font-size: 18px;
-  margin: 0;
-}
-
-.ghost-close {
-  background: transparent;
-  border: 1px solid #dccfc4;
-  border-radius: 8px;
-  padding: 4px 10px;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.ghost-close:hover {
-  background: #f8f1ea;
-}
-
-.dialog-body {
-  padding: 20px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.form-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-section label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.slider {
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: #e5ddd4;
-  outline: none;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--accent);
-  cursor: pointer;
-}
-
-.slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--accent);
-  cursor: pointer;
-  border: none;
-}
-
-.layout-stats {
-  background: #f8f1ea;
-  border-radius: 12px;
-  padding: 14px 18px;
-}
-
-.layout-stats h3 {
-  font-size: 14px;
-  margin: 0 0 10px;
-}
-
-.layout-stats ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.layout-stats li {
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.dialog-footer {
-  padding: 16px 24px;
-  border-top: 1px solid rgba(28, 28, 28, 0.08);
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.dialog-footer button {
-  border-radius: 10px;
-  padding: 8px 16px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.dialog-footer .primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 </style>

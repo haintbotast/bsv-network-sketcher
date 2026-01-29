@@ -67,7 +67,7 @@
   - **Tier 7: Office** (Office floors, building access) - **mặc định**
   - **Tier 8: Department** (Department-specific networks)
   - **Tier 9: Project** (Project-specific networks)
-  - **Tier 10: Servers/Monitoring** (Datacenter, servers, storage, monitor/NOC/NMS)
+  - **Tier 10: Servers/Storage** (servers, storage)
 - Mỗi tier có **width factor** riêng:
   - Tier 0-4 (Infrastructure): rộng hơn (1.3-1.5x), tối đa 2 areas/hàng
   - Tier 5-6 (Campus/Branch): vừa phải (1.1-1.2x), tối đa 3 areas/hàng
@@ -79,8 +79,9 @@
 **Quy ước bổ sung (bắt buộc):**
 - **VPN Gateway là chức năng của Firewall** → thể hiện bằng `device_type=Firewall` và tên có `VPN` (màu firewall), **không tạo device_type riêng**.
 - **Area Data Center** bao gồm **Edge/Security/DMZ/Core/Distribution** (không tách rời thành các area con nếu không cần).
-- **Area Server/Monitor** ưu tiên đặt **cùng hàng hoặc ngay dưới DMZ** (không rơi sâu xuống các tầng Office/Department/Project).
-- Thiết bị **Server/NAS/Storage/Server Switch** không được nằm trong area Project/Office/IT; phải gom về **Area Server** hoặc **Area Monitor**.
+- **Area Server** ưu tiên đặt **cùng hàng hoặc ngay dưới DMZ** (không rơi sâu xuống các tầng Office/Department/Project).
+- Thiết bị **Server/NAS/Storage/Server Switch** không được nằm trong area Project/Office/IT; phải gom về **Area Server**.
+- Thiết bị **Monitor/NOC/NMS** được gộp vào **Area IT** (không tạo Area Monitor riêng).
 - **Access Switch** phải nằm **trong area nghiệp vụ** (Head Office/Department/Project/IT), **không tạo area Access riêng**.
 - **Server Switch** được xem là **Distribution Switch** trong lớp Server; server chỉ kết nối lên **Server Distribution Switch**.
 

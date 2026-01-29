@@ -42,9 +42,10 @@
 - Endpoint **không** được nối trực tiếp lên Distribution/Core (mặc định chặn ở L1).
 - VPN Gateway là **chức năng Firewall** (device_type Firewall, tên có VPN).
 - Area **Data Center** bao gồm Edge/Security/DMZ/Core/Distribution.
-- Thiết bị Server/NAS/Storage/Server Switch bắt buộc nằm trong **Area Server/Monitor** và **đặt cùng hàng hoặc ngay dưới DMZ**.
+- Thiết bị Server/NAS/Storage/Server Switch bắt buộc nằm trong **Area Server** và **đặt cùng hàng hoặc ngay dưới DMZ**.
 - Access Switch phải nằm trong **area nghiệp vụ** (Head Office/Department/Project/IT).
 - Server chỉ được kết nối lên **Server Distribution Switch**.
+ - Thiết bị Monitor/NOC/NMS được gộp vào **Area IT** (không tạo Area Monitor riêng).
 
 ### 2.5 Xuất dữ liệu
 - Sinh PPTX/Excel theo layout mode đã chọn.

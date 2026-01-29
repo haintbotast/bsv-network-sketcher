@@ -111,6 +111,17 @@ const props = defineProps<{
   l2Assignments?: L2AssignmentRecord[]
   l3Addresses?: L3AddressRecord[]
   autoLayoutCoords?: Map<string, { x: number; y: number }> // Auto-layout coords (logical units/inches)
+  renderTuning?: {
+    port_edge_inset?: number
+    port_label_offset?: number
+    bundle_gap?: number
+    bundle_stub?: number
+    area_clearance?: number
+    area_anchor_offset?: number
+    label_gap_x?: number
+    label_gap_y?: number
+    corridor_gap?: number
+  }
   vlanGroups?: Array<{
     vlan_id: number
     name: string
@@ -686,14 +697,23 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
-const PORT_EDGE_INSET = 6
 const PORT_LABEL_HEIGHT = 16
 const PORT_LABEL_PADDING = 8
-const PORT_LABEL_OFFSET = 10
-const BUNDLE_GAP = 14
-const BUNDLE_STUB = 14
-const AREA_CLEARANCE = 14
-const AREA_ANCHOR_OFFSET = 12
+const DEFAULT_RENDER_TUNING = {
+  port_edge_inset: 6,
+  port_label_offset: 10,
+  bundle_gap: 14,
+  bundle_stub: 14,
+  area_clearance: 14,
+  area_anchor_offset: 12,
+  label_gap_x: 6,
+  label_gap_y: 4,
+  corridor_gap: 32
+}
+const renderTuning = computed(() => ({
+  ...DEFAULT_RENDER_TUNING,
+  ...(props.renderTuning || {})
+}))
 const LABEL_SCALE_MIN = 0.6
 const LABEL_SCALE_MAX = 1.15
 
@@ -756,11 +776,13 @@ function computePortAnchorFallback(
   const ratio = index == null || Number.isNaN(index) ? 0.5 : ((index % 12) + 0.5) / 12
   if (Math.abs(dx) >= Math.abs(dy)) {
     const x = dx >= 0 ? rect.x + rect.width : rect.x
-    const y = rect.y + PORT_EDGE_INSET + (rect.height - PORT_EDGE_INSET * 2) * ratio
+    const portEdgeInset = renderTuning.value.port_edge_inset
+    const y = rect.y + portEdgeInset + (rect.height - portEdgeInset * 2) * ratio
     return { x, y }
   }
   const y = dy >= 0 ? rect.y + rect.height : rect.y
-  const x = rect.x + PORT_EDGE_INSET + (rect.width - PORT_EDGE_INSET * 2) * ratio
+  const portEdgeInset = renderTuning.value.port_edge_inset
+  const x = rect.x + portEdgeInset + (rect.width - portEdgeInset * 2) * ratio
   return { x, y }
 }
 
@@ -879,6 +901,7 @@ const devicePortSideMap = computed(() => {
 
 const devicePortAnchors = computed(() => {
   const map = new Map<string, Map<string, { x: number; y: number; side: string }>>()
+  const portEdgeInset = renderTuning.value.port_edge_inset
 
   devicePortList.value.forEach((ports, deviceId) => {
     const rect = deviceViewMap.value.get(deviceId)
@@ -906,9 +929,9 @@ const devicePortAnchors = computed(() => {
         if (ay !== by) return ay - by
         return (orderMap.get(a) ?? 0) - (orderMap.get(b) ?? 0)
       })
-      const spacing = (rect.height - PORT_EDGE_INSET * 2) / (count + 1)
+      const spacing = (rect.height - portEdgeInset * 2) / (count + 1)
       list.forEach((port, index) => {
-        const y = rect.y + PORT_EDGE_INSET + spacing * (index + 1)
+        const y = rect.y + portEdgeInset + spacing * (index + 1)
         const x = side === 'left' ? rect.x : rect.x + rect.width
         anchors.set(port, { x, y, side })
       })
@@ -925,9 +948,9 @@ const devicePortAnchors = computed(() => {
         if (ax !== bx) return ax - bx
         return (orderMap.get(a) ?? 0) - (orderMap.get(b) ?? 0)
       })
-      const spacing = (rect.width - PORT_EDGE_INSET * 2) / (count + 1)
+      const spacing = (rect.width - portEdgeInset * 2) / (count + 1)
       list.forEach((port, index) => {
-        const x = rect.x + PORT_EDGE_INSET + spacing * (index + 1)
+        const x = rect.x + portEdgeInset + spacing * (index + 1)
         const y = side === 'top' ? rect.y : rect.y + rect.height
         anchors.set(port, { x, y, side })
       })
@@ -1111,14 +1134,14 @@ const visibleLinks = computed(() => {
       const areaBundle = areaBundleIndex.value.get(link.id)
       const scale = clamp(props.viewport.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
       const bundleOffset = bundle && bundle.total > 1
-        ? (bundle.index - (bundle.total - 1) / 2) * (BUNDLE_GAP * scale)
+        ? (bundle.index - (bundle.total - 1) / 2) * (renderTuning.value.bundle_gap * scale)
         : 0
       const areaBundleOffset = areaBundle && areaBundle.total > 1
-        ? (areaBundle.index - (areaBundle.total - 1) / 2) * (BUNDLE_GAP * scale)
+        ? (areaBundle.index - (areaBundle.total - 1) / 2) * (renderTuning.value.bundle_gap * scale)
         : 0
       const interBundleOffset = areaBundleOffset + bundleOffset * 0.5
-      const bundleStub = BUNDLE_STUB * scale
-      const anchorOffset = AREA_ANCHOR_OFFSET * scale
+      const bundleStub = renderTuning.value.bundle_stub * scale
+      const anchorOffset = renderTuning.value.area_anchor_offset * scale
 
       // Orthogonal routing for all links (NS gốc style)
       if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
@@ -1127,7 +1150,7 @@ const visibleLinks = computed(() => {
         const toAreaAnchor = computeAreaAnchor(toArea, toAnchor, fromAnchor, interBundleOffset, anchorOffset)
         const bounds = areaBounds.value
         if (bounds) {
-          const corridorGap = 32 + Math.abs(interBundleOffset)
+          const corridorGap = renderTuning.value.corridor_gap + Math.abs(interBundleOffset)
           const dx = toAnchor.x - fromAnchor.x
           const dy = toAnchor.y - fromAnchor.y
           if (Math.abs(dx) >= Math.abs(dy)) {
@@ -1195,7 +1218,7 @@ const visibleLinks = computed(() => {
           const blockedAreas = []
           areaViewMap.value.forEach((rect, areaId) => {
             if (areaId === fromAreaId || areaId === toAreaId) return
-            if (segmentIntersectsRect({ x: fromAnchor.x, y: fromAnchor.y }, { x: toAnchor.x, y: toAnchor.y }, rect, AREA_CLEARANCE)) {
+            if (segmentIntersectsRect({ x: fromAnchor.x, y: fromAnchor.y }, { x: toAnchor.x, y: toAnchor.y }, rect, renderTuning.value.area_clearance)) {
               blockedAreas.push(rect)
             }
           })
@@ -1206,8 +1229,8 @@ const visibleLinks = computed(() => {
               let hits = 0
               areaViewMap.value.forEach((rect, areaId) => {
                 if (areaId === fromAreaId || areaId === toAreaId) return
-                if (segmentIntersectsRect(fromAnchor, a, rect, AREA_CLEARANCE)) hits += 1
-                if (segmentIntersectsRect(a, toAnchor, rect, AREA_CLEARANCE)) hits += 1
+                if (segmentIntersectsRect(fromAnchor, a, rect, renderTuning.value.area_clearance)) hits += 1
+                if (segmentIntersectsRect(a, toAnchor, rect, renderTuning.value.area_clearance)) hits += 1
               })
               const length = Math.hypot(a.x - fromAnchor.x, a.y - fromAnchor.y) + Math.hypot(toAnchor.x - a.x, toAnchor.y - a.y)
               return hits * 10000 + length
@@ -1272,7 +1295,7 @@ const linkPortLabels = computed(() => {
   const labelScale = clamp(props.viewport.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
   const labelHeight = PORT_LABEL_HEIGHT * labelScale
   const labelPadding = PORT_LABEL_PADDING * labelScale
-  const labelOffset = PORT_LABEL_OFFSET * labelScale
+  const labelOffset = renderTuning.value.port_label_offset * labelScale
   const fontSize = 10 * labelScale
   const textPadX = 4 * labelScale
   const textPadY = 2 * labelScale
@@ -1389,7 +1412,7 @@ const linkPortLabels = computed(() => {
       let prev = list[0]
       list.forEach((label, idx) => {
         if (idx === 0) return
-        const minGap = (prev.height + label.height) / 2 + 4 * labelScale
+        const minGap = (prev.height + label.height) / 2 + renderTuning.value.label_gap_y * labelScale
         if (label.center.y < cursor + minGap) {
           label.center.y = cursor + minGap
         }
@@ -1402,7 +1425,7 @@ const linkPortLabels = computed(() => {
       let prev = list[0]
       list.forEach((label, idx) => {
         if (idx === 0) return
-        const minGap = (prev.width + label.width) / 2 + 6 * labelScale
+        const minGap = (prev.width + label.width) / 2 + renderTuning.value.label_gap_x * labelScale
         if (label.center.x < cursor + minGap) {
           label.center.x = cursor + minGap
         }
@@ -1429,7 +1452,7 @@ const linkPortLabels = computed(() => {
       let prev = list[0]
       list.forEach((label, idx) => {
         if (idx === 0) return
-        const minGap = (prev.height + label.height) / 2 + 4 * labelScale
+        const minGap = (prev.height + label.height) / 2 + renderTuning.value.label_gap_y * labelScale
         if (label.center.y < cursor + minGap) {
           label.center.y = cursor + minGap
         }
@@ -1442,7 +1465,7 @@ const linkPortLabels = computed(() => {
       let prev = list[0]
       list.forEach((label, idx) => {
         if (idx === 0) return
-        const minGap = (prev.width + label.width) / 2 + 6 * labelScale
+        const minGap = (prev.width + label.width) / 2 + renderTuning.value.label_gap_x * labelScale
         if (label.center.x < cursor + minGap) {
           label.center.x = cursor + minGap
         }

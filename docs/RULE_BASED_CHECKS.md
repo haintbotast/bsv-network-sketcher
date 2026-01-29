@@ -53,7 +53,8 @@
 - **RB-007:** Liên kết khác Area bắt buộc đi qua Waypoint area (đuôi `_wp_`).
 - **RB-008:** Endpoint **không được** kết nối trực tiếp lên **Distribution/Core**; phải đi qua Access.
 - **RB-009:** VPN Gateway là chức năng Firewall → device phải được nhận diện như Firewall (device_type hoặc tên).
-- **RB-010:** Thiết bị Server/NAS/Storage/Server Switch phải nằm trong **Area Server/Monitor** (không nằm trong Project/Office/IT).
+- **RB-010:** Thiết bị Server/NAS/Storage/Server Switch phải nằm trong **Area Server** (không nằm trong Project/Office/IT).
+- **RB-010A:** Thiết bị Monitor/NOC/NMS phải nằm trong **Area IT** (không tạo Area Monitor riêng).
 - **RB-011:** Access Switch phải nằm trong **Area nghiệp vụ** (Head Office/Department/Project/IT), không thuộc area Access riêng.
 - **RB-012:** Server chỉ được kết nối lên **Server Distribution Switch**.
 
@@ -85,7 +86,7 @@
 - **RB-203:** Bố cục thiết bị trong Area tuân theo top‑to‑bottom tier (Core/Dist → Access → Endpoints).
 - **RB-204:** Overview (nếu bật) chỉ hiển thị L1/flow (không render nhãn L2/L3).
 - **RB-205:** Nếu có **Area Data Center**, các thiết bị Edge/Security/DMZ/Core/Distribution phải nằm trong area này (cảnh báo nếu nằm ngoài).
-- **RB-206:** Area Server/Monitor ưu tiên đặt **cùng hàng hoặc ngay dưới DMZ** (cảnh báo nếu thấp hơn quá 1 tier).
+- **RB-206:** Area Server ưu tiên đặt **cùng hàng hoặc ngay dưới DMZ** (cảnh báo nếu thấp hơn quá 1 tier).
 
 ---
 

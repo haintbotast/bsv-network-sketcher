@@ -71,6 +71,90 @@
           <button type="button" class="primary" @click="fetchHealth">Kiểm tra backend</button>
         </div>
 
+        <div v-if="currentUser" class="section">
+          <h2>Cấu hình Layout</h2>
+          <div class="stack">
+            <p class="panel-hint">Auto-layout (inch)</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Layer gap</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.layer_gap" />
+              </div>
+              <div class="form-group">
+                <label>Node spacing</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.node_spacing" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Area gap</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.area_gap" />
+              </div>
+              <div class="form-group">
+                <label>Area padding</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.area_padding" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Label band</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.label_band" />
+              </div>
+              <div class="form-group">
+                <label>Max row width</label>
+                <input type="number" step="0.1" v-model.number="layoutTuningForm.max_row_width_base" />
+              </div>
+            </div>
+
+            <div class="divider"></div>
+            <p class="panel-hint">Routing & nhãn (px)</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Bundle gap</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.bundle_gap" />
+              </div>
+              <div class="form-group">
+                <label>Bundle stub</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.bundle_stub" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Area clearance</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.area_clearance" />
+              </div>
+              <div class="form-group">
+                <label>Anchor offset</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.area_anchor_offset" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Label gap X</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.label_gap_x" />
+              </div>
+              <div class="form-group">
+                <label>Label gap Y</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.label_gap_y" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Port offset</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.port_label_offset" />
+              </div>
+              <div class="form-group">
+                <label>Corridor gap</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.corridor_gap" />
+              </div>
+            </div>
+
+            <button type="button" class="primary" :disabled="adminConfigSaving" @click="saveAdminConfig">
+              {{ adminConfigSaving ? 'Đang lưu...' : 'Lưu cấu hình' }}
+            </button>
+          </div>
+        </div>
+
         <p v-if="notice" :class="['notice', noticeType]">{{ notice }}</p>
       </aside>
 
@@ -99,6 +183,7 @@
           :view-mode="viewMode"
           :l2-assignments="l2Assignments"
           :l3-addresses="l3Addresses"
+          :render-tuning="renderTuning"
           @select="handleSelect"
           @update:viewport="updateViewport"
         />
@@ -264,10 +349,31 @@ import { listLinks, createLink, updateLink, deleteLink } from './services/links'
 import { getToken } from './services/api'
 import { autoLayout, invalidateLayoutCache } from './services/layout'
 import type { LayoutResult } from './services/layout'
+import { getAdminConfig, updateAdminConfig } from './services/adminConfig'
+import type { AdminConfig, LayoutTuning, RenderTuning } from './services/adminConfig'
 
 const UNIT_PX = 120
 const GRID_FALLBACK_X = 4
 const GRID_FALLBACK_Y = 2.5
+const DEFAULT_LAYOUT_TUNING: LayoutTuning = {
+  layer_gap: 1.4,
+  node_spacing: 0.7,
+  area_gap: 0.9,
+  area_padding: 0.3,
+  label_band: 0.45,
+  max_row_width_base: 12.0
+}
+const DEFAULT_RENDER_TUNING: RenderTuning = {
+  port_edge_inset: 6,
+  port_label_offset: 10,
+  bundle_gap: 14,
+  bundle_stub: 14,
+  area_clearance: 14,
+  area_anchor_offset: 12,
+  label_gap_x: 6,
+  label_gap_y: 4,
+  corridor_gap: 32
+}
 
 const statusText = ref('đang kiểm tra...')
 const notice = ref('')
@@ -278,6 +384,10 @@ const authForm = reactive({
   password: ''
 })
 const currentUser = ref<UserRecord | null>(null)
+const adminConfig = ref<AdminConfig>({})
+const layoutTuningForm = reactive({ ...DEFAULT_LAYOUT_TUNING })
+const renderTuningForm = reactive({ ...DEFAULT_RENDER_TUNING })
+const adminConfigSaving = ref(false)
 
 const projects = ref<ProjectRecord[]>([])
 const selectedProjectId = ref<string | null>(null)
@@ -309,6 +419,14 @@ const rightPanelWidth = ref(360)
 const layoutMode = computed(() => activeProject.value?.layout_mode || 'cisco')
 const layoutModeSelection = ref<'cisco' | 'iso' | 'custom'>('cisco')
 const layoutModeUpdating = ref(false)
+const layoutTuning = computed(() => ({
+  ...DEFAULT_LAYOUT_TUNING,
+  ...(adminConfig.value.layout_tuning || {})
+}))
+const renderTuning = computed(() => ({
+  ...DEFAULT_RENDER_TUNING,
+  ...(adminConfig.value.render_tuning || {})
+}))
 
 // View mode for canvas (L1/L2/L3)
 type ViewMode = 'L1' | 'L2' | 'L3'
@@ -589,6 +707,44 @@ function setNotice(message: string, type: 'info' | 'success' | 'error' = 'info')
   noticeType.value = type
 }
 
+function syncTuningForms(config: AdminConfig) {
+  Object.assign(layoutTuningForm, { ...DEFAULT_LAYOUT_TUNING, ...(config.layout_tuning || {}) })
+  Object.assign(renderTuningForm, { ...DEFAULT_RENDER_TUNING, ...(config.render_tuning || {}) })
+}
+
+async function loadAdminConfig() {
+  if (!currentUser.value) return
+  try {
+    const config = await getAdminConfig()
+    adminConfig.value = config
+    syncTuningForms(config)
+  } catch (error: any) {
+    setNotice(error?.message || 'Không thể tải cấu hình layout.', 'error')
+  }
+}
+
+async function saveAdminConfig() {
+  if (adminConfigSaving.value) return
+  adminConfigSaving.value = true
+  try {
+    const payload: AdminConfig = {
+      layout_tuning: { ...layoutTuningForm },
+      render_tuning: { ...renderTuningForm }
+    }
+    const updated = await updateAdminConfig(payload)
+    adminConfig.value = updated
+    syncTuningForms(updated)
+    if (activeProject.value) {
+      await runAutoLayoutAuto(activeProject.value.id, true)
+    }
+    setNotice('Đã lưu cấu hình layout.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Lưu cấu hình layout thất bại.', 'error')
+  } finally {
+    adminConfigSaving.value = false
+  }
+}
+
 async function fetchHealth() {
   try {
     const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'}/api/v1/health`)
@@ -608,6 +764,7 @@ async function initAuth() {
   if (!token) return
   try {
     currentUser.value = await getMe()
+    await loadAdminConfig()
     await loadProjects()
   } catch (error) {
     logoutUser()
@@ -624,6 +781,7 @@ async function handleLogin() {
   try {
     await loginUser({ email: authForm.email, password: authForm.password })
     currentUser.value = await getMe()
+    await loadAdminConfig()
     await loadProjects()
     setNotice('Đăng nhập thành công.', 'success')
   } catch (error: any) {
@@ -634,6 +792,8 @@ async function handleLogin() {
 function handleLogout() {
   logoutUser()
   currentUser.value = null
+  adminConfig.value = {}
+  syncTuningForms({})
   projects.value = []
   selectedProjectId.value = null
   areas.value = []
@@ -964,11 +1124,9 @@ watch(layoutModeSelection, async (value) => {
 })
 
 function computeAutoLayoutTuning() {
-  const deviceCount = devices.value.length
-  const density = Math.min(1, Math.max(0, (deviceCount - 20) / 60))
-  // Layout luôn top-to-bottom, auto-tune layer_gap dựa trên density
-  const layer_gap = Number((0.9 + density * 1.0).toFixed(2))  // 0.9-1.9 inches
-  const node_spacing = Number((0.6 + density * 0.4).toFixed(2))  // 0.6-1.0 inches
+  const tuning = layoutTuning.value
+  const layer_gap = Number((tuning.layer_gap ?? DEFAULT_LAYOUT_TUNING.layer_gap).toFixed(2))
+  const node_spacing = Number((tuning.node_spacing ?? DEFAULT_LAYOUT_TUNING.node_spacing).toFixed(2))
   return { layer_gap, node_spacing }
 }
 

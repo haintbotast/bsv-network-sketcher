@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-23  
+> **Cập nhật:** 2026-01-29  
 > **Mục tiêu:** Chuẩn hóa cấu hình preset/layout/validation cho hệ thống, tránh hardcode.
 
 ---
@@ -15,6 +15,25 @@
   "layout": {
     "default_mode": "cisco",
     "allowed_modes": ["cisco", "iso", "custom"]
+  },
+  "layout_tuning": {
+    "layer_gap": 1.4,
+    "node_spacing": 0.7,
+    "area_gap": 0.9,
+    "area_padding": 0.3,
+    "label_band": 0.45,
+    "max_row_width_base": 12.0
+  },
+  "render_tuning": {
+    "port_edge_inset": 6,
+    "port_label_offset": 10,
+    "bundle_gap": 14,
+    "bundle_stub": 14,
+    "area_clearance": 14,
+    "area_anchor_offset": 12,
+    "label_gap_x": 6,
+    "label_gap_y": 4,
+    "corridor_gap": 32
   },
   "style": {
     "themes": ["default", "contrast", "light", "dark"],

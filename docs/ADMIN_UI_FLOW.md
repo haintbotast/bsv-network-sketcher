@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-23  
+> **Cập nhật:** 2026-01-29  
 > **Mục tiêu:** Gợi ý luồng UI cho trang quản trị cấu hình và lịch sử phiên bản topology.
 
 ---
@@ -18,6 +18,8 @@
 
 **Hiển thị tối thiểu:**
 - `layout.default_mode`, `layout.allowed_modes`
+- `layout_tuning` (layer_gap, node_spacing, area_gap, area_padding, label_band)
+- `render_tuning` (bundle_gap, area_clearance, anchor_offset, label_gap_x/y, corridor_gap)
 - `style.default_theme`, preset size
 - `validation` rule cơ bản + `validation.layout_checks`
 - `export` default format + include metadata

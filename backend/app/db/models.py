@@ -297,3 +297,17 @@ class ExportJob(Base):
 
     # Relationships
     project: Mapped["Project"] = relationship(back_populates="export_jobs")
+
+
+# ============================================================================
+# Admin Config
+# ============================================================================
+
+
+class AdminConfig(Base):
+    __tablename__ = "admin_configs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    config_key: Mapped[str] = mapped_column(String(50), unique=True, default="global")
+    config_json: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

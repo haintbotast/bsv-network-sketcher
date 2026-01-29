@@ -122,7 +122,7 @@ POST /projects/{project_id}/invalidate-layout-cache
 **Ghi chú:**
 - `group_by_area=true` là mặc định theo AI Context: layout 2 tầng (macro Area + micro Device).
 - `overview_mode="l1-only"` để tránh đè nhãn L2/L3 trong overview.
-- `normalize_topology=true` sẽ tự tạo Area Data Center/Server/Monitor (nếu thiếu) và chuyển device theo quy ước (Access vào area nghiệp vụ, Server về Server, Edge/Security/DMZ/Core/Dist vào Data Center).
+- `normalize_topology=true` sẽ tự tạo Area Data Center/Server (nếu thiếu) và chuyển device theo quy ước (Access vào area nghiệp vụ, Server về Server, Edge/Security/DMZ/Core/Dist vào Data Center; Monitor/NOC/NMS gộp vào IT).
 
 ---
 
@@ -209,6 +209,7 @@ POST /admin/config/versions/{version_id}/restore
 
 **Phạm vi cấu hình:** preset layout/style, validation rules + layout checks, export defaults.
 **Schema:** xem `docs/ADMIN_CONFIG_SCHEMA.md`.
+**Bổ sung:** `layout_tuning` và `render_tuning` dùng để điều chỉnh auto-layout & routing/label trên UI.
 
 ---
 

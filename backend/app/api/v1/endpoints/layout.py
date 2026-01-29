@@ -11,6 +11,7 @@ from app.db.session import get_db
 from app.services import device as device_service
 from app.services import link as link_service
 from app.services import area as area_service
+from app.services.admin_config import get_admin_config
 from app.schemas.area import AreaCreate
 from app.services.layout_models import LayoutConfig
 from app.services.simple_layer_layout import simple_layer_layout
@@ -31,7 +32,6 @@ router = APIRouter()
 AREA_PREFIX_RE = re.compile(r"^([A-Za-z0-9]{2,6})(\s*-\s*)")
 SECURITY_AREA_KEYWORDS = ["security", "firewall", "fw", "ids", "ips", "vpn", "soc"]
 SERVER_AREA_KEYWORDS = ["server", "servers", "storage", "nas", "san"]
-MONITOR_AREA_KEYWORDS = ["monitor", "monitoring", "noc", "nms"]
 DMZ_AREA_KEYWORDS = ["dmz", "proxy"]
 DATACENTER_AREA_KEYWORDS = ["datacenter", "data center", "dc"]
 
@@ -92,8 +92,6 @@ def _classify_area_kind(name: str | None) -> str | None:
     label = _normalize(name)
     if any(keyword in label for keyword in DATACENTER_AREA_KEYWORDS):
         return "datacenter"
-    if any(keyword in label for keyword in MONITOR_AREA_KEYWORDS):
-        return "monitor"
     if any(keyword in label for keyword in SERVER_AREA_KEYWORDS):
         return "server"
     if any(keyword in label for keyword in SECURITY_AREA_KEYWORDS):
@@ -199,7 +197,7 @@ async def _normalize_topology(
     prefix = _infer_area_prefix(areas)
     datacenter_area = _find_area_by_keywords(areas, DATACENTER_AREA_KEYWORDS)
     server_area = _find_area_by_keywords(areas, SERVER_AREA_KEYWORDS)
-    monitor_area = _find_area_by_keywords(areas, MONITOR_AREA_KEYWORDS)
+    it_area = _find_area_by_keywords(areas, IT_AREA_KEYWORDS)
 
     next_row = max((area.grid_row for area in areas), default=1) + 1
 
@@ -224,12 +222,12 @@ async def _normalize_topology(
             f"{prefix}Servers" if prefix else "Servers",
             next_row,
         )
-    if not monitor_area:
-        monitor_area, next_row = await _ensure_area(
+    if not it_area:
+        it_area, next_row = await _ensure_area(
             db,
             project_id,
             areas,
-            f"{prefix}Monitor" if prefix else "Monitor",
+            f"{prefix}IT" if prefix else "IT",
             next_row,
         )
 
@@ -261,7 +259,7 @@ async def _normalize_topology(
         target_area = None
 
         if _is_monitor_device(device):
-            target_area = monitor_area
+            target_area = it_area
         elif _is_server_device(device):
             target_area = server_area
         elif _is_access_switch(device):
@@ -276,7 +274,7 @@ async def _normalize_topology(
                     )
                     for area_id, _count in sorted_neighbors:
                         kind = area_kind_by_id.get(area_id)
-                        if kind not in {"datacenter", "server", "monitor"}:
+                        if kind not in {"datacenter", "server"}:
                             target_area = area_by_id.get(area_id)
                             break
         elif datacenter_area and (
@@ -295,6 +293,16 @@ async def _normalize_topology(
             updated = True
 
     if updated:
+        await db.commit()
+
+    # Remove empty areas (no devices) after normalization
+    area_ids_in_use = {device.area_id for device in devices}
+    removed = False
+    for area in list(area_by_id.values()):
+        if area.id not in area_ids_in_use:
+            await db.delete(area)
+            removed = True
+    if removed:
         await db.commit()
 
     areas = await area_service.get_areas(db, project_id)
@@ -332,6 +340,9 @@ async def compute_auto_layout(
     if not links and not options.group_by_area:
         raise HTTPException(status_code=404, detail="No links found in project")
     links = links or []
+
+    admin_config = await get_admin_config(db)
+    layout_tuning = admin_config.get("layout_tuning", {}) if isinstance(admin_config, dict) else {}
 
     # Load data based on view_mode
     view_mode = options.view_mode
@@ -385,6 +396,7 @@ async def compute_auto_layout(
         "layout_scope": options.layout_scope,
         "view_mode": options.view_mode,
         "normalize_topology": options.normalize_topology,
+        "layout_tuning": layout_tuning,
     }
 
     # Different cache keys for different views
@@ -411,7 +423,7 @@ async def compute_auto_layout(
     try:
         if view_mode == "L1":
             if options.group_by_area:
-                response = compute_layout_l1(devices, links, areas, config, options.layout_scope)
+                response = compute_layout_l1(devices, links, areas, config, options.layout_scope, layout_tuning)
             else:
                 layout_result = simple_layer_layout(devices, links, config)
                 response = {
@@ -559,14 +571,16 @@ def compute_layout_l1(
     areas: list,
     config: LayoutConfig,
     layout_scope: str,
+    layout_tuning: dict | None = None,
 ) -> dict:
     """Compute L1 layout: area-based with minimized area visuals (compact spacing)."""
+    tuning = layout_tuning or {}
     AREA_MIN_WIDTH = 3.0
     AREA_MIN_HEIGHT = 1.5
-    AREA_GAP = 0.9
-    AREA_PADDING = 0.3
-    LABEL_BAND = 0.45
-    MAX_ROW_WIDTH_BASE = 12.0
+    AREA_GAP = float(tuning.get("area_gap", 0.9))
+    AREA_PADDING = float(tuning.get("area_padding", 0.3))
+    LABEL_BAND = float(tuning.get("label_band", 0.45))
+    MAX_ROW_WIDTH_BASE = float(tuning.get("max_row_width_base", 12.0))
 
     # Tier characteristics for enhanced layout (11 tiers: 0-10)
     TIER_CHARACTERISTICS = {
@@ -611,7 +625,7 @@ def compute_layout_l1(
             # Tier 9: Project
             (9, ["project", "proj", "it"]),
             # Tier 10: Servers
-            (10, ["server", "servers", "storage", "nas", "monitor", "monitoring", "noc", "nms"]),
+            (10, ["server", "servers", "storage", "nas"]),
         ]
         for tier, keywords in tier_hints:
             if any(keyword in label for keyword in keywords):
@@ -633,7 +647,7 @@ def compute_layout_l1(
             (7, ["office", "floor"]),
             (8, ["department", "dept"]),
             (9, ["project", "proj"]),
-            (10, ["server", "storage", "nas", "san", "monitor", "monitoring", "noc", "nms"]),
+            (10, ["server", "storage", "nas", "san"]),
         ]
         for tier, keywords in tier_keywords:
             if any(keyword in name for keyword in keywords):

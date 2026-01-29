@@ -1110,14 +1110,17 @@ function computeAreaAnchor(
 ) {
   const dx = targetPoint.x - fromPoint.x
   const dy = targetPoint.y - fromPoint.y
-  const inset = 12
+  const inset = 4
   if (Math.abs(dx) >= Math.abs(dy)) {
     const x = dx >= 0 ? areaRect.x + areaRect.width + edgeOffset : areaRect.x - edgeOffset
-    const y = clamp(fromPoint.y + shift, areaRect.y + inset, areaRect.y + areaRect.height - inset)
+    // Clamp base position first, then apply shift outside area bounds to preserve separation
+    const baseY = clamp(fromPoint.y, areaRect.y + inset, areaRect.y + areaRect.height - inset)
+    const y = baseY + shift
     return { x, y }
   }
   const y = dy >= 0 ? areaRect.y + areaRect.height + edgeOffset : areaRect.y - edgeOffset
-  const x = clamp(fromPoint.x + shift, areaRect.x + inset, areaRect.x + areaRect.width - inset)
+  const baseX = clamp(fromPoint.x, areaRect.x + inset, areaRect.x + areaRect.width - inset)
+  const x = baseX + shift
   return { x, y }
 }
 
@@ -1217,9 +1220,11 @@ const visibleLinks = computed(() => {
           pushPoint(points, toAnchor.x, toAnchor.y)
         }
       } else if (isL1) {
-        // L1 intra-area: shortest straight segment between ports, bundle if needed
-        const dx = toAnchor.x - fromAnchor.x
-        const dy = toAnchor.y - fromAnchor.y
+        // L1 intra-area: straight segment between ports, bundle if needed
+        // For bundled links, use device centers for consistent perpendicular direction
+        const useCenters = bundleOffset !== 0
+        const dx = useCenters ? (toCenter.x - fromCenter.x) : (toAnchor.x - fromAnchor.x)
+        const dy = useCenters ? (toCenter.y - fromCenter.y) : (toAnchor.y - fromAnchor.y)
         const dir = normalizeVector(dx, dy)
         const perp = normalizeVector(-dir.y, dir.x)
         if (bundleOffset !== 0 && (dir.x !== 0 || dir.y !== 0)) {
@@ -1362,12 +1367,32 @@ const linkPortLabels = computed(() => {
       center: { x: number; y: number },
       neighbor: { x: number; y: number },
       deviceId: string,
-      deviceRect: { x: number; y: number; width: number; height: number }
+      deviceRect: { x: number; y: number; width: number; height: number },
+      segmentCount: number
     ) => {
       if (!text) return
       const width = Math.max(text.length * charWidth + labelPadding, minLabelWidth)
-      const pos = computePortLabelPlacement(anchor, center, width, labelHeight, labelOffset)
-      const angle = computeAngle(anchor, neighbor)
+
+      const dx = neighbor.x - anchor.x
+      const dy = neighbor.y - anchor.y
+      const len = Math.hypot(dx, dy)
+
+      let cx: number
+      let cy: number
+
+      if (len < 1) {
+        const pos = computePortLabelPlacement(anchor, center, width, labelHeight, labelOffset)
+        cx = pos.x + width / 2
+        cy = pos.y + labelHeight / 2
+      } else {
+        // Place label near the device anchor, ON the connection line
+        // The line passes through the center of the label (via group offsetX/offsetY)
+        // Use a small offset from anchor so label doesn't overlap the device edge
+        const offset = (width / 2 + 4) / len  // fraction to clear half the label + small gap
+        cx = anchor.x + dx * offset
+        cy = anchor.y + dy * offset
+      }
+
       rawLabels.push({
         id,
         deviceId,
@@ -1376,8 +1401,8 @@ const linkPortLabels = computed(() => {
         width,
         height: labelHeight,
         text,
-        angle,
-        center: { x: pos.x + width / 2, y: pos.y + labelHeight / 2 },
+        angle: computeAngle(anchor, neighbor),
+        center: { x: cx, y: cy },
         rect: deviceRect,
         fontSize,
         textPadX,
@@ -1394,6 +1419,7 @@ const linkPortLabels = computed(() => {
 
     const fromRect = deviceViewMap.value.get(link.fromDeviceId)
     const toRect = deviceViewMap.value.get(link.toDeviceId)
+    const segmentCount = entry.points.length / 2
     if (fromRect && fromText) {
       placeLabel(
         `${link.id}-from`,
@@ -1402,7 +1428,8 @@ const linkPortLabels = computed(() => {
         entry.fromCenter,
         fromNeighbor,
         link.fromDeviceId,
-        fromRect
+        fromRect,
+        segmentCount
       )
     }
     if (toRect && toText) {
@@ -1413,11 +1440,13 @@ const linkPortLabels = computed(() => {
         entry.toCenter,
         toNeighbor,
         link.toDeviceId,
-        toRect
+        toRect,
+        segmentCount
       )
     }
   })
 
+  // Single-pass collision avoidance per device-side (reduced gaps, capped displacement)
   const bySide = new Map<string, typeof rawLabels>()
   rawLabels.forEach(label => {
     const key = `${label.deviceId}-${label.side}`
@@ -1426,76 +1455,50 @@ const linkPortLabels = computed(() => {
     bySide.set(key, list)
   })
 
+  const maxDisplacement = 60 * labelScale // Cap max displacement from original position
+
   bySide.forEach(list => {
-    if (!list.length) return
+    if (list.length < 2) return
     const side = list[0].side
+    // Save original positions to cap displacement
+    const originals = list.map(l => ({ x: l.center.x, y: l.center.y }))
+
     if (side === 'left' || side === 'right') {
       list.sort((a, b) => a.center.y - b.center.y)
       let cursor = list[0].center.y
-      let prev = list[0]
       list.forEach((label, idx) => {
         if (idx === 0) return
-        const minGap = (prev.height + label.height) / 2 + renderTuning.value.label_gap_y * labelScale
+        const minGap = (list[idx - 1].height + label.height) / 2 + 2 * labelScale
         if (label.center.y < cursor + minGap) {
           label.center.y = cursor + minGap
         }
         cursor = label.center.y
-        prev = label
       })
     } else {
       list.sort((a, b) => a.center.x - b.center.x)
       let cursor = list[0].center.x
-      let prev = list[0]
       list.forEach((label, idx) => {
         if (idx === 0) return
-        const minGap = (prev.width + label.width) / 2 + renderTuning.value.label_gap_x * labelScale
+        const minGap = (list[idx - 1].width + label.width) / 2 + 2 * labelScale
         if (label.center.x < cursor + minGap) {
           label.center.x = cursor + minGap
         }
         cursor = label.center.x
-        prev = label
       })
     }
-  })
 
-  const byAreaSide = new Map<string, typeof rawLabels>()
-  rawLabels.forEach(label => {
-    const key = `${label.areaId ?? 'global'}-${label.side}`
-    const list = byAreaSide.get(key) || []
-    list.push(label)
-    byAreaSide.set(key, list)
-  })
-
-  byAreaSide.forEach(list => {
-    if (!list.length) return
-    const side = list[0].side
-    if (side === 'left' || side === 'right') {
-      list.sort((a, b) => a.center.y - b.center.y)
-      let cursor = list[0].center.y
-      let prev = list[0]
-      list.forEach((label, idx) => {
-        if (idx === 0) return
-        const minGap = (prev.height + label.height) / 2 + renderTuning.value.label_gap_y * labelScale
-        if (label.center.y < cursor + minGap) {
-          label.center.y = cursor + minGap
-        }
-        cursor = label.center.y
-        prev = label
-      })
-    } else {
-      list.sort((a, b) => a.center.x - b.center.x)
-      let cursor = list[0].center.x
-      let prev = list[0]
-      list.forEach((label, idx) => {
-        if (idx === 0) return
-        const minGap = (prev.width + label.width) / 2 + renderTuning.value.label_gap_x * labelScale
-        if (label.center.x < cursor + minGap) {
-          label.center.x = cursor + minGap
-        }
-        cursor = label.center.x
-        prev = label
-      })
-    }
+    // Cap displacement
+    list.forEach((label, idx) => {
+      const orig = originals[idx]
+      const dispX = label.center.x - orig.x
+      const dispY = label.center.y - orig.y
+      const dist = Math.hypot(dispX, dispY)
+      if (dist > maxDisplacement) {
+        const scale = maxDisplacement / dist
+        label.center.x = orig.x + dispX * scale
+        label.center.y = orig.y + dispY * scale
+      }
+    })
   })
 
   return rawLabels.map(label => ({

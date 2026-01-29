@@ -14,6 +14,7 @@ export interface AutoLayoutOptions {
   overview_mode?: 'l1-only'
   view_mode?: 'L1' | 'L2' | 'L3'
   normalize_topology?: boolean
+  auto_resize_devices?: boolean
 }
 
 export interface DeviceLayout {
@@ -90,6 +91,7 @@ export async function autoLayout(
     overview_mode: 'l1-only',
     view_mode: 'L1',
     normalize_topology: false,
+    auto_resize_devices: true,
     ...options
   }
 

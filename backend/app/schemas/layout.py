@@ -49,6 +49,10 @@ class AutoLayoutOptions(BaseModel):
         default=False,
         description="If True, auto-normalize areas/devices (Security/Server/Monitor) before layout."
     )
+    auto_resize_devices: bool = Field(
+        default=True,
+        description="If True, auto-resize device dimensions based on port count (from links + L2)."
+    )
 
     class Config:
         json_schema_extra = {
@@ -61,6 +65,7 @@ class AutoLayoutOptions(BaseModel):
                 "anchor_routing": True,
                 "overview_mode": "l1-only",
                 "normalize_topology": False,
+                "auto_resize_devices": True,
             }
         }
 

@@ -16,6 +16,10 @@ from app.schemas.area import AreaCreate
 from app.services.layout_models import LayoutConfig
 from app.services.simple_layer_layout import simple_layer_layout
 from app.services.layout_cache import get_cache
+from app.services.device_sizing import (
+    compute_device_port_counts,
+    auto_resize_devices_by_ports,
+)
 from app.schemas.layout import (
     AutoLayoutOptions,
     LayoutResult,
@@ -340,6 +344,13 @@ async def compute_auto_layout(
     if not links and not options.group_by_area:
         raise HTTPException(status_code=404, detail="No links found in project")
     links = links or []
+
+    # Auto-resize devices based on port count (if enabled)
+    if options.auto_resize_devices and options.apply_to_db:
+        port_counts = await compute_device_port_counts(db, project_id)
+        await auto_resize_devices_by_ports(db, project_id, port_counts)
+        # Reload devices after resize
+        devices = await device_service.get_devices(db, project_id)
 
     admin_config = await get_admin_config(db)
     layout_tuning = admin_config.get("layout_tuning", {}) if isinstance(admin_config, dict) else {}

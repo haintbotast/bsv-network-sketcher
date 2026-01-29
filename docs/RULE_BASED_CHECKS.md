@@ -78,7 +78,7 @@
 - **RB-201:** Hướng bố cục tuân theo layout mode đã chọn (cisco/iso/custom).
 - **RB-202:** Nếu `custom` thiếu tham số bố cục, fallback ISO và sinh WARN.
 - **RB-203:** Bố cục thiết bị trong Area tuân theo top‑to‑bottom tier (Core/Dist → Access → Endpoints).
-- **RB-204:** Overview chỉ hiển thị L1/flow (không render nhãn L2/L3).
+- **RB-204:** Overview (nếu bật) chỉ hiển thị L1/flow (không render nhãn L2/L3).
 
 ---
 

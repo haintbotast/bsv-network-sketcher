@@ -46,7 +46,7 @@ export type LinkModel = {
 }
 
 // View modes for canvas
-export type ViewMode = 'L1' | 'L2' | 'L3' | 'overview'
+export type ViewMode = 'L1' | 'L2' | 'L3'
 
 // L2 Layer records
 export type L2SegmentRecord = {

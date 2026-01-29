@@ -14,7 +14,7 @@
 - **inter‑area:** link khác Area bắt buộc qua Waypoint area (`_wp_`).
 
 ### 1.2 Kiểm thử overview/L2/L3
-- Overview chỉ L1/flow; L2/L3 không render nhãn trong overview.
+- Overview (nếu bật) chỉ L1/flow; L2/L3 không render nhãn trong overview.
 - L2/L3 view hiển thị nhãn đúng, không đè lên thiết bị (band nhãn).
 
 - Bao phủ kiểm tra liên lớp L1→L2→L3 (interface tồn tại, port-channel, virtual port).

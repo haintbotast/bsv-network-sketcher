@@ -45,7 +45,8 @@
 - Dùng `_AIR_` (ô trống) để canh cột, giữ thẳng hàng theo chiều dọc.
 
 **Quy tắc hiển thị theo view:**
-- **Overview:** chỉ L1/flow; không render nhãn L2/L3 để tránh đè chữ/đường.
+- **Overview (nếu bật):** chỉ L1/flow; không render nhãn L2/L3 để tránh đè chữ/đường.  
+  **Lưu ý:** UI hiện không hiển thị Overview; dùng L1 thay thế.
 - **L2/L3:** chỉ hiển thị nhãn L2/L3 trong view tương ứng; có **band nhãn** để không chồng lên thiết bị.
 
 **Liên kết liên‑area:**
@@ -94,11 +95,11 @@
 
 | Đối tượng | Shape | Ghi chú |
 |----------|-------|--------|
-| Area | Rectangle bo góc | Nền nhạt, label góc trên trái |
-| Device | Rectangle bo góc | Màu theo loại thiết bị |
+| Area | Rectangle bo góc | Nền nhạt, label góc trên trái, **không viền**, có **đổ bóng nhẹ** |
+| Device | Rectangle bo góc | Màu theo loại thiết bị, **không viền**, có **đổ bóng nhẹ** |
 | Waypoint | Diamond hoặc Circle | Không hiện label khi zoom out |
-| Link | Line | Màu theo purpose; nét liền/đứt |
-| Interface Tag | Text + background | Offset khỏi link |
+| Link | Line | Bắt đầu từ **port anchor** trên device; màu theo purpose; nét liền/đứt |
+| Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor** |
 
 ### 4.1 Kích thước chuẩn (tham chiếu)
 

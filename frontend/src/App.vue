@@ -80,10 +80,10 @@
           <button type="button" @click="zoomOut">Zoom -</button>
           <button type="button" class="ghost" @click="resetViewport">Reset view</button>
           <span class="toolbar-divider"></span>
-          <button type="button" :class="{ active: viewMode === 'L1' }" @click="setViewMode('L1')">L1</button>
-          <button type="button" :class="{ active: viewMode === 'L2' }" @click="setViewMode('L2')">L2</button>
-          <button type="button" :class="{ active: viewMode === 'L3' }" @click="setViewMode('L3')">L3</button>
-          <button type="button" :class="{ active: viewMode === 'overview' }" @click="setViewMode('overview')">Tổng quan</button>
+          <button type="button" :class="{ active: viewMode === 'L1' }" @click="setViewMode('L1')">[L1]</button>
+          <button type="button" :class="{ active: viewMode === 'L2' }" @click="setViewMode('L2')">[L2]</button>
+          <button type="button" :class="{ active: viewMode === 'L3' }" @click="setViewMode('L3')">[L3]</button>
+          <span class="view-badge">{{ viewModeLabel }}</span>
           <span class="toolbar-divider"></span>
           <button type="button" class="ghost" @click="toggleRightPanel">
             {{ showRightPanel ? 'Ẩn panel' : 'Hiện panel' }}
@@ -310,8 +310,8 @@ const layoutMode = computed(() => activeProject.value?.layout_mode || 'cisco')
 const layoutModeSelection = ref<'cisco' | 'iso' | 'custom'>('cisco')
 const layoutModeUpdating = ref(false)
 
-// View mode for canvas (L1/L2/L3/Overview)
-type ViewMode = 'L1' | 'L2' | 'L3' | 'overview'
+// View mode for canvas (L1/L2/L3)
+type ViewMode = 'L1' | 'L2' | 'L3'
 const viewMode = ref<ViewMode>('L1')
 
 // L2/L3 data
@@ -372,14 +372,43 @@ const selectedObjectType = computed(() => {
   return null
 })
 
+const selectedAreaName = computed(() => {
+  if (!selectedObject.value) return null
+  if (selectedObjectType.value === 'Area') {
+    return (selectedObject.value as AreaRow).name
+  }
+  if (selectedObjectType.value === 'Device') {
+    const device = selectedObject.value as DeviceRow
+    const area = areas.value.find(a => a.id === device.area_id)
+    return area?.name || null
+  }
+  return null
+})
+
 const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']
 const linkPurposes = ['DEFAULT', 'WAN', 'INTERNET', 'DMZ', 'LAN', 'MGMT', 'HA', 'STORAGE', 'BACKUP', 'VPN']
+
+const defaultAreaStyle: AreaStyle = {
+  fill_color_rgb: [240, 240, 240],
+  stroke_color_rgb: [51, 51, 51],
+  stroke_width: 1
+}
 
 const statusClass = computed(() => {
   if (statusText.value === 'healthy') return 'ok'
   if (statusText.value === 'không kết nối được') return 'error'
   if (statusText.value === 'lỗi kết nối') return 'error'
   return 'pending'
+})
+
+const viewModeLabel = computed(() => {
+  const areaName = selectedAreaName.value
+  if (viewMode.value === 'L1') return 'All Areas'
+  if (viewMode.value === 'L2') return areaName || 'Focus on Area'
+  if (viewMode.value === 'L3') {
+    return areaName ? `All Areas · Focus: ${areaName}` : 'All Areas'
+  }
+  return ''
 })
 
 const viewportState = computed<Viewport>(() => ({
@@ -938,8 +967,8 @@ function computeAutoLayoutTuning() {
   const deviceCount = devices.value.length
   const density = Math.min(1, Math.max(0, (deviceCount - 20) / 60))
   // Layout luôn top-to-bottom, auto-tune layer_gap dựa trên density
-  const layer_gap = Number((0.8 + density * 1.0).toFixed(2))  // 0.8-1.8 inches
-  const node_spacing = Number((0.45 + density * 0.25).toFixed(2))  // 0.45-0.7 inches
+  const layer_gap = Number((0.5 + density * 0.7).toFixed(2))  // 0.5-1.2 inches
+  const node_spacing = Number((0.35 + density * 0.2).toFixed(2))  // 0.35-0.55 inches
   return { layer_gap, node_spacing }
 }
 
@@ -1174,6 +1203,7 @@ onMounted(() => {
 .canvas {
   height: 100%;
   min-height: 0;
+  min-width: 0;
   position: relative;
 }
 
@@ -1209,6 +1239,15 @@ onMounted(() => {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
+}
+
+.view-badge {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px dashed rgba(28, 28, 28, 0.2);
+  background: rgba(255, 255, 255, 0.75);
 }
 
 .toolbar-divider {

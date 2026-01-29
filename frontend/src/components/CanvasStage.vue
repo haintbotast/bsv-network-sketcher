@@ -31,21 +31,15 @@
         </v-group>
       </v-layer>
 
-      <!-- L2 View: VLAN grouping boxes -->
-      <v-layer ref="vlanLayerRef">
-        <v-group v-for="group in visibleVlanGroups" :key="group.id">
-          <v-rect :config="group.rect" />
-          <v-text :config="group.label" />
-        </v-group>
-      </v-layer>
-
-      <!-- L3 View: Subnet grouping boxes -->
-      <v-layer ref="subnetLayerRef">
-        <v-group v-for="group in visibleSubnetGroups" :key="group.id">
-          <v-rect :config="group.rect" />
-          <v-text :config="group.label" />
-        </v-group>
-      </v-layer>
+      <!-- L2/L3 grouping boxes (keep under links/devices) -->
+      <v-group v-for="group in visibleVlanGroups" :key="group.id">
+        <v-rect :config="group.rect" />
+        <v-text :config="group.label" />
+      </v-group>
+      <v-group v-for="group in visibleSubnetGroups" :key="group.id">
+        <v-rect :config="group.rect" />
+        <v-text :config="group.label" />
+      </v-group>
 
       <v-layer ref="linkLayerRef">
         <v-line
@@ -69,7 +63,16 @@
 
       <!-- L2/L3 Overlay Layer -->
       <v-layer ref="overlayLayerRef">
-        <!-- L3 IP Labels (show in L3 and overview) -->
+        <!-- L1 Port Labels -->
+        <v-group
+          v-for="label in linkPortLabels"
+          :key="label.id"
+          :config="label.group"
+        >
+          <v-rect :config="label.bg" />
+          <v-text :config="label.text" />
+        </v-group>
+        <!-- L3 IP Labels (show in L3) -->
         <v-group
           v-for="label in l3Labels"
           :key="label.id"
@@ -78,7 +81,7 @@
           <v-rect :config="label.bg" />
           <v-text :config="label.text" />
         </v-group>
-        <!-- L2 VLAN Labels (show in L2 and overview) -->
+        <!-- L2 VLAN Labels (show in L2) -->
         <v-group
           v-for="label in l2Labels"
           :key="label.id"
@@ -270,6 +273,7 @@ const visibleAreas = computed(() => {
       // L1 view: areas fully visible with clear borders (NS gốc style)
       const areaOpacity = 0.95
 
+      const isSelected = props.selectedId === area.id
       return {
         id: area.id,
         group: {
@@ -287,9 +291,14 @@ const visibleAreas = computed(() => {
           height: rect.height,
           fill: area.fill,
           opacity: areaOpacity,
-          stroke: area.stroke,
-          strokeWidth: hasChildren ? 2 : 1.5,
-          cornerRadius: 10
+          stroke: isSelected ? '#d66c3b' : 'transparent',
+          strokeWidth: isSelected ? 2 : 0,
+          cornerRadius: 10,
+          shadowColor: 'rgba(28, 28, 28, 0.25)',
+          shadowBlur: 14,
+          shadowOffset: { x: 0, y: 6 },
+          shadowOpacity: 0.18,
+          shadowForStrokeEnabled: false
         },
         label: {
           x: labelAlign === 'right' ? rect.width - TEXT_PADDING : TEXT_PADDING,
@@ -332,10 +341,15 @@ const visibleVlanGroups = computed(() => {
         width: viewRect.width,
         height: viewRect.height,
         fill: '#e3f2fd',
-        opacity: 0.3,
-        stroke: '#1976d2',
-        strokeWidth: 2,
-        cornerRadius: 8
+        opacity: 0.25,
+        stroke: 'transparent',
+        strokeWidth: 0,
+        cornerRadius: 10,
+        shadowColor: 'rgba(25, 118, 210, 0.35)',
+        shadowBlur: 8,
+        shadowOffset: { x: 0, y: 4 },
+        shadowOpacity: 0.2,
+        shadowForStrokeEnabled: false
       },
       label: {
         x: viewRect.x + 10,
@@ -373,10 +387,15 @@ const visibleSubnetGroups = computed(() => {
         width: viewRect.width,
         height: viewRect.height,
         fill: '#f3e5f5',
-        opacity: 0.3,
-        stroke: '#7b1fa2',
-        strokeWidth: 2,
-        cornerRadius: 8
+        opacity: 0.25,
+        stroke: 'transparent',
+        strokeWidth: 0,
+        cornerRadius: 10,
+        shadowColor: 'rgba(123, 31, 162, 0.35)',
+        shadowBlur: 8,
+        shadowOffset: { x: 0, y: 4 },
+        shadowOpacity: 0.2,
+        shadowForStrokeEnabled: false
       },
       label: {
         x: viewRect.x + 10,
@@ -597,9 +616,14 @@ const visibleDevices = computed(() => {
           width: rect.width,
           height: rect.height,
           fill,
-          stroke: isSelected ? '#d66c3b' : '#5f564f',
-          strokeWidth: isSelected ? 2 : 1.2,
-          cornerRadius: 8
+          stroke: isSelected ? '#d66c3b' : 'transparent',
+          strokeWidth: isSelected ? 2 : 0,
+          cornerRadius: 8,
+          shadowColor: 'rgba(0, 0, 0, 0.22)',
+          shadowBlur: 6,
+          shadowOffset: { x: 0, y: 3 },
+          shadowOpacity: 0.22,
+          shadowForStrokeEnabled: false
         },
         label: {
           x: 8,
@@ -651,6 +675,62 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
+const PORT_SLOTS = 12
+const PORT_EDGE_INSET = 4
+const PORT_LABEL_HEIGHT = 16
+const PORT_LABEL_PADDING = 8
+const PORT_LABEL_OFFSET = 6
+
+function extractPortIndex(portName?: string) {
+  if (!portName) return null
+  const match = portName.match(/(\d+)(?!.*\d)/)
+  if (!match) return null
+  return Number.parseInt(match[1], 10)
+}
+
+function portRatio(portName?: string) {
+  const index = extractPortIndex(portName)
+  if (index == null || Number.isNaN(index)) return 0.5
+  const slot = index % PORT_SLOTS
+  return (slot + 0.5) / PORT_SLOTS
+}
+
+function computePortAnchor(
+  rect: { x: number; y: number; width: number; height: number },
+  target: { x: number; y: number },
+  portName?: string
+) {
+  const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+  const dx = target.x - center.x
+  const dy = target.y - center.y
+  const ratio = portRatio(portName)
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    const x = dx >= 0 ? rect.x + rect.width : rect.x
+    const y = rect.y + PORT_EDGE_INSET + (rect.height - PORT_EDGE_INSET * 2) * ratio
+    return { x, y }
+  }
+  const y = dy >= 0 ? rect.y + rect.height : rect.y
+  const x = rect.x + PORT_EDGE_INSET + (rect.width - PORT_EDGE_INSET * 2) * ratio
+  return { x, y }
+}
+
+function computePortLabelPlacement(
+  anchor: { x: number; y: number },
+  center: { x: number; y: number },
+  textWidth: number
+) {
+  const dx = anchor.x - center.x
+  const dy = anchor.y - center.y
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    const x = dx >= 0 ? anchor.x + PORT_LABEL_OFFSET : anchor.x - textWidth - PORT_LABEL_OFFSET
+    const y = anchor.y - PORT_LABEL_HEIGHT / 2
+    return { x, y }
+  }
+  const x = anchor.x - textWidth / 2
+  const y = dy >= 0 ? anchor.y + PORT_LABEL_OFFSET : anchor.y - PORT_LABEL_HEIGHT - PORT_LABEL_OFFSET
+  return { x, y }
+}
+
 function computeAreaAnchor(
   areaRect: { x: number; y: number; width: number; height: number },
   fromPoint: { x: number; y: number },
@@ -675,14 +755,10 @@ const visibleLinks = computed(() => {
       const fromView = deviceViewMap.value.get(link.fromDeviceId)
       const toView = deviceViewMap.value.get(link.toDeviceId)
       if (!fromView || !toView) return null
-      const fromCenter = {
-        x: fromView.x + fromView.width / 2,
-        y: fromView.y + fromView.height / 2
-      }
-      const toCenter = {
-        x: toView.x + toView.width / 2,
-        y: toView.y + toView.height / 2
-      }
+      const fromCenter = { x: fromView.x + fromView.width / 2, y: fromView.y + fromView.height / 2 }
+      const toCenter = { x: toView.x + toView.width / 2, y: toView.y + toView.height / 2 }
+      const fromAnchor = computePortAnchor(fromView, toCenter, link.fromPort)
+      const toAnchor = computePortAnchor(toView, fromCenter, link.toPort)
       const fromAreaId = deviceAreaMap.value.get(link.fromDeviceId)
       const toAreaId = deviceAreaMap.value.get(link.toDeviceId)
       const fromArea = fromAreaId ? areaViewMap.value.get(fromAreaId) : null
@@ -693,82 +769,87 @@ const visibleLinks = computed(() => {
       // Orthogonal routing for all links (NS gốc style)
       if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
         // Inter-area links: use corridor routing
-        const fromAnchor = computeAreaAnchor(fromArea, fromCenter, toCenter)
-        const toAnchor = computeAreaAnchor(toArea, toCenter, fromCenter)
+        const fromAreaAnchor = computeAreaAnchor(fromArea, fromAnchor, toAnchor)
+        const toAreaAnchor = computeAreaAnchor(toArea, toAnchor, fromAnchor)
         const bounds = areaBounds.value
         if (bounds) {
           const corridorGap = 24
-          const dx = toCenter.x - fromCenter.x
-          const dy = toCenter.y - fromCenter.y
+          const dx = toAnchor.x - fromAnchor.x
+          const dy = toAnchor.y - fromAnchor.y
           if (Math.abs(dx) >= Math.abs(dy)) {
             const topY = bounds.minY - corridorGap
             const bottomY = bounds.maxY + corridorGap
-            const midY = (fromCenter.y + toCenter.y) / 2
+            const midY = (fromAnchor.y + toAnchor.y) / 2
             const corridorY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
             points = [
-              fromCenter.x, fromCenter.y,
               fromAnchor.x, fromAnchor.y,
-              fromAnchor.x, corridorY,
-              toAnchor.x, corridorY,
-              toAnchor.x, toAnchor.y,
-              toCenter.x, toCenter.y
+              fromAreaAnchor.x, fromAreaAnchor.y,
+              fromAreaAnchor.x, corridorY,
+              toAreaAnchor.x, corridorY,
+              toAreaAnchor.x, toAreaAnchor.y,
+              toAnchor.x, toAnchor.y
             ]
           } else {
             const leftX = bounds.minX - corridorGap
             const rightX = bounds.maxX + corridorGap
-            const midX = (fromCenter.x + toCenter.x) / 2
+            const midX = (fromAnchor.x + toAnchor.x) / 2
             const corridorX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
             points = [
-              fromCenter.x, fromCenter.y,
               fromAnchor.x, fromAnchor.y,
-              corridorX, fromAnchor.y,
-              corridorX, toAnchor.y,
-              toAnchor.x, toAnchor.y,
-              toCenter.x, toCenter.y
+              fromAreaAnchor.x, fromAreaAnchor.y,
+              corridorX, fromAreaAnchor.y,
+              corridorX, toAreaAnchor.y,
+              toAreaAnchor.x, toAreaAnchor.y,
+              toAnchor.x, toAnchor.y
             ]
           }
         } else {
           const midX = (fromAnchor.x + toAnchor.x) / 2
           points = [
-            fromCenter.x, fromCenter.y,
             fromAnchor.x, fromAnchor.y,
-            midX, fromAnchor.y,
-            midX, toAnchor.y,
-            toAnchor.x, toAnchor.y,
-            toCenter.x, toCenter.y
+            fromAreaAnchor.x, fromAreaAnchor.y,
+            midX, fromAreaAnchor.y,
+            midX, toAreaAnchor.y,
+            toAreaAnchor.x, toAreaAnchor.y,
+            toAnchor.x, toAnchor.y
           ]
         }
       } else {
         // Intra-area links: orthogonal (Manhattan) routing
-        const dx = toCenter.x - fromCenter.x
-        const dy = toCenter.y - fromCenter.y
+        const dx = toAnchor.x - fromAnchor.x
+        const dy = toAnchor.y - fromAnchor.y
 
         if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
           // Very close: direct line
-          points = [fromCenter.x, fromCenter.y, toCenter.x, toCenter.y]
+          points = [fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y]
         } else if (Math.abs(dx) >= Math.abs(dy)) {
           // Horizontal dominant: go horizontal first
-          const midX = fromCenter.x + dx / 2
+          const midX = fromAnchor.x + dx / 2
           points = [
-            fromCenter.x, fromCenter.y,
-            midX, fromCenter.y,
-            midX, toCenter.y,
-            toCenter.x, toCenter.y
+            fromAnchor.x, fromAnchor.y,
+            midX, fromAnchor.y,
+            midX, toAnchor.y,
+            toAnchor.x, toAnchor.y
           ]
         } else {
           // Vertical dominant: go vertical first
-          const midY = fromCenter.y + dy / 2
+          const midY = fromAnchor.y + dy / 2
           points = [
-            fromCenter.x, fromCenter.y,
-            fromCenter.x, midY,
-            toCenter.x, midY,
-            toCenter.x, toCenter.y
+            fromAnchor.x, fromAnchor.y,
+            fromAnchor.x, midY,
+            toAnchor.x, midY,
+            toAnchor.x, toAnchor.y
           ]
         }
       }
 
       return {
         id: link.id,
+        fromAnchor,
+        toAnchor,
+        fromCenter,
+        toCenter,
+        points,
         config: {
           points,
           stroke: '#2b2a28',
@@ -778,7 +859,67 @@ const visibleLinks = computed(() => {
         }
       }
     })
-    .filter(Boolean) as Array<{ id: string; config: Record<string, unknown> }>
+    .filter(Boolean) as Array<{ id: string; points: number[]; config: Record<string, unknown> }>
+})
+
+const linkPortLabels = computed(() => {
+  if ((props.viewMode || 'L1') !== 'L1') return []
+  const linkMap = new Map(visibleLinks.value.map(link => [link.id, link]))
+
+  const labels: Array<{
+    id: string
+    group: { x: number; y: number }
+    bg: { x: number; y: number; width: number; height: number; fill: string; cornerRadius: number; opacity: number; shadowColor: string; shadowBlur: number; shadowOffset: { x: number; y: number }; shadowOpacity: number }
+    text: { x: number; y: number; text: string; fontSize: number; fill: string }
+  }> = []
+
+  props.links.forEach(link => {
+    const entry = linkMap.get(link.id)
+    if (!entry) return
+
+    const fromText = link.fromPort?.trim()
+    const toText = link.toPort?.trim()
+
+    const placeLabel = (
+      id: string,
+      text: string,
+      anchor: { x: number; y: number },
+      center: { x: number; y: number }
+    ) => {
+      if (!text) return
+      const width = Math.max(text.length * 6 + PORT_LABEL_PADDING, 24)
+      const pos = computePortLabelPlacement(anchor, center, width)
+      labels.push({
+        id,
+        group: { x: pos.x, y: pos.y },
+        bg: {
+          x: 0,
+          y: 0,
+          width,
+          height: PORT_LABEL_HEIGHT,
+          fill: '#ffffff',
+          cornerRadius: 4,
+          opacity: 0.92,
+          shadowColor: 'rgba(0, 0, 0, 0.2)',
+          shadowBlur: 4,
+          shadowOffset: { x: 0, y: 2 },
+          shadowOpacity: 0.2
+        },
+        text: {
+          x: 4,
+          y: 2,
+          text,
+          fontSize: 10,
+          fill: '#2b2a28'
+        }
+      })
+    }
+
+    if (fromText) placeLabel(`${link.id}-from`, fromText, entry.fromAnchor, entry.fromCenter)
+    if (toText) placeLabel(`${link.id}-to`, toText, entry.toAnchor, entry.toCenter)
+  })
+
+  return labels
 })
 
 // L2 Labels - VLAN info on devices
@@ -853,8 +994,8 @@ const l3Labels = computed(() => {
     const moreCount = addresses.length > 2 ? ` +${addresses.length - 2}` : ''
     const text = `${shown}${moreCount}`
     const labelWidth = Math.min(text.length * 6 + 8, deviceRect.width)
-    // Position below device (and below L2 label if in overview)
-    const yOffset = mode === 'overview' ? deviceRect.height + 20 : deviceRect.height + 2
+    // Position below device
+    const yOffset = deviceRect.height + 2
     labels.push({
       id: `l3-${deviceId}`,
       group: { x: deviceRect.x, y: deviceRect.y + yOffset },
@@ -997,7 +1138,7 @@ onBeforeUnmount(() => {
   observer = null
 })
 
-watch([visibleAreas, visibleDevices, visibleLinks, l2Labels, l3Labels, stageSize], () => {
+watch([visibleAreas, visibleDevices, visibleLinks, linkPortLabels, l2Labels, l3Labels, stageSize], () => {
   batchDraw()
 })
 </script>

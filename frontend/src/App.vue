@@ -105,62 +105,146 @@
       </main>
 
       <aside v-show="showRightPanel" class="panel right">
-        <div class="grid-tabs">
-          <button type="button" :class="{ active: activeGrid === 'areas' }" @click="activeGrid = 'areas'">Areas</button>
-          <button type="button" :class="{ active: activeGrid === 'devices' }" @click="activeGrid = 'devices'">Devices</button>
-          <button type="button" :class="{ active: activeGrid === 'links' }" @click="activeGrid = 'links'">Links</button>
-          <button type="button" class="ghost" @click="togglePanelMode">
-            {{ panelMode === 'selection' ? 'Chỉ chọn' : 'Xem tất cả' }}
-          </button>
+        <div class="inspector-header">
+          <h3>Properties</h3>
           <label class="panel-size">
             <span>Rộng</span>
             <input type="range" min="280" max="520" step="20" v-model.number="rightPanelWidth" />
           </label>
         </div>
 
-        <div v-if="panelMode === 'selection' && !selectedRowForActiveGrid" class="panel-hint">
-          Chọn một đối tượng trên canvas để xem chi tiết.
+        <div v-if="!selectedObject" class="inspector-empty">
+          <p>Chọn một đối tượng trên canvas để xem và chỉnh sửa thuộc tính.</p>
         </div>
 
-        <DataGrid
-          v-if="activeGrid === 'areas'"
-          :rows="areaRowsView"
-          :show-add="panelMode === 'all'"
-          title="Grid: Areas"
-          :columns="areaColumns"
-          :default-row="areaDefaults"
-          @update:rows="handleAreaRowsUpdate"
-          @row:add="handleAreaAdd"
-          @row:change="handleAreaChange"
-          @row:remove="handleAreaRemove"
-        />
-        <DataGrid
-          v-else-if="activeGrid === 'devices'"
-          :rows="deviceRowsView"
-          :show-add="panelMode === 'all'"
-          title="Grid: Devices"
-          :columns="deviceColumns"
-          :default-row="deviceDefaults"
-          @update:rows="handleDeviceRowsUpdate"
-          @row:add="handleDeviceAdd"
-          @row:change="handleDeviceChange"
-          @row:remove="handleDeviceRemove"
-        />
-        <DataGrid
-          v-else
-          :rows="linkRowsView"
-          :show-add="panelMode === 'all'"
-          title="Grid: Links"
-          :columns="linkColumns"
-          :default-row="linkDefaults"
-          @update:rows="handleLinkRowsUpdate"
-          @row:add="handleLinkAdd"
-          @row:change="handleLinkChange"
-          @row:remove="handleLinkRemove"
-        />
+        <div v-else class="inspector-content">
+          <div class="inspector-type">
+            {{ selectedObjectType }}
+          </div>
+
+          <!-- Area Properties -->
+          <div v-if="selectedObjectType === 'Area'" class="inspector-form">
+            <div class="form-group">
+              <label>Tên</label>
+              <input type="text" v-model="selectedObject.name" @change="handleSelectedObjectChange" />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Grid Row</label>
+                <input type="number" v-model.number="selectedObject.grid_row" @change="handleSelectedObjectChange" />
+              </div>
+              <div class="form-group">
+                <label>Grid Col</label>
+                <input type="number" v-model.number="selectedObject.grid_col" @change="handleSelectedObjectChange" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>X (đv)</label>
+                <input type="number" step="0.1" v-model.number="selectedObject.position_x" @change="handleSelectedObjectChange" />
+              </div>
+              <div class="form-group">
+                <label>Y (đv)</label>
+                <input type="number" step="0.1" v-model.number="selectedObject.position_y" @change="handleSelectedObjectChange" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Width (đv)</label>
+                <input type="number" step="0.1" v-model.number="selectedObject.width" @change="handleSelectedObjectChange" />
+              </div>
+              <div class="form-group">
+                <label>Height (đv)</label>
+                <input type="number" step="0.1" v-model.number="selectedObject.height" @change="handleSelectedObjectChange" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Device Properties -->
+          <div v-else-if="selectedObjectType === 'Device'" class="inspector-form">
+            <div class="form-group">
+              <label>Tên thiết bị</label>
+              <input type="text" v-model="selectedObject.name" @change="handleSelectedObjectChange" />
+            </div>
+            <div class="form-group">
+              <label>Area</label>
+              <select v-model="selectedObject.area_name" @change="handleSelectedObjectChange">
+                <option v-for="area in areas" :key="area.id" :value="area.name">{{ area.name }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Loại thiết bị</label>
+              <select v-model="selectedObject.device_type" @change="handleSelectedObjectChange">
+                <option v-for="type in deviceTypes" :key="type" :value="type">{{ type }}</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>X (đv)</label>
+                <input type="number" step="0.1" v-model.number="selectedObject.position_x" @change="handleSelectedObjectChange" />
+              </div>
+              <div class="form-group">
+                <label>Y (đv)</label>
+                <input type="number" step="0.1" v-model.number="selectedObject.position_y" @change="handleSelectedObjectChange" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Width (đv)</label>
+                <input type="number" step="0.1" v-model.number="selectedObject.width" @change="handleSelectedObjectChange" />
+              </div>
+              <div class="form-group">
+                <label>Height (đv)</label>
+                <input type="number" step="0.1" v-model.number="selectedObject.height" @change="handleSelectedObjectChange" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Link Properties -->
+          <div v-else-if="selectedObjectType === 'Link'" class="inspector-form">
+            <div class="form-group">
+              <label>Từ thiết bị</label>
+              <select v-model="selectedObject.from_device_name" @change="handleSelectedObjectChange">
+                <option v-for="device in devices" :key="device.id" :value="device.name">{{ device.name }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Cổng đi</label>
+              <input type="text" v-model="selectedObject.from_port" @change="handleSelectedObjectChange" />
+            </div>
+            <div class="form-group">
+              <label>Đến thiết bị</label>
+              <select v-model="selectedObject.to_device_name" @change="handleSelectedObjectChange">
+                <option v-for="device in devices" :key="device.id" :value="device.name">{{ device.name }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Cổng đến</label>
+              <input type="text" v-model="selectedObject.to_port" @change="handleSelectedObjectChange" />
+            </div>
+            <div class="form-group">
+              <label>Line Style</label>
+              <select v-model="selectedObject.line_style" @change="handleSelectedObjectChange">
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Mục đích</label>
+              <select v-model="selectedObject.purpose" @change="handleSelectedObjectChange">
+                <option v-for="purpose in linkPurposes" :key="purpose" :value="purpose">{{ purpose }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="inspector-actions">
+            <button type="button" class="danger" @click="handleSelectedObjectDelete">Xóa</button>
+          </div>
+        </div>
 
         <div class="hint">
-          {{ activeProject ? 'Phase 7: Data grid nhập liệu (đã nối API)' : 'Cần đăng nhập và chọn project' }}
+          {{ activeProject ? 'Properties Inspector' : 'Cần đăng nhập và chọn project' }}
         </div>
       </aside>
     </section>
@@ -170,7 +254,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import CanvasStage from './components/CanvasStage.vue'
-import DataGrid, { type ColumnDef } from './components/DataGrid.vue'
 import type { AreaModel, DeviceModel, LinkModel, Viewport } from './models/types'
 import type { AreaRecord, AreaStyle, DeviceRecord, LinkRecord, ProjectRecord, UserRecord } from './models/api'
 import { getMe, loginUser, logout as logoutUser } from './services/auth'
@@ -213,7 +296,6 @@ const devices = ref<DeviceRow[]>([])
 const links = ref<LinkRow[]>([])
 
 const selectedId = ref<string | null>(null)
-const activeGrid = ref<'areas' | 'devices' | 'links'>('areas')
 
 const viewport = reactive({
   scale: 1,
@@ -227,12 +309,6 @@ const rightPanelWidth = ref(360)
 const layoutMode = computed(() => activeProject.value?.layout_mode || 'cisco')
 const layoutModeSelection = ref<'cisco' | 'iso' | 'custom'>('cisco')
 const layoutModeUpdating = ref(false)
-
-const panelMode = ref<'selection' | 'all'>('all')
-
-function togglePanelMode() {
-  panelMode.value = panelMode.value === 'selection' ? 'all' : 'selection'
-}
 
 // View mode for canvas (L1/L2/L3/Overview)
 type ViewMode = 'L1' | 'L2' | 'L3' | 'overview'
@@ -267,167 +343,37 @@ const autoLayoutAutoApplying = ref(false)
 const autoLayoutAutoAppliedProjects = new Set<string>()
 let autoLayoutTimer: number | null = null
 
-const selectedRowForActiveGrid = computed(() => {
+// Properties Inspector computed properties
+const selectedObject = computed(() => {
   if (!selectedId.value) return null
-  if (activeGrid.value === 'areas') {
-    return areas.value.find(a => a.id === selectedId.value) || null
-  }
-  if (activeGrid.value === 'devices') {
-    return devices.value.find(d => d.id === selectedId.value) || null
-  }
-  if (activeGrid.value === 'links') {
-    return links.value.find(l => l.id === selectedId.value) || null
-  }
+
+  // Try to find in areas
+  const area = areas.value.find(a => a.id === selectedId.value)
+  if (area) return area
+
+  // Try to find in devices
+  const device = devices.value.find(d => d.id === selectedId.value)
+  if (device) return device
+
+  // Try to find in links
+  const link = links.value.find(l => l.id === selectedId.value)
+  if (link) return link
+
   return null
 })
 
-const areaRowsView = computed(() => {
-  if (panelMode.value === 'all') return areas.value
-  if (!selectedId.value) return []
-  const found = areas.value.find(a => a.id === selectedId.value)
-  return found ? [found] : []
+const selectedObjectType = computed(() => {
+  if (!selectedObject.value) return null
+
+  if (areas.value.some(a => a.id === selectedId.value)) return 'Area'
+  if (devices.value.some(d => d.id === selectedId.value)) return 'Device'
+  if (links.value.some(l => l.id === selectedId.value)) return 'Link'
+
+  return null
 })
-
-const deviceRowsView = computed(() => {
-  if (panelMode.value === 'all') return devices.value
-  if (!selectedId.value) return []
-  const found = devices.value.find(d => d.id === selectedId.value)
-  return found ? [found] : []
-})
-
-const linkRowsView = computed(() => {
-  if (panelMode.value === 'all') return links.value
-  if (!selectedId.value) return []
-  const found = links.value.find(l => l.id === selectedId.value)
-  return found ? [found] : []
-})
-
-function handleAreaRowsUpdate(rows: AreaRow[]) {
-  if (panelMode.value === 'all') {
-    areas.value = rows
-  }
-}
-
-function handleDeviceRowsUpdate(rows: DeviceRow[]) {
-  if (panelMode.value === 'all') {
-    devices.value = rows
-  }
-}
-
-function handleLinkRowsUpdate(rows: LinkRow[]) {
-  if (panelMode.value === 'all') {
-    links.value = rows
-  }
-}
 
 const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']
 const linkPurposes = ['DEFAULT', 'WAN', 'INTERNET', 'DMZ', 'LAN', 'MGMT', 'HA', 'STORAGE', 'BACKUP', 'VPN']
-
-const defaultAreaStyle: AreaStyle = {
-  fill_color_rgb: [240, 240, 240],
-  stroke_color_rgb: [51, 51, 51],
-  stroke_width: 1
-}
-
-const areaColumns: ColumnDef[] = [
-  { key: 'name', label: 'Tên' },
-  { key: 'grid_row', label: 'Grid R', type: 'number', width: '72px' },
-  { key: 'grid_col', label: 'Grid C', type: 'number', width: '72px' },
-  { key: 'position_x', label: 'X (đv)', type: 'number', width: '80px' },
-  { key: 'position_y', label: 'Y (đv)', type: 'number', width: '80px' },
-  { key: 'width', label: 'W (đv)', type: 'number', width: '72px' },
-  { key: 'height', label: 'H (đv)', type: 'number', width: '72px' }
-]
-
-const deviceColumns = computed<ColumnDef[]>(() => [
-  { key: 'name', label: 'Thiết bị' },
-  {
-    key: 'area_name',
-    label: 'Area',
-    type: 'select',
-    options: areas.value.map(area => ({ value: area.name, label: area.name }))
-  },
-  {
-    key: 'device_type',
-    label: 'Loại',
-    type: 'select',
-    options: deviceTypes.map(type => ({ value: type, label: type }))
-  },
-  { key: 'position_x', label: 'X (đv)', type: 'number', width: '80px' },
-  { key: 'position_y', label: 'Y (đv)', type: 'number', width: '80px' },
-  { key: 'width', label: 'W (đv)', type: 'number', width: '72px' },
-  { key: 'height', label: 'H (đv)', type: 'number', width: '72px' }
-])
-
-const linkColumns = computed<ColumnDef[]>(() => {
-  const deviceOptions = devices.value.map(device => ({ value: device.name, label: device.name }))
-  return [
-    { key: 'from_device_name', label: 'Từ thiết bị', type: 'select', options: deviceOptions },
-    { key: 'from_port', label: 'Cổng đi' },
-    { key: 'to_device_name', label: 'Đến thiết bị', type: 'select', options: deviceOptions },
-    { key: 'to_port', label: 'Cổng đến' },
-    {
-      key: 'line_style',
-      label: 'Style',
-      type: 'select',
-      options: [
-        { value: 'solid', label: 'Solid' },
-        { value: 'dashed', label: 'Dashed' },
-        { value: 'dotted', label: 'Dotted' }
-      ]
-    },
-    {
-      key: 'purpose',
-      label: 'Mục đích',
-      type: 'select',
-      options: linkPurposes.map(purpose => ({ value: purpose, label: purpose }))
-    }
-  ]
-})
-
-const areaDefaults: AreaRow = {
-  id: 'area-temp',
-  project_id: '',
-  name: 'Area mới',
-  grid_row: 1,
-  grid_col: 1,
-  position_x: 1,
-  position_y: 1,
-  width: 3,
-  height: 1.5,
-  style: defaultAreaStyle,
-  __temp: true
-}
-
-const deviceDefaults: DeviceRow = {
-  id: 'device-temp',
-  project_id: '',
-  name: 'Device mới',
-  area_id: '',
-  area_name: '',
-  device_type: 'Switch',
-  position_x: 1,
-  position_y: 1,
-  width: 1.2,
-  height: 0.5,
-  color_rgb: null,
-  __temp: true
-}
-
-const linkDefaults: LinkRow = {
-  id: 'link-temp',
-  project_id: '',
-  from_device_id: '',
-  from_device_name: '',
-  from_port: 'Gi 0/1',
-  to_device_id: '',
-  to_device_name: '',
-  to_port: 'Gi 0/2',
-  purpose: 'DEFAULT',
-  line_style: 'solid',
-  color_rgb: null,
-  __temp: true
-}
 
 const statusClass = computed(() => {
   if (statusText.value === 'healthy') return 'ok'
@@ -917,6 +863,37 @@ async function handleLinkRemove(row: LinkRow) {
   }
 }
 
+// Properties Inspector handlers
+function handleSelectedObjectChange() {
+  if (!selectedObject.value || !selectedId.value) return
+
+  const objectType = selectedObjectType.value
+  if (objectType === 'Area') {
+    handleAreaChange({ row: selectedObject.value as AreaRow })
+  } else if (objectType === 'Device') {
+    handleDeviceChange({ row: selectedObject.value as DeviceRow })
+  } else if (objectType === 'Link') {
+    handleLinkChange({ row: selectedObject.value as LinkRow })
+  }
+}
+
+async function handleSelectedObjectDelete() {
+  if (!selectedObject.value || !selectedId.value) return
+  if (!confirm('Bạn có chắc muốn xóa đối tượng này?')) return
+
+  const objectType = selectedObjectType.value
+  if (objectType === 'Area') {
+    await handleAreaRemove(selectedObject.value as AreaRow)
+  } else if (objectType === 'Device') {
+    await handleDeviceRemove(selectedObject.value as DeviceRow)
+  } else if (objectType === 'Link') {
+    await handleLinkRemove(selectedObject.value as LinkRow)
+  }
+
+  // Clear selection after delete
+  selectedId.value = null
+}
+
 watch(selectedProjectId, async (projectId) => {
   // Reset L2/L3 loaded flags when project changes
   l2Loaded.value = false
@@ -1241,26 +1218,95 @@ onMounted(() => {
   margin: 0 4px;
 }
 
-.grid-tabs {
+/* Properties Inspector */
+.inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inspector-header h3 {
+  font-size: 16px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.inspector-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.inspector-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.inspector-type {
+  display: inline-block;
+  padding: 6px 12px;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  align-self: flex-start;
+}
+
+.inspector-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.form-group input,
+.form-group select {
+  padding: 8px 10px;
+  border: 1px solid rgba(28, 28, 28, 0.12);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.inspector-actions {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid rgba(28, 28, 28, 0.08);
 }
 
-.grid-tabs button {
+.inspector-actions button {
   flex: 1;
-  border: 1px solid rgba(28, 28, 28, 0.12);
-  background: transparent;
-  border-radius: 10px;
-  padding: 6px 8px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.grid-tabs button.active {
-  background: var(--accent-soft);
-  border-color: rgba(214, 108, 59, 0.4);
 }
 
 .panel-size {

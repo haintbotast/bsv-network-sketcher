@@ -10,8 +10,8 @@
 ## 1. Trang quản trị cấu hình (Admin Config)
 
 **Luồng đề xuất:**
-1) Mở **Admin → Config**
-2) Chọn tab: Layout / Style / Validation / Export
+1) Mở project và chọn tab **Bố cục** trong panel phải (cạnh **Thuộc tính**)
+2) Điều chỉnh nhóm **Bố cục tổng thể** hoặc **Đường nối & nhãn**
 3) Sửa giá trị → **Validate** → **Save**
 4) Hiển thị diff + audit log entry
 5) Lưu **config version** mới và cho phép khôi phục

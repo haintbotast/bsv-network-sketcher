@@ -71,90 +71,6 @@
           <button type="button" class="primary" @click="fetchHealth">Kiểm tra backend</button>
         </div>
 
-        <div v-if="currentUser" class="section">
-          <h2>Cấu hình Layout</h2>
-          <div class="stack">
-            <p class="panel-hint">Auto-layout (inch)</p>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Layer gap</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.layer_gap" />
-              </div>
-              <div class="form-group">
-                <label>Node spacing</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.node_spacing" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Area gap</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.area_gap" />
-              </div>
-              <div class="form-group">
-                <label>Area padding</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.area_padding" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Label band</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.label_band" />
-              </div>
-              <div class="form-group">
-                <label>Max row width</label>
-                <input type="number" step="0.1" v-model.number="layoutTuningForm.max_row_width_base" />
-              </div>
-            </div>
-
-            <div class="divider"></div>
-            <p class="panel-hint">Routing & nhãn (px)</p>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Bundle gap</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.bundle_gap" />
-              </div>
-              <div class="form-group">
-                <label>Bundle stub</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.bundle_stub" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Area clearance</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.area_clearance" />
-              </div>
-              <div class="form-group">
-                <label>Anchor offset</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.area_anchor_offset" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Label gap X</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.label_gap_x" />
-              </div>
-              <div class="form-group">
-                <label>Label gap Y</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.label_gap_y" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Port offset</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.port_label_offset" />
-              </div>
-              <div class="form-group">
-                <label>Corridor gap</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.corridor_gap" />
-              </div>
-            </div>
-
-            <button type="button" class="primary" :disabled="adminConfigSaving" @click="saveAdminConfig">
-              {{ adminConfigSaving ? 'Đang lưu...' : 'Lưu cấu hình' }}
-            </button>
-          </div>
-        </div>
-
         <p v-if="notice" :class="['notice', noticeType]">{{ notice }}</p>
       </aside>
 
@@ -191,14 +107,140 @@
 
       <aside v-show="showRightPanel" class="panel right">
         <div class="inspector-header">
-          <h3>Properties</h3>
+          <div class="inspector-tabs">
+            <button
+              type="button"
+              :class="{ active: rightPanelTab === 'properties' }"
+              @click="rightPanelTab = 'properties'"
+            >
+              Thuộc tính
+            </button>
+            <button
+              type="button"
+              :class="{ active: rightPanelTab === 'layout' }"
+              @click="rightPanelTab = 'layout'"
+            >
+              Bố cục
+            </button>
+          </div>
           <label class="panel-size">
             <span>Rộng</span>
             <input type="range" min="280" max="520" step="20" v-model.number="rightPanelWidth" />
           </label>
         </div>
 
-        <div v-if="!selectedObject" class="inspector-empty">
+        <div v-if="rightPanelTab === 'layout'" class="inspector-content">
+          <div v-if="!currentUser" class="inspector-empty">
+            <p>Đăng nhập để chỉnh cấu hình bố cục.</p>
+          </div>
+          <div v-else class="layout-content">
+            <p class="panel-hint">Bố cục tổng thể (đơn vị inch)</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Khoảng cách tầng</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.layer_gap" />
+              </div>
+              <div class="form-group">
+                <label>Khoảng cách thiết bị</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.node_spacing" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Khoảng cách giữa các vùng</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.area_gap" />
+              </div>
+              <div class="form-group">
+                <label>Lề trong của vùng</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.area_padding" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Lề nhãn khu vực</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.label_band" />
+              </div>
+              <div class="form-group">
+                <label>Giới hạn độ rộng mỗi hàng</label>
+                <input type="number" step="0.1" v-model.number="layoutTuningForm.max_row_width_base" />
+              </div>
+            </div>
+
+            <div class="divider"></div>
+            <p class="panel-hint">Đường nối & nhãn (px)</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Khoảng cách bó đường</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.bundle_gap" />
+              </div>
+              <div class="form-group">
+                <label>Độ dài đuôi bó</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.bundle_stub" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Khoảng tránh vùng</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.area_clearance" />
+              </div>
+              <div class="form-group">
+                <label>Đẩy điểm neo</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.area_anchor_offset" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Giãn nhãn ngang</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.label_gap_x" />
+              </div>
+              <div class="form-group">
+                <label>Giãn nhãn dọc</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.label_gap_y" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Đẩy nhãn cổng</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.port_label_offset" />
+              </div>
+              <div class="form-group">
+                <label>Khoảng cách hành lang</label>
+                <input type="number" step="1" v-model.number="renderTuningForm.corridor_gap" />
+              </div>
+            </div>
+
+            <button type="button" class="primary" :disabled="adminConfigSaving" @click="saveAdminConfig">
+              {{ adminConfigSaving ? 'Đang lưu...' : 'Lưu cấu hình' }}
+            </button>
+
+            <div class="divider"></div>
+            <div class="section">
+              <h2>Phân bổ thiết bị vào area</h2>
+              <div v-if="!areas.length || !devices.length" class="inspector-empty">
+                <p>Chưa có area hoặc thiết bị để phân bổ.</p>
+              </div>
+              <div v-else class="device-area-list">
+                <div v-for="device in devices" :key="device.id" class="device-area-row">
+                  <div class="device-area-info">
+                    <strong>{{ device.name }}</strong>
+                    <span class="muted">{{ device.device_type }}</span>
+                  </div>
+                  <select
+                    class="select"
+                    :value="device.area_id"
+                    @change="event => assignDeviceArea(device, (event.target as HTMLSelectElement).value)"
+                  >
+                    <option v-for="area in areas" :key="area.id" :value="area.id">
+                      {{ area.name }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="!selectedObject" class="inspector-empty">
           <p>Chọn một đối tượng trên canvas để xem và chỉnh sửa thuộc tính.</p>
         </div>
 
@@ -215,31 +257,31 @@
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Grid Row</label>
+                <label>Hàng lưới</label>
                 <input type="number" v-model.number="selectedObject.grid_row" @change="handleSelectedObjectChange" />
               </div>
               <div class="form-group">
-                <label>Grid Col</label>
+                <label>Cột lưới</label>
                 <input type="number" v-model.number="selectedObject.grid_col" @change="handleSelectedObjectChange" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>X (đv)</label>
+                <label>Tọa độ X (đv)</label>
                 <input type="number" step="0.1" v-model.number="selectedObject.position_x" @change="handleSelectedObjectChange" />
               </div>
               <div class="form-group">
-                <label>Y (đv)</label>
+                <label>Tọa độ Y (đv)</label>
                 <input type="number" step="0.1" v-model.number="selectedObject.position_y" @change="handleSelectedObjectChange" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Width (đv)</label>
+                <label>Rộng (đv)</label>
                 <input type="number" step="0.1" v-model.number="selectedObject.width" @change="handleSelectedObjectChange" />
               </div>
               <div class="form-group">
-                <label>Height (đv)</label>
+                <label>Cao (đv)</label>
                 <input type="number" step="0.1" v-model.number="selectedObject.height" @change="handleSelectedObjectChange" />
               </div>
             </div>
@@ -288,27 +330,27 @@
           <!-- Link Properties -->
           <div v-else-if="selectedObjectType === 'Link'" class="inspector-form">
             <div class="form-group">
-              <label>Từ thiết bị</label>
+              <label>Thiết bị nguồn</label>
               <select v-model="selectedObject.from_device_name" @change="handleSelectedObjectChange">
                 <option v-for="device in devices" :key="device.id" :value="device.name">{{ device.name }}</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Cổng đi</label>
+              <label>Cổng nguồn</label>
               <input type="text" v-model="selectedObject.from_port" @change="handleSelectedObjectChange" />
             </div>
             <div class="form-group">
-              <label>Đến thiết bị</label>
+              <label>Thiết bị đích</label>
               <select v-model="selectedObject.to_device_name" @change="handleSelectedObjectChange">
                 <option v-for="device in devices" :key="device.id" :value="device.name">{{ device.name }}</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Cổng đến</label>
+              <label>Cổng đích</label>
               <input type="text" v-model="selectedObject.to_port" @change="handleSelectedObjectChange" />
             </div>
             <div class="form-group">
-              <label>Line Style</label>
+              <label>Kiểu đường</label>
               <select v-model="selectedObject.line_style" @change="handleSelectedObjectChange">
                 <option value="solid">Solid</option>
                 <option value="dashed">Dashed</option>
@@ -328,8 +370,8 @@
           </div>
         </div>
 
-        <div class="hint">
-          {{ activeProject ? 'Properties Inspector' : 'Cần đăng nhập và chọn project' }}
+        <div v-if="rightPanelTab === 'properties'" class="hint">
+          {{ activeProject ? 'Bảng thuộc tính' : 'Cần đăng nhập và chọn project' }}
         </div>
       </aside>
     </section>
@@ -415,6 +457,7 @@ const viewport = reactive({
 
 const showRightPanel = ref(true)
 const rightPanelWidth = ref(360)
+const rightPanelTab = ref<'properties' | 'layout'>('properties')
 
 const layoutMode = computed(() => activeProject.value?.layout_mode || 'cisco')
 const layoutModeSelection = ref<'cisco' | 'iso' | 'custom'>('cisco')
@@ -608,28 +651,15 @@ function updateViewport(value: Viewport) {
 
 function handleSelect(payload: { id: string; type?: 'device' | 'area' }) {
   selectedId.value = payload.id
+  rightPanelTab.value = 'properties'
+}
 
-  // Auto-switch to relevant tab when selecting an object
-  if (panelMode.value === 'selection' && payload.id) {
-    if (payload.type === 'device') {
-      activeGrid.value = 'devices'
-    } else if (payload.type === 'area') {
-      activeGrid.value = 'areas'
-    } else {
-      // Infer type from data
-      const isArea = areas.value.some(a => a.id === payload.id)
-      const isDevice = devices.value.some(d => d.id === payload.id)
-      const isLink = links.value.some(l => l.id === payload.id)
-
-      if (isArea) {
-        activeGrid.value = 'areas'
-      } else if (isDevice) {
-        activeGrid.value = 'devices'
-      } else if (isLink) {
-        activeGrid.value = 'links'
-      }
-    }
-  }
+function assignDeviceArea(device: DeviceRow, areaId: string) {
+  const area = areas.value.find(item => item.id === areaId)
+  if (!area) return
+  device.area_id = area.id
+  device.area_name = area.name
+  handleDeviceChange({ row: device })
 }
 
 function zoomIn() {
@@ -1424,6 +1454,30 @@ onMounted(() => {
   gap: 12px;
 }
 
+.inspector-tabs {
+  display: flex;
+  gap: 6px;
+  background: #f5eee7;
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.inspector-tabs button {
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.inspector-tabs button.active {
+  background: #fff;
+  color: var(--accent);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
 .inspector-header h3 {
   font-size: 16px;
   margin: 0;
@@ -1438,6 +1492,12 @@ onMounted(() => {
 }
 
 .inspector-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.layout-content {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1472,6 +1532,11 @@ onMounted(() => {
   font-size: 12px;
   font-weight: 500;
   color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .form-group input,
@@ -1535,6 +1600,27 @@ onMounted(() => {
   font-size: 13px;
   color: var(--muted);
   text-align: center;
+}
+
+.device-area-list {
+  display: grid;
+  gap: 10px;
+}
+
+.device-area-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #faf6f2;
+}
+
+.device-area-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .hint-text {

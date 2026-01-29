@@ -205,6 +205,56 @@ def simple_layer_layout(devices: list, links: list, config: LayoutConfig) -> Lay
     # Run barycenter crossing reduction (12 iterations is empirically good)
     reduce_crossings(12)
 
+    def normalize_device_type(device) -> str:
+        dtype = getattr(device, "device_type", None) or "Unknown"
+        return str(dtype).strip().lower() or "unknown"
+
+    def split_rows_by_type(ordered: list, max_nodes: int) -> list[list]:
+        if max_nodes <= 0:
+            return [ordered]
+
+        # Group contiguous blocks by device type (preserve barycenter order)
+        blocks: list[tuple[str, list]] = []
+        current_type: str | None = None
+        current_block: list = []
+
+        for device in ordered:
+            dtype = normalize_device_type(device)
+            if current_type is None or dtype == current_type:
+                current_block.append(device)
+                current_type = dtype
+            else:
+                blocks.append((current_type, current_block))
+                current_type = dtype
+                current_block = [device]
+
+        if current_block:
+            blocks.append((current_type or "unknown", current_block))
+
+        rows: list[list] = []
+        current_row: list = []
+
+        for _dtype, block in blocks:
+            if len(block) > max_nodes:
+                if current_row:
+                    rows.append(current_row)
+                    current_row = []
+                for i in range(0, len(block), max_nodes):
+                    rows.append(block[i:i + max_nodes])
+                continue
+
+            if len(current_row) + len(block) <= max_nodes:
+                current_row.extend(block)
+            else:
+                if current_row:
+                    rows.append(current_row)
+                current_row = list(block)
+
+        if current_row:
+            rows.append(current_row)
+
+        return rows
+
     def compute_crossings() -> int:
         position_map = build_position_map()
         device_layer = {
@@ -258,10 +308,7 @@ def simple_layer_layout(devices: list, links: list, config: LayoutConfig) -> Lay
         if max_nodes_per_row <= 0:
             max_nodes_per_row = len(ordered_devices)
 
-        rows = [
-            ordered_devices[i:i + max_nodes_per_row]
-            for i in range(0, len(ordered_devices), max_nodes_per_row)
-        ]
+        rows = split_rows_by_type(ordered_devices, max_nodes_per_row)
 
         row_step_x = node_width + node_spacing
         for row_idx, row_devices in enumerate(rows):

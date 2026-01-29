@@ -43,6 +43,35 @@ class SimpleLayerLayoutTests(unittest.TestCase):
         self.assertEqual([d["id"] for d in layer1], ["D", "C"])
         self.assertGreaterEqual(result.stats["total_crossings"], 0)
 
+    def test_group_same_type_on_row_when_possible(self) -> None:
+        devices = [
+            DummyDevice("S1", "Server"),
+            DummyDevice("S2", "Server"),
+            DummyDevice("S3", "Server"),
+            DummyDevice("T1", "Storage"),
+            DummyDevice("T2", "Storage"),
+            DummyDevice("T3", "Storage"),
+        ]
+        config = LayoutConfig(
+            layer_gap=1.0,
+            node_spacing=0.5,
+            node_width=1.0,
+            node_height=1.0,
+            max_nodes_per_row=4,
+            row_gap=0.2,
+            row_stagger=0.0,
+        )
+
+        result = simple_layer_layout(devices, [], config)
+        rows = {}
+        for device in result.devices:
+            row_key = round(device["y"], 3)
+            rows.setdefault(row_key, []).append(device["id"])
+
+        ordered_rows = [rows[key] for key in sorted(rows.keys())]
+        self.assertEqual(ordered_rows[0], ["S1", "S2", "S3"])
+        self.assertEqual(ordered_rows[1], ["T1", "T2", "T3"])
+
 
 if __name__ == "__main__":
     unittest.main()

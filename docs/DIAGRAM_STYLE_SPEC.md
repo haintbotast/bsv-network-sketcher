@@ -43,6 +43,7 @@
 - **Macro (Area):** sắp xếp các Area theo location/tầng; không để thiết bị xuyên Area.
 - **Micro (Device):** mỗi Area là một lưới **top‑to‑bottom** (Core/Distribution ở trên, Access ở giữa, Endpoints ở dưới).
 - Cho phép **nhiều hàng trong cùng tầng** và **so‑le nhẹ** để giảm đường vòng liên kết; vẫn giữ hướng top‑down.
+- Ưu tiên **thiết bị cùng loại ở cùng một hàng** nếu kích thước hàng cho phép (ví dụ cụm HA/Sync).
 - Dùng `_AIR_` (ô trống) để canh cột, giữ thẳng hàng theo chiều dọc khi cần.
 
 **Quy tắc hiển thị theo view:**

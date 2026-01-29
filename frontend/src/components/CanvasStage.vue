@@ -694,6 +694,32 @@ const areaBounds = computed(() => {
   return { minX, minY, maxX, maxY }
 })
 
+const deviceBounds = computed(() => {
+  let minX = 0
+  let minY = 0
+  let maxX = 0
+  let maxY = 0
+  let hasBounds = false
+  deviceViewMap.value.forEach(rect => {
+    if (!hasBounds) {
+      minX = rect.x
+      minY = rect.y
+      maxX = rect.x + rect.width
+      maxY = rect.y + rect.height
+      hasBounds = true
+      return
+    }
+    minX = Math.min(minX, rect.x)
+    minY = Math.min(minY, rect.y)
+    maxX = Math.max(maxX, rect.x + rect.width)
+    maxY = Math.max(maxY, rect.y + rect.height)
+  })
+  if (!hasBounds) return null
+  return { minX, minY, maxX, maxY }
+})
+
+const diagramBounds = computed(() => areaBounds.value || deviceBounds.value)
+
 const deviceAreaMap = computed(() => {
   const map = new Map<string, string | null>()
   props.devices.forEach(device => {
@@ -1220,6 +1246,78 @@ const buildVisibleLinks = (useCache: boolean) => {
   const gridNodeCount = grid ? grid.cols * grid.rows : 0
   const allowAStar = isL1View && grid && props.links.length <= maxRouteLinks && gridNodeCount > 0 && gridNodeCount <= maxGridNodes
 
+  const areaCenters = new Map<string, { x: number; y: number }>()
+  areaRects.forEach(({ id, rect }) => {
+    areaCenters.set(id, { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 })
+  })
+
+  const laneGroups = new Map<string, Array<{ id: string; order: number }>>()
+  const laneAxisByPair = new Map<string, 'x' | 'y'>()
+
+  const getPairKey = (fromArea: string, toArea: string) =>
+    fromArea < toArea ? `${fromArea}|${toArea}` : `${toArea}|${fromArea}`
+
+  const resolveLaneAxis = (fromAreaId: string, toAreaId: string) => {
+    const key = getPairKey(fromAreaId, toAreaId)
+    const cached = laneAxisByPair.get(key)
+    if (cached) return cached
+    const fromCenter = areaCenters.get(fromAreaId)
+    const toCenter = areaCenters.get(toAreaId)
+    if (!fromCenter || !toCenter) return 'y'
+    const dx = toCenter.x - fromCenter.x
+    const dy = toCenter.y - fromCenter.y
+    const axis = Math.abs(dx) >= Math.abs(dy) ? 'y' : 'x'
+    laneAxisByPair.set(key, axis)
+    return axis
+  }
+
+  const linkMetas = props.links.map(link => {
+    const fromView = deviceViewMap.value.get(link.fromDeviceId)
+    const toView = deviceViewMap.value.get(link.toDeviceId)
+    if (!fromView || !toView) return null
+    const fromCenter = { x: fromView.x + fromView.width / 2, y: fromView.y + fromView.height / 2 }
+    const toCenter = { x: toView.x + toView.width / 2, y: toView.y + toView.height / 2 }
+    const fromAnchor = resolvePortAnchor(link.fromDeviceId, fromView, toCenter, link.fromPort)
+    const toAnchor = resolvePortAnchor(link.toDeviceId, toView, fromCenter, link.toPort)
+    const fromAreaId = deviceAreaMap.value.get(link.fromDeviceId)
+    const toAreaId = deviceAreaMap.value.get(link.toDeviceId)
+    const fromArea = fromAreaId ? areaViewMap.value.get(fromAreaId) : null
+    const toArea = toAreaId ? areaViewMap.value.get(toAreaId) : null
+
+    if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
+      const axis = resolveLaneAxis(fromAreaId, toAreaId)
+      const order = axis === 'y'
+        ? (fromAnchor.y + toAnchor.y) / 2
+        : (fromAnchor.x + toAnchor.x) / 2
+      const key = getPairKey(fromAreaId, toAreaId)
+      const list = laneGroups.get(key) || []
+      list.push({ id: link.id, order })
+      laneGroups.set(key, list)
+    }
+
+    return {
+      link,
+      fromView,
+      toView,
+      fromCenter,
+      toCenter,
+      fromAnchor,
+      toAnchor,
+      fromAreaId,
+      toAreaId,
+      fromArea,
+      toArea
+    }
+  })
+
+  const laneIndex = new Map<string, { index: number; total: number }>()
+  laneGroups.forEach(list => {
+    list.sort((a, b) => a.order - b.order)
+    list.forEach((entry, idx) => {
+      laneIndex.set(entry.id, { index: idx, total: list.length })
+    })
+  })
+
   const cache = new Map<string, {
     points: number[]
     fromAnchor: { x: number; y: number; side?: string }
@@ -1228,24 +1326,27 @@ const buildVisibleLinks = (useCache: boolean) => {
     toCenter: { x: number; y: number }
   }>()
 
-  const links = props.links
-    .map(link => {
-      const fromView = deviceViewMap.value.get(link.fromDeviceId)
-      const toView = deviceViewMap.value.get(link.toDeviceId)
-      if (!fromView || !toView) return null
-      const fromCenter = { x: fromView.x + fromView.width / 2, y: fromView.y + fromView.height / 2 }
-      const toCenter = { x: toView.x + toView.width / 2, y: toView.y + toView.height / 2 }
-      const fromAnchor = resolvePortAnchor(link.fromDeviceId, fromView, toCenter, link.fromPort)
-      const toAnchor = resolvePortAnchor(link.toDeviceId, toView, fromCenter, link.toPort)
-      const fromAreaId = deviceAreaMap.value.get(link.fromDeviceId)
-      const toAreaId = deviceAreaMap.value.get(link.toDeviceId)
-      const fromArea = fromAreaId ? areaViewMap.value.get(fromAreaId) : null
-      const toArea = toAreaId ? areaViewMap.value.get(toAreaId) : null
+  const links = linkMetas
+    .map(meta => {
+      if (!meta) return null
+      const {
+        link,
+        fromView,
+        toView,
+        fromCenter,
+        toCenter,
+        fromAnchor,
+        toAnchor,
+        fromAreaId,
+        toAreaId,
+        fromArea,
+        toArea
+      } = meta
 
       let points: number[] = []
       const isL1 = isL1View
       const bundle = linkBundleIndex.value.get(link.id)
-      const areaBundle = areaBundleIndex.value.get(link.id)
+      const areaBundle = laneIndex.get(link.id) || areaBundleIndex.value.get(link.id)
       const bundleOffset = bundle && bundle.total > 1
         ? (bundle.index - (bundle.total - 1) / 2) * (renderTuning.value.bundle_gap * scale)
         : 0
@@ -1847,41 +1948,15 @@ function onPointerMove(event: any) {
   const dy = pointer.y - lastPointer.value.y
   lastPointer.value = { x: pointer.x, y: pointer.y }
 
-  // Calculate diagram bounds (in view coordinates)
-  let minX = 0, minY = 0, maxX = 0, maxY = 0
-  let hasBounds = false
-
-  // Get bounds from areas
-  props.areas.forEach(area => {
-    if (area.x !== undefined && area.y !== undefined) {
-      const areaView = logicalRectToView({ x: area.x, y: area.y, width: area.width, height: area.height }, props.viewport)
-      minX = hasBounds ? Math.min(minX, areaView.x) : areaView.x
-      minY = hasBounds ? Math.min(minY, areaView.y) : areaView.y
-      maxX = hasBounds ? Math.max(maxX, areaView.x + areaView.width) : areaView.x + areaView.width
-      maxY = hasBounds ? Math.max(maxY, areaView.y + areaView.height) : areaView.y + areaView.height
-      hasBounds = true
-    }
-  })
-
-  // Get bounds from devices (if no areas)
-  if (!hasBounds) {
-    deviceViewMap.value.forEach(rect => {
-      minX = hasBounds ? Math.min(minX, rect.x) : rect.x
-      minY = hasBounds ? Math.min(minY, rect.y) : rect.y
-      maxX = hasBounds ? Math.max(maxX, rect.x + rect.width) : rect.x + rect.width
-      maxY = hasBounds ? Math.max(maxY, rect.y + rect.height) : rect.y + rect.height
-      hasBounds = true
-    })
-  }
-
   // Clamp pan to keep diagram visible (allow 20% overflow)
   const MARGIN = 200  // Pixels of margin
   let newOffsetX = props.viewport.offsetX + dx
   let newOffsetY = props.viewport.offsetY + dy
 
-  if (hasBounds && stageSize.value.width > 0 && stageSize.value.height > 0) {
-    const diagramWidth = maxX - minX
-    const diagramHeight = maxY - minY
+  const bounds = diagramBounds.value
+  if (bounds && stageSize.value.width > 0 && stageSize.value.height > 0) {
+    const diagramWidth = bounds.maxX - bounds.minX
+    const diagramHeight = bounds.maxY - bounds.minY
 
     // Clamp X (allow panning until diagram edge is at margin distance from canvas edge)
     const maxOffsetX = MARGIN

@@ -11,6 +11,7 @@
 - **group_by_area:** thiết bị không vượt biên Area; macro/micro layout tách tầng.
 - **top‑to‑bottom:** Core/Dist ở hàng trên, Access giữa, Endpoints dưới (ưu tiên cha ở trên con).
 - **_AIR_ spacing:** giữ thẳng cột, không chồng lấn.
+- **same_type_row:** thiết bị cùng loại ưu tiên ở cùng hàng khi `max_nodes_per_row` cho phép.
 - **inter‑area:** link khác Area bắt buộc qua Waypoint area (`_wp_`).
 
 ### 1.2 Kiểm thử overview/L2/L3

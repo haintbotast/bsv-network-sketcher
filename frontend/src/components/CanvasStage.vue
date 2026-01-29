@@ -14,12 +14,12 @@
       @touchmove="onPointerMove"
       @touchend="onPointerUp"
     >
-      <v-layer ref="gridLayerRef">
+      <v-layer ref="gridLayerRef" :config="layerTranslation">
         <v-rect :config="gridConfig" />
       </v-layer>
 
       <!-- L1 View: Areas with minimized visuals -->
-      <v-layer ref="areaLayerRef">
+      <v-layer ref="areaLayerRef" :config="layerTranslation">
         <v-group
           v-for="area in visibleAreas"
           :key="area.id"
@@ -32,16 +32,18 @@
       </v-layer>
 
       <!-- L2/L3 grouping boxes (keep under links/devices) -->
-      <v-group v-for="group in visibleVlanGroups" :key="group.id">
-        <v-rect :config="group.rect" />
-        <v-text :config="group.label" />
-      </v-group>
-      <v-group v-for="group in visibleSubnetGroups" :key="group.id">
-        <v-rect :config="group.rect" />
-        <v-text :config="group.label" />
-      </v-group>
+      <v-layer ref="groupLayerRef" :config="layerTranslation">
+        <v-group v-for="group in visibleVlanGroups" :key="group.id">
+          <v-rect :config="group.rect" />
+          <v-text :config="group.label" />
+        </v-group>
+        <v-group v-for="group in visibleSubnetGroups" :key="group.id">
+          <v-rect :config="group.rect" />
+          <v-text :config="group.label" />
+        </v-group>
+      </v-layer>
 
-      <v-layer ref="linkLayerRef">
+      <v-layer ref="linkLayerRef" :config="layerTranslation">
         <v-line
           v-for="link in visibleLinks"
           :key="link.id"
@@ -49,7 +51,7 @@
         />
       </v-layer>
 
-      <v-layer ref="deviceLayerRef">
+      <v-layer ref="deviceLayerRef" :config="layerTranslation">
         <v-group
           v-for="device in visibleDevices"
           :key="device.id"
@@ -62,7 +64,7 @@
       </v-layer>
 
       <!-- L2/L3 Overlay Layer -->
-      <v-layer ref="overlayLayerRef">
+      <v-layer ref="overlayLayerRef" :config="layerTranslation">
         <!-- L1 Port Labels -->
         <v-group
           v-for="label in linkPortLabels"
@@ -154,13 +156,15 @@ const stageRef = ref()
 const stageSize = ref({ width: 300, height: 200 })
 let observer: ResizeObserver | null = null
 const isPanning = ref(false)
-const lastPointer = ref<{ x: number; y: number } | null>(null)
-const panOffset = ref<{ x: number; y: number } | null>(null)
-const pendingPan = ref<{ x: number; y: number } | null>(null)
+const panStartPointer = ref<{ x: number; y: number } | null>(null)
+const panBaseOffset = ref<{ x: number; y: number } | null>(null)
+const panTranslation = ref({ x: 0, y: 0 })
+const pendingTranslation = ref<{ x: number; y: number } | null>(null)
 let panRaf = 0
 
 const gridLayerRef = ref()
 const areaLayerRef = ref()
+const groupLayerRef = ref()
 const linkLayerRef = ref()
 const deviceLayerRef = ref()
 const overlayLayerRef = ref()
@@ -722,6 +726,11 @@ const deviceBounds = computed(() => {
 })
 
 const diagramBounds = computed(() => areaBounds.value || deviceBounds.value)
+
+const layerTranslation = computed(() => {
+  if (!isPanning.value) return { x: 0, y: 0 }
+  return panTranslation.value
+})
 
 const deviceAreaMap = computed(() => {
   const map = new Map<string, string | null>()
@@ -1919,6 +1928,7 @@ function emitSelect(id: string, type: 'device' | 'area') {
 function batchDraw() {
   gridLayerRef.value?.getNode()?.batchDraw()
   areaLayerRef.value?.getNode()?.batchDraw()
+  groupLayerRef.value?.getNode()?.batchDraw()
   linkLayerRef.value?.getNode()?.batchDraw()
   deviceLayerRef.value?.getNode()?.batchDraw()
   overlayLayerRef.value?.getNode()?.batchDraw()
@@ -1942,24 +1952,24 @@ function onPointerDown(event: any) {
   const pointer = stage?.getPointerPosition?.()
   if (!pointer) return
   isPanning.value = true
-  lastPointer.value = { x: pointer.x, y: pointer.y }
-  panOffset.value = { x: props.viewport.offsetX, y: props.viewport.offsetY }
-  pendingPan.value = null
+  panStartPointer.value = { x: pointer.x, y: pointer.y }
+  panBaseOffset.value = { x: props.viewport.offsetX, y: props.viewport.offsetY }
+  panTranslation.value = { x: 0, y: 0 }
+  pendingTranslation.value = null
 }
 
 function onPointerMove(event: any) {
   if (!isPanning.value) return
   const stage = stageRef.value?.getNode?.()
   const pointer = stage?.getPointerPosition?.()
-  if (!pointer || !lastPointer.value) return
-  const dx = pointer.x - lastPointer.value.x
-  const dy = pointer.y - lastPointer.value.y
-  lastPointer.value = { x: pointer.x, y: pointer.y }
+  if (!pointer || !panStartPointer.value || !panBaseOffset.value) return
+  const dx = pointer.x - panStartPointer.value.x
+  const dy = pointer.y - panStartPointer.value.y
 
   // Clamp pan to keep diagram visible (allow 20% overflow)
   const MARGIN = 200  // Pixels of margin
-  let newOffsetX = (panOffset.value?.x ?? props.viewport.offsetX) + dx
-  let newOffsetY = (panOffset.value?.y ?? props.viewport.offsetY) + dy
+  let newOffsetX = panBaseOffset.value.x + dx
+  let newOffsetY = panBaseOffset.value.y + dy
 
   const bounds = diagramBounds.value
   if (bounds && stageSize.value.width > 0 && stageSize.value.height > 0) {
@@ -1977,33 +1987,33 @@ function onPointerMove(event: any) {
     newOffsetY = Math.max(minOffsetY, Math.min(maxOffsetY, newOffsetY))
   }
 
-  panOffset.value = { x: newOffsetX, y: newOffsetY }
-  pendingPan.value = { x: newOffsetX, y: newOffsetY }
+  const nextTranslation = {
+    x: newOffsetX - panBaseOffset.value.x,
+    y: newOffsetY - panBaseOffset.value.y
+  }
+  pendingTranslation.value = nextTranslation
   if (!panRaf) {
     panRaf = requestAnimationFrame(() => {
       panRaf = 0
-      if (!pendingPan.value) return
-      emit('update:viewport', {
-        ...props.viewport,
-        offsetX: pendingPan.value.x,
-        offsetY: pendingPan.value.y
-      })
+      if (!pendingTranslation.value) return
+      panTranslation.value = pendingTranslation.value
     })
   }
 }
 
 function onPointerUp() {
   isPanning.value = false
-  lastPointer.value = null
-  panOffset.value = null
-  if (pendingPan.value) {
+  panStartPointer.value = null
+  if (panBaseOffset.value) {
     emit('update:viewport', {
       ...props.viewport,
-      offsetX: pendingPan.value.x,
-      offsetY: pendingPan.value.y
+      offsetX: panBaseOffset.value.x + panTranslation.value.x,
+      offsetY: panBaseOffset.value.y + panTranslation.value.y
     })
   }
-  pendingPan.value = null
+  panBaseOffset.value = null
+  panTranslation.value = { x: 0, y: 0 }
+  pendingTranslation.value = null
   if (panRaf) {
     cancelAnimationFrame(panRaf)
     panRaf = 0

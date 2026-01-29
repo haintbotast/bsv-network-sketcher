@@ -99,6 +99,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AreaModel, DeviceModel, LinkModel, Viewport, ViewMode, L2AssignmentRecord, L3AddressRecord } from '../models/types'
 import { getVisibleBounds, logicalRectToView } from '../utils/viewport'
+import { addOccupancy, buildGridSpec, connectOrthogonal, routeOrthogonalPath, simplifyOrthogonalPath } from '../utils/link_routing'
 
 const props = defineProps<{
   areas: AreaModel[]
@@ -1125,6 +1126,50 @@ function computeAreaAnchor(
 }
 
 const visibleLinks = computed(() => {
+  const scale = clamp(props.viewport.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
+  const isL1View = (props.viewMode || 'L1') === 'L1'
+  const clearance = renderTuning.value.area_clearance * scale
+  const gridBase = Math.max(6, Math.round(renderTuning.value.area_clearance * 0.5 * scale))
+  const minSegment = Math.max(4, Math.round(6 * scale))
+
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+
+  areaViewMap.value.forEach(rect => {
+    minX = Math.min(minX, rect.x)
+    minY = Math.min(minY, rect.y)
+    maxX = Math.max(maxX, rect.x + rect.width)
+    maxY = Math.max(maxY, rect.y + rect.height)
+  })
+  deviceViewMap.value.forEach(rect => {
+    minX = Math.min(minX, rect.x)
+    minY = Math.min(minY, rect.y)
+    maxX = Math.max(maxX, rect.x + rect.width)
+    maxY = Math.max(maxY, rect.y + rect.height)
+  })
+
+  const padding = renderTuning.value.corridor_gap * scale + clearance + gridBase * 2
+  const grid = Number.isFinite(minX)
+    ? buildGridSpec(
+      { minX: minX - padding, minY: minY - padding, maxX: maxX + padding, maxY: maxY + padding },
+      gridBase
+    )
+    : null
+
+  const occupancy = new Map<string, number>()
+  const areaRects = Array.from(areaViewMap.value.entries()).map(([id, rect]) => ({ id, rect }))
+  const deviceRects = Array.from(deviceViewMap.value.entries()).map(([id, rect]) => ({ id, rect }))
+
+  const appendPoints = (arr: { x: number; y: number }[], points: { x: number; y: number }[]) => {
+    points.forEach(point => {
+      const last = arr[arr.length - 1]
+      if (last && last.x === point.x && last.y === point.y) return
+      arr.push(point)
+    })
+  }
+
   return props.links
     .map(link => {
       const fromView = deviceViewMap.value.get(link.fromDeviceId)
@@ -1140,10 +1185,9 @@ const visibleLinks = computed(() => {
       const toArea = toAreaId ? areaViewMap.value.get(toAreaId) : null
 
       let points: number[] = []
-      const isL1 = (props.viewMode || 'L1') === 'L1'
+      const isL1 = isL1View
       const bundle = linkBundleIndex.value.get(link.id)
       const areaBundle = areaBundleIndex.value.get(link.id)
-      const scale = clamp(props.viewport.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
       const bundleOffset = bundle && bundle.total > 1
         ? (bundle.index - (bundle.total - 1) / 2) * (renderTuning.value.bundle_gap * scale)
         : 0
@@ -1161,140 +1205,193 @@ const visibleLinks = computed(() => {
         arr.push(x, y)
       }
 
-      // Orthogonal routing for all links (NS gốc style)
-      if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
-        // Inter-area links: use corridor routing
-        const fromSide = fromAnchor.side || computeSide(fromView, toCenter)
-        const toSide = toAnchor.side || computeSide(toView, fromCenter)
-        const fromExit = offsetFromAnchor({ ...fromAnchor, side: fromSide }, exitStub)
-        const toExit = offsetFromAnchor({ ...toAnchor, side: toSide }, exitStub)
+      const obstacles: Array<{ x: number; y: number; width: number; height: number }> = []
+      deviceRects.forEach(({ id, rect }) => {
+        if (id === link.fromDeviceId || id === link.toDeviceId) return
+        obstacles.push(rect)
+      })
+      areaRects.forEach(({ id, rect }) => {
+        if (id === fromAreaId || id === toAreaId) return
+        obstacles.push(rect)
+      })
 
-        const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, anchorOffset)
-        const toAreaAnchor = computeAreaAnchor(toArea, toExit, fromExit, interBundleOffset, anchorOffset)
-        const bounds = areaBounds.value
-        if (bounds) {
-          const corridorGap = renderTuning.value.corridor_gap + renderTuning.value.area_clearance + Math.abs(interBundleOffset)
+      const lineBlocked = isL1 && obstacles.some(rect =>
+        segmentIntersectsRect(
+          { x: fromAnchor.x, y: fromAnchor.y },
+          { x: toAnchor.x, y: toAnchor.y },
+          rect,
+          clearance
+        )
+      )
+      const directAllowed = isL1 && !lineBlocked
+
+      const fromSide = fromAnchor.side || computeSide(fromView, toCenter)
+      const toSide = toAnchor.side || computeSide(toView, fromCenter)
+      const fromExit = offsetFromAnchor({ ...fromAnchor, side: fromSide }, exitStub)
+      const toExit = offsetFromAnchor({ ...toAnchor, side: toSide }, exitStub)
+
+      let routed = false
+      if (!directAllowed && grid) {
+        const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
+        const route = routeOrthogonalPath({
+          start: fromExit,
+          end: toExit,
+          obstacles,
+          clearance,
+          grid,
+          occupancy,
+          preferAxis
+        })
+
+        if (route && route.points.length) {
+          const startAxis = fromSide === 'left' || fromSide === 'right' ? 'x' : 'y'
+          const endAxis = toSide === 'left' || toSide === 'right' ? 'x' : 'y'
+          const startConnector = connectOrthogonal(fromAnchor, route.points[0], obstacles, clearance, startAxis)
+          const endConnector = connectOrthogonal(route.points[route.points.length - 1], toAnchor, obstacles, clearance, endAxis)
+
+          const assembled: Array<{ x: number; y: number }> = []
+          appendPoints(assembled, startConnector || [fromAnchor, route.points[0]])
+          appendPoints(assembled, route.points)
+          appendPoints(assembled, endConnector || [route.points[route.points.length - 1], toAnchor])
+
+          const simplified = simplifyOrthogonalPath(assembled, minSegment)
+          simplified.forEach(point => pushPoint(points, point.x, point.y))
+          addOccupancy(occupancy, route.gridPath)
+          routed = true
+        }
+      }
+
+      if (!routed) {
+        // Orthogonal routing for all links (fallback)
+        if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
+          // Inter-area links: use corridor routing
+          const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, anchorOffset)
+          const toAreaAnchor = computeAreaAnchor(toArea, toExit, fromExit, interBundleOffset, anchorOffset)
+          const bounds = areaBounds.value
+          if (bounds) {
+            const corridorGap = renderTuning.value.corridor_gap + renderTuning.value.area_clearance + Math.abs(interBundleOffset)
+            const dx = toAnchor.x - fromAnchor.x
+            const dy = toAnchor.y - fromAnchor.y
+            if (Math.abs(dx) >= Math.abs(dy)) {
+              const topY = bounds.minY - corridorGap
+              const bottomY = bounds.maxY + corridorGap
+              const midY = (fromAnchor.y + toAnchor.y) / 2
+              const corridorBaseY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
+              const corridorY = corridorBaseY + interBundleOffset
+              points = []
+              pushPoint(points, fromAnchor.x, fromAnchor.y)
+              pushPoint(points, fromExit.x, fromExit.y)
+              pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+              pushPoint(points, fromAreaAnchor.x, corridorY)
+              pushPoint(points, toAreaAnchor.x, corridorY)
+              pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+              pushPoint(points, toExit.x, toExit.y)
+              pushPoint(points, toAnchor.x, toAnchor.y)
+            } else {
+              const leftX = bounds.minX - corridorGap
+              const rightX = bounds.maxX + corridorGap
+              const midX = (fromAnchor.x + toAnchor.x) / 2
+              const corridorBaseX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
+              const corridorX = corridorBaseX + interBundleOffset
+              points = []
+              pushPoint(points, fromAnchor.x, fromAnchor.y)
+              pushPoint(points, fromExit.x, fromExit.y)
+              pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+              pushPoint(points, corridorX, fromAreaAnchor.y)
+              pushPoint(points, corridorX, toAreaAnchor.y)
+              pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+              pushPoint(points, toExit.x, toExit.y)
+              pushPoint(points, toAnchor.x, toAnchor.y)
+            }
+          } else {
+            const midX = (fromAnchor.x + toAnchor.x) / 2 + interBundleOffset
+            points = []
+            pushPoint(points, fromAnchor.x, fromAnchor.y)
+            pushPoint(points, fromExit.x, fromExit.y)
+            pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+            pushPoint(points, midX, fromAreaAnchor.y)
+            pushPoint(points, midX, toAreaAnchor.y)
+            pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+            pushPoint(points, toExit.x, toExit.y)
+            pushPoint(points, toAnchor.x, toAnchor.y)
+          }
+        } else if (isL1) {
+          // L1 intra-area: straight segment between ports, bundle if needed
+          // For bundled links, use device centers for consistent perpendicular direction
+          const useCenters = bundleOffset !== 0
+          const dx = useCenters ? (toCenter.x - fromCenter.x) : (toAnchor.x - fromAnchor.x)
+          const dy = useCenters ? (toCenter.y - fromCenter.y) : (toAnchor.y - fromAnchor.y)
+          const dir = normalizeVector(dx, dy)
+          const perp = normalizeVector(-dir.y, dir.x)
+          if (bundleOffset !== 0 && (dir.x !== 0 || dir.y !== 0)) {
+            const fromStub = { x: fromAnchor.x + dir.x * bundleStub, y: fromAnchor.y + dir.y * bundleStub }
+            const toStub = { x: toAnchor.x - dir.x * bundleStub, y: toAnchor.y - dir.y * bundleStub }
+            const fromShift = { x: fromStub.x + perp.x * bundleOffset, y: fromStub.y + perp.y * bundleOffset }
+            const toShift = { x: toStub.x + perp.x * bundleOffset, y: toStub.y + perp.y * bundleOffset }
+            points = [
+              fromAnchor.x, fromAnchor.y,
+              fromShift.x, fromShift.y,
+              toShift.x, toShift.y,
+              toAnchor.x, toAnchor.y
+            ]
+          } else {
+            points = [fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y]
+          }
+
+          if (bundleOffset === 0) {
+            const blockedAreas = []
+            areaViewMap.value.forEach((rect, areaId) => {
+              if (areaId === fromAreaId || areaId === toAreaId) return
+              if (segmentIntersectsRect({ x: fromAnchor.x, y: fromAnchor.y }, { x: toAnchor.x, y: toAnchor.y }, rect, renderTuning.value.area_clearance)) {
+                blockedAreas.push(rect)
+              }
+            })
+            if (blockedAreas.length) {
+              const midA = { x: fromAnchor.x, y: toAnchor.y }
+              const midB = { x: toAnchor.x, y: fromAnchor.y }
+              const score = (a: { x: number; y: number }) => {
+                let hits = 0
+                areaViewMap.value.forEach((rect, areaId) => {
+                  if (areaId === fromAreaId || areaId === toAreaId) return
+                  if (segmentIntersectsRect(fromAnchor, a, rect, renderTuning.value.area_clearance)) hits += 1
+                  if (segmentIntersectsRect(a, toAnchor, rect, renderTuning.value.area_clearance)) hits += 1
+                })
+                const length = Math.hypot(a.x - fromAnchor.x, a.y - fromAnchor.y) + Math.hypot(toAnchor.x - a.x, toAnchor.y - a.y)
+                return hits * 10000 + length
+              }
+              const scoreA = score(midA)
+              const scoreB = score(midB)
+              const mid = scoreA <= scoreB ? midA : midB
+              points = [fromAnchor.x, fromAnchor.y, mid.x, mid.y, toAnchor.x, toAnchor.y]
+            }
+          }
+        } else {
+          // Intra-area links: orthogonal (Manhattan) routing
           const dx = toAnchor.x - fromAnchor.x
           const dy = toAnchor.y - fromAnchor.y
-          if (Math.abs(dx) >= Math.abs(dy)) {
-            const topY = bounds.minY - corridorGap
-            const bottomY = bounds.maxY + corridorGap
-            const midY = (fromAnchor.y + toAnchor.y) / 2
-            const corridorBaseY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
-            const corridorY = corridorBaseY + interBundleOffset
-            points = []
-            pushPoint(points, fromAnchor.x, fromAnchor.y)
-            pushPoint(points, fromExit.x, fromExit.y)
-            pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-            pushPoint(points, fromAreaAnchor.x, corridorY)
-            pushPoint(points, toAreaAnchor.x, corridorY)
-            pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-            pushPoint(points, toExit.x, toExit.y)
-            pushPoint(points, toAnchor.x, toAnchor.y)
+
+          if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+            // Very close: direct line
+            points = [fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y]
+          } else if (Math.abs(dx) >= Math.abs(dy)) {
+            // Horizontal dominant: go horizontal first
+            const midX = fromAnchor.x + dx / 2
+            points = [
+              fromAnchor.x, fromAnchor.y,
+              midX, fromAnchor.y,
+              midX, toAnchor.y,
+              toAnchor.x, toAnchor.y
+            ]
           } else {
-            const leftX = bounds.minX - corridorGap
-            const rightX = bounds.maxX + corridorGap
-            const midX = (fromAnchor.x + toAnchor.x) / 2
-            const corridorBaseX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
-            const corridorX = corridorBaseX + interBundleOffset
-            points = []
-            pushPoint(points, fromAnchor.x, fromAnchor.y)
-            pushPoint(points, fromExit.x, fromExit.y)
-            pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-            pushPoint(points, corridorX, fromAreaAnchor.y)
-            pushPoint(points, corridorX, toAreaAnchor.y)
-            pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-            pushPoint(points, toExit.x, toExit.y)
-            pushPoint(points, toAnchor.x, toAnchor.y)
+            // Vertical dominant: go vertical first
+            const midY = fromAnchor.y + dy / 2
+            points = [
+              fromAnchor.x, fromAnchor.y,
+              fromAnchor.x, midY,
+              toAnchor.x, midY,
+              toAnchor.x, toAnchor.y
+            ]
           }
-        } else {
-          const midX = (fromAnchor.x + toAnchor.x) / 2 + interBundleOffset
-          points = []
-          pushPoint(points, fromAnchor.x, fromAnchor.y)
-          pushPoint(points, fromExit.x, fromExit.y)
-          pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-          pushPoint(points, midX, fromAreaAnchor.y)
-          pushPoint(points, midX, toAreaAnchor.y)
-          pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-          pushPoint(points, toExit.x, toExit.y)
-          pushPoint(points, toAnchor.x, toAnchor.y)
-        }
-      } else if (isL1) {
-        // L1 intra-area: straight segment between ports, bundle if needed
-        // For bundled links, use device centers for consistent perpendicular direction
-        const useCenters = bundleOffset !== 0
-        const dx = useCenters ? (toCenter.x - fromCenter.x) : (toAnchor.x - fromAnchor.x)
-        const dy = useCenters ? (toCenter.y - fromCenter.y) : (toAnchor.y - fromAnchor.y)
-        const dir = normalizeVector(dx, dy)
-        const perp = normalizeVector(-dir.y, dir.x)
-        if (bundleOffset !== 0 && (dir.x !== 0 || dir.y !== 0)) {
-          const fromStub = { x: fromAnchor.x + dir.x * bundleStub, y: fromAnchor.y + dir.y * bundleStub }
-          const toStub = { x: toAnchor.x - dir.x * bundleStub, y: toAnchor.y - dir.y * bundleStub }
-          const fromShift = { x: fromStub.x + perp.x * bundleOffset, y: fromStub.y + perp.y * bundleOffset }
-          const toShift = { x: toStub.x + perp.x * bundleOffset, y: toStub.y + perp.y * bundleOffset }
-          points = [
-            fromAnchor.x, fromAnchor.y,
-            fromShift.x, fromShift.y,
-            toShift.x, toShift.y,
-            toAnchor.x, toAnchor.y
-          ]
-        } else {
-          points = [fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y]
-        }
-
-        if (bundleOffset === 0) {
-          const blockedAreas = []
-          areaViewMap.value.forEach((rect, areaId) => {
-            if (areaId === fromAreaId || areaId === toAreaId) return
-            if (segmentIntersectsRect({ x: fromAnchor.x, y: fromAnchor.y }, { x: toAnchor.x, y: toAnchor.y }, rect, renderTuning.value.area_clearance)) {
-              blockedAreas.push(rect)
-            }
-          })
-          if (blockedAreas.length) {
-            const midA = { x: fromAnchor.x, y: toAnchor.y }
-            const midB = { x: toAnchor.x, y: fromAnchor.y }
-            const score = (a: { x: number; y: number }) => {
-              let hits = 0
-              areaViewMap.value.forEach((rect, areaId) => {
-                if (areaId === fromAreaId || areaId === toAreaId) return
-                if (segmentIntersectsRect(fromAnchor, a, rect, renderTuning.value.area_clearance)) hits += 1
-                if (segmentIntersectsRect(a, toAnchor, rect, renderTuning.value.area_clearance)) hits += 1
-              })
-              const length = Math.hypot(a.x - fromAnchor.x, a.y - fromAnchor.y) + Math.hypot(toAnchor.x - a.x, toAnchor.y - a.y)
-              return hits * 10000 + length
-            }
-            const scoreA = score(midA)
-            const scoreB = score(midB)
-            const mid = scoreA <= scoreB ? midA : midB
-            points = [fromAnchor.x, fromAnchor.y, mid.x, mid.y, toAnchor.x, toAnchor.y]
-          }
-        }
-      } else {
-        // Intra-area links: orthogonal (Manhattan) routing
-        const dx = toAnchor.x - fromAnchor.x
-        const dy = toAnchor.y - fromAnchor.y
-
-        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
-          // Very close: direct line
-          points = [fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y]
-        } else if (Math.abs(dx) >= Math.abs(dy)) {
-          // Horizontal dominant: go horizontal first
-          const midX = fromAnchor.x + dx / 2
-          points = [
-            fromAnchor.x, fromAnchor.y,
-            midX, fromAnchor.y,
-            midX, toAnchor.y,
-            toAnchor.x, toAnchor.y
-          ]
-        } else {
-          // Vertical dominant: go vertical first
-          const midY = fromAnchor.y + dy / 2
-          points = [
-            fromAnchor.x, fromAnchor.y,
-            fromAnchor.x, midY,
-            toAnchor.x, midY,
-            toAnchor.x, toAnchor.y
-          ]
         }
       }
 

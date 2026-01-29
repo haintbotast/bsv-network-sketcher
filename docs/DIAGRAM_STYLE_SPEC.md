@@ -53,6 +53,7 @@
 - Bắt buộc đi qua **Waypoint area** (đuôi `_wp_`), không nối Area‑Area trực tiếp.
 - Link đi qua **anchor** trên biên Area để giảm cắt xuyên.
 - Ưu tiên tuyến **corridor** (ngoài biên Area) cho liên‑area để tránh đi xuyên vùng thiết bị.
+- Routing link ưu tiên **tránh vật cản** (area/device) và **giảm chồng lấn**; nếu không bị cản thì giữ đường thẳng ngắn nhất.
 
 **Macro layout (Area):**
 - Kích thước Area được **tính lại từ bounding thiết bị** + padding + band nhãn khi auto‑layout toàn dự án (cho phép **co lại** nếu dư thừa).
@@ -107,7 +108,7 @@
 | Area | Rectangle bo góc | Nền nhạt xám nhẹ, label góc trên trái, **không viền**, có **đổ bóng nhẹ** |
 | Device | Rectangle bo góc | Màu theo loại thiết bị, **không viền**, có **đổ bóng nhẹ** |
 | Waypoint | Diamond hoặc Circle | Không hiện label khi zoom out |
-| Link | Line | L1 ưu tiên **đường thẳng ngắn nhất** giữa port; L2/L3 dùng Manhattan; màu theo purpose; nét liền/đứt |
+| Link | Line | L1 ưu tiên **đường thẳng ngắn nhất** giữa port; nếu bị cản thì dùng Manhattan tránh vật cản; L2/L3 dùng Manhattan; màu theo purpose; nét liền/đứt |
 | Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor**, có thể xoay theo hướng link; auto-scale theo zoom (0.6-1.15) và tự giãn để tránh chồng lấn |
 
 ### 4.1 Kích thước chuẩn (tham chiếu)

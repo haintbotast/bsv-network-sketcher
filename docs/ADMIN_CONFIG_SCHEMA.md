@@ -22,7 +22,10 @@
     "area_gap": 1.1,
     "area_padding": 0.35,
     "label_band": 0.5,
-    "max_row_width_base": 12.0
+    "max_row_width_base": 12.0,
+    "max_nodes_per_row": 8,
+    "row_gap": 0.5,
+    "row_stagger": 0.5
   },
   "render_tuning": {
     "port_edge_inset": 6,

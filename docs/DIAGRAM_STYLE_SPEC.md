@@ -42,7 +42,8 @@
 **Nguyên tắc chung (bắt buộc):**
 - **Macro (Area):** sắp xếp các Area theo location/tầng; không để thiết bị xuyên Area.
 - **Micro (Device):** mỗi Area là một lưới **top‑to‑bottom** (Core/Distribution ở trên, Access ở giữa, Endpoints ở dưới).
-- Dùng `_AIR_` (ô trống) để canh cột, giữ thẳng hàng theo chiều dọc.
+- Cho phép **nhiều hàng trong cùng tầng** và **so‑le nhẹ** để giảm đường vòng liên kết; vẫn giữ hướng top‑down.
+- Dùng `_AIR_` (ô trống) để canh cột, giữ thẳng hàng theo chiều dọc khi cần.
 
 **Quy tắc hiển thị theo view:**
 - **Overview (nếu bật):** chỉ L1/flow; không render nhãn L2/L3 để tránh đè chữ/đường.  
@@ -57,6 +58,7 @@
 
 **Macro layout (Area):**
 - Kích thước Area được **tính lại từ bounding thiết bị** + padding + band nhãn khi auto‑layout toàn dự án (cho phép **co lại** nếu dư thừa).
+- Trong cùng tier, **được phép hoán vị theo kết nối** (barycenter + local swap) để giảm đường vòng liên‑area, nhưng **không đổi thứ tự tier theo trục dọc**.
 - Sắp xếp Area theo **11 tiers** (0-10):
   - **Tier 0: Edge/WAN** (ISP, Internet, Edge routers)
   - **Tier 1: Security** (Firewalls, IDS/IPS, VPN)

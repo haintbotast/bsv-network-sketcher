@@ -11,6 +11,9 @@ export type LayoutTuning = {
   area_padding?: number
   label_band?: number
   max_row_width_base?: number
+  max_nodes_per_row?: number
+  row_gap?: number
+  row_stagger?: number
 }
 
 export type RenderTuning = {

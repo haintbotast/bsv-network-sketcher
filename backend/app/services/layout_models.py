@@ -14,6 +14,9 @@ class LayoutConfig:
     node_spacing: float = 0.8  # Spacing between nodes in same layer (inch)
     node_width: float = 1.2  # Default node width (inch)
     node_height: float = 0.5  # Default node height (inch)
+    max_nodes_per_row: int | None = None  # Max nodes per row inside a layer
+    row_gap: float = 0.5  # Vertical gap between rows inside a layer (inch)
+    row_stagger: float = 0.5  # Stagger ratio for alternating rows (0-1)
 
 
 @dataclass

@@ -161,6 +161,14 @@ const areaLayerRef = ref()
 const linkLayerRef = ref()
 const deviceLayerRef = ref()
 const overlayLayerRef = ref()
+const linkRouteCache = ref(new Map<string, {
+  points: number[]
+  fromAnchor: { x: number; y: number; side?: string }
+  toAnchor: { x: number; y: number; side?: string }
+  fromCenter: { x: number; y: number }
+  toCenter: { x: number; y: number }
+}>())
+const linkRouteCacheViewport = ref<Viewport | null>(null)
 
 const gridConfig = computed(() => ({
   x: 16,
@@ -1125,12 +1133,51 @@ function computeAreaAnchor(
   return { x, y }
 }
 
-const visibleLinks = computed(() => {
+const buildVisibleLinks = (useCache: boolean) => {
   const scale = clamp(props.viewport.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
+  if (useCache) {
+    const cachedViewport = linkRouteCacheViewport.value
+    if (cachedViewport && cachedViewport.scale === props.viewport.scale) {
+      const cached = linkRouteCache.value
+      const dx = props.viewport.offsetX - cachedViewport.offsetX
+      const dy = props.viewport.offsetY - cachedViewport.offsetY
+      let canUseCache = cached.size === props.links.length && cached.size > 0
+      const shifted = props.links
+        .map(link => {
+          const entry = cached.get(link.id)
+          if (!entry) {
+            canUseCache = false
+            return null
+          }
+          const points = entry.points.map((value, idx) => value + (idx % 2 === 0 ? dx : dy))
+          return {
+            id: link.id,
+            fromAnchor: { x: entry.fromAnchor.x + dx, y: entry.fromAnchor.y + dy, side: entry.fromAnchor.side },
+            toAnchor: { x: entry.toAnchor.x + dx, y: entry.toAnchor.y + dy, side: entry.toAnchor.side },
+            fromCenter: { x: entry.fromCenter.x + dx, y: entry.fromCenter.y + dy },
+            toCenter: { x: entry.toCenter.x + dx, y: entry.toCenter.y + dy },
+            points,
+            config: {
+              points,
+              stroke: '#2b2a28',
+              strokeWidth: 1.5,
+              dash: link.style === 'dashed' ? [8, 6] : link.style === 'dotted' ? [2, 4] : [],
+              opacity: 0.8
+            }
+          }
+        })
+        .filter(Boolean) as Array<{ id: string; points: number[]; config: Record<string, unknown> }>
+
+      if (canUseCache) return { links: shifted, cache: null }
+    }
+  }
+
   const isL1View = (props.viewMode || 'L1') === 'L1'
   const clearance = renderTuning.value.area_clearance * scale
   const gridBase = Math.max(6, Math.round(renderTuning.value.area_clearance * 0.5 * scale))
   const minSegment = Math.max(4, Math.round(6 * scale))
+  const maxRouteLinks = 400
+  const maxGridNodes = 30000
 
   let minX = Number.POSITIVE_INFINITY
   let minY = Number.POSITIVE_INFINITY
@@ -1170,7 +1217,18 @@ const visibleLinks = computed(() => {
     })
   }
 
-  return props.links
+  const gridNodeCount = grid ? grid.cols * grid.rows : 0
+  const allowAStar = isL1View && grid && props.links.length <= maxRouteLinks && gridNodeCount > 0 && gridNodeCount <= maxGridNodes
+
+  const cache = new Map<string, {
+    points: number[]
+    fromAnchor: { x: number; y: number; side?: string }
+    toAnchor: { x: number; y: number; side?: string }
+    fromCenter: { x: number; y: number }
+    toCenter: { x: number; y: number }
+  }>()
+
+  const links = props.links
     .map(link => {
       const fromView = deviceViewMap.value.get(link.fromDeviceId)
       const toView = deviceViewMap.value.get(link.toDeviceId)
@@ -1231,7 +1289,7 @@ const visibleLinks = computed(() => {
       const toExit = offsetFromAnchor({ ...toAnchor, side: toSide }, exitStub)
 
       let routed = false
-      if (!directAllowed && grid) {
+      if (allowAStar && !directAllowed) {
         const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
         const route = routeOrthogonalPath({
           start: fromExit,
@@ -1412,6 +1470,23 @@ const visibleLinks = computed(() => {
       }
     })
     .filter(Boolean) as Array<{ id: string; points: number[]; config: Record<string, unknown> }>
+
+  links.forEach(link => {
+    cache.set(link.id, {
+      points: [...link.points],
+      fromAnchor: { ...link.fromAnchor },
+      toAnchor: { ...link.toAnchor },
+      fromCenter: { ...link.fromCenter },
+      toCenter: { ...link.toCenter }
+    })
+  })
+
+  return { links, cache }
+}
+
+const visibleLinks = computed(() => {
+  const result = buildVisibleLinks(isPanning.value)
+  return result.links
 })
 
 const linkPortLabels = computed(() => {
@@ -1848,6 +1923,38 @@ onBeforeUnmount(() => {
 
 watch([visibleAreas, visibleDevices, visibleLinks, linkPortLabels, l2Labels, l3Labels, stageSize], () => {
   batchDraw()
+})
+
+const refreshLinkCache = () => {
+  if (isPanning.value) return
+  const result = buildVisibleLinks(false)
+  if (result.cache) {
+    linkRouteCache.value = result.cache
+    linkRouteCacheViewport.value = { ...props.viewport }
+  }
+}
+
+watch(
+  [
+    () => props.links,
+    () => props.areas,
+    () => props.devices,
+    () => props.viewMode,
+    () => props.viewport.scale,
+    () => props.viewport.offsetX,
+    () => props.viewport.offsetY,
+    renderTuning
+  ],
+  () => {
+    if (isPanning.value) return
+    refreshLinkCache()
+  }
+)
+
+watch(isPanning, (value, prev) => {
+  if (!value && prev) {
+    refreshLinkCache()
+  }
 })
 </script>
 

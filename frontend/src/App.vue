@@ -165,6 +165,22 @@
                 <input type="number" step="0.1" v-model.number="layoutTuningForm.max_row_width_base" />
               </div>
             </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Tối đa node mỗi hàng</label>
+                <input type="number" step="1" min="1" v-model.number="layoutTuningForm.max_nodes_per_row" />
+              </div>
+              <div class="form-group">
+                <label>Khoảng cách giữa hàng</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.row_gap" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Độ so‑le hàng (0‑1)</label>
+                <input type="number" step="0.05" min="0" max="1" v-model.number="layoutTuningForm.row_stagger" />
+              </div>
+            </div>
 
             <div class="divider"></div>
             <p class="panel-hint">Đường nối & nhãn (px)</p>
@@ -403,7 +419,10 @@ const DEFAULT_LAYOUT_TUNING: LayoutTuning = {
   area_gap: 1.1,
   area_padding: 0.35,
   label_band: 0.5,
-  max_row_width_base: 12.0
+  max_row_width_base: 12.0,
+  max_nodes_per_row: 8,
+  row_gap: 0.5,
+  row_stagger: 0.5
 }
 const DEFAULT_RENDER_TUNING: RenderTuning = {
   port_edge_inset: 6,

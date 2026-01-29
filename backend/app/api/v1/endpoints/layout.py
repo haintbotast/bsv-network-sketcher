@@ -824,9 +824,30 @@ def compute_layout_l1(
         area_external_links[to_area] += 1
 
     # Micro layout config (top-to-bottom per AI Context)
+    max_nodes_per_row = tuning.get("max_nodes_per_row")
+    try:
+        max_nodes_per_row = int(max_nodes_per_row) if max_nodes_per_row is not None else None
+    except (TypeError, ValueError):
+        max_nodes_per_row = None
+
+    row_gap = tuning.get("row_gap")
+    try:
+        row_gap = float(row_gap) if row_gap is not None else max(0.2, config.node_spacing * 0.6)
+    except (TypeError, ValueError):
+        row_gap = max(0.2, config.node_spacing * 0.6)
+
+    row_stagger = tuning.get("row_stagger")
+    try:
+        row_stagger = float(row_stagger) if row_stagger is not None else 0.5
+    except (TypeError, ValueError):
+        row_stagger = 0.5
+
     micro_config = LayoutConfig(
         layer_gap=config.layer_gap,
         node_spacing=config.node_spacing,
+        max_nodes_per_row=max_nodes_per_row,
+        row_gap=row_gap,
+        row_stagger=row_stagger,
     )
 
     micro_results: dict[str, dict] = {}
@@ -946,12 +967,86 @@ def compute_layout_l1(
         ordered.extend(remaining)
         return ordered
 
+    def build_index_map(area_tiers_map: dict[int, list[str]]) -> dict[str, int]:
+        index_map: dict[str, int] = {}
+        for tier_ids in area_tiers_map.values():
+            for idx, aid in enumerate(tier_ids):
+                index_map[aid] = idx
+        return index_map
+
+    def area_order_cost(aid: str, index_map: dict[str, int]) -> float:
+        cost = 0.0
+        for neighbor, weight in area_link_weights.get(aid, {}).items():
+            if neighbor not in index_map:
+                continue
+            cost += weight * abs(index_map[aid] - index_map[neighbor])
+        return cost
+
+    def refine_tier_by_barycenter(area_ids: list[str], index_map: dict[str, int]) -> list[str]:
+        if len(area_ids) <= 1:
+            return area_ids
+
+        base_positions = {aid: idx for idx, aid in enumerate(area_ids)}
+
+        def barycenter(aid: str) -> float | None:
+            total = 0.0
+            weight_sum = 0.0
+            for neighbor, weight in area_link_weights.get(aid, {}).items():
+                if neighbor not in index_map:
+                    continue
+                total += index_map[neighbor] * weight
+                weight_sum += weight
+            if weight_sum == 0:
+                return None
+            return total / weight_sum
+
+        def sort_key(aid: str) -> tuple[float, int, str]:
+            score = barycenter(aid)
+            return (
+                score if score is not None else base_positions[aid],
+                base_positions[aid],
+                normalize(area_meta[aid]["name"]),
+            )
+
+        ordered = sorted(area_ids, key=sort_key)
+
+        # Local swap refinement to reduce weighted distance
+        for _ in range(2):
+            index_map_local = {aid: idx for idx, aid in enumerate(ordered)}
+            swapped = False
+            for idx in range(len(ordered) - 1):
+                a_id = ordered[idx]
+                b_id = ordered[idx + 1]
+                cost_before = area_order_cost(a_id, index_map_local) + area_order_cost(b_id, index_map_local)
+                index_map_local[a_id], index_map_local[b_id] = index_map_local[b_id], index_map_local[a_id]
+                cost_after = area_order_cost(a_id, index_map_local) + area_order_cost(b_id, index_map_local)
+                if cost_after + 1e-6 < cost_before:
+                    ordered[idx], ordered[idx + 1] = ordered[idx + 1], ordered[idx]
+                    swapped = True
+                else:
+                    index_map_local[a_id], index_map_local[b_id] = index_map_local[b_id], index_map_local[a_id]
+            if not swapped:
+                break
+
+        return ordered
+
     ordered_tiers = order_tiers(area_tiers)
     prev_tier_ids: list[str] = []
     for tier in ordered_tiers:
         area_ids = area_tiers[tier]
         area_tiers[tier] = order_areas_by_connectivity(area_ids, prev_tier_ids)
         prev_tier_ids = area_tiers[tier]
+
+    # Refine area order within each tier using barycenter + local swaps
+    for _ in range(2):
+        index_map = build_index_map(area_tiers)
+        for tier in ordered_tiers:
+            area_tiers[tier] = refine_tier_by_barycenter(area_tiers[tier], index_map)
+            index_map = build_index_map(area_tiers)
+        index_map = build_index_map(area_tiers)
+        for tier in reversed(ordered_tiers):
+            area_tiers[tier] = refine_tier_by_barycenter(area_tiers[tier], index_map)
+            index_map = build_index_map(area_tiers)
 
     macro_positions = compute_macro_positions(area_tiers)
 

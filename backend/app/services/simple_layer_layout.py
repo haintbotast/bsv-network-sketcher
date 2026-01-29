@@ -246,22 +246,39 @@ def simple_layer_layout(devices: list, links: list, config: LayoutConfig) -> Lay
     node_spacing = config.node_spacing
     node_width = config.node_width
     node_height = config.node_height
+    row_gap = config.row_gap if config.row_gap is not None else max(0.2, node_spacing * 0.6)
+    row_stagger = max(0.0, min(config.row_stagger or 0.0, 1.0))
 
     for layer_idx in layer_indices:
         ordered_devices = layer_orders[layer_idx]
-        current_x = 0.0
+        if not ordered_devices:
+            continue
 
-        for device in ordered_devices:
-            device_layouts.append({
-                "id": device.id,
-                "x": current_x,
-                "y": current_y,
-                "layer": layer_idx,
-            })
-            current_x += node_width + node_spacing
+        max_nodes_per_row = config.max_nodes_per_row or len(ordered_devices)
+        if max_nodes_per_row <= 0:
+            max_nodes_per_row = len(ordered_devices)
 
-        # Move to next layer
-        current_y += node_height + layer_gap
+        rows = [
+            ordered_devices[i:i + max_nodes_per_row]
+            for i in range(0, len(ordered_devices), max_nodes_per_row)
+        ]
+
+        row_step_x = node_width + node_spacing
+        for row_idx, row_devices in enumerate(rows):
+            row_y = current_y + row_idx * (node_height + row_gap)
+            offset_x = row_step_x * row_stagger if row_idx % 2 == 1 else 0.0
+            current_x = offset_x
+            for device in row_devices:
+                device_layouts.append({
+                    "id": device.id,
+                    "x": current_x,
+                    "y": row_y,
+                    "layer": layer_idx,
+                })
+                current_x += row_step_x
+
+        total_layer_height = len(rows) * node_height + max(0, len(rows) - 1) * row_gap
+        current_y += total_layer_height + layer_gap
 
     # Compute stats
     execution_time_ms = int((time.time() - start_time) * 1000)

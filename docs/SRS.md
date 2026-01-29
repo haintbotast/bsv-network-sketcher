@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-27  
+> **Cập nhật:** 2026-01-29  
 > **Mục tiêu:** Đặc tả yêu cầu kỹ thuật để triển khai web app theo chuẩn layout network phổ biến.
 
 ---
@@ -39,6 +39,12 @@
 - Overview (nếu bật) chỉ L1/flow; L2/L3 chỉ hiển thị ở view riêng.  
   **Lưu ý:** UI hiện không hiển thị Overview; dùng L1 thay thế.
 - Liên kết khác Area bắt buộc qua **Waypoint area** (đuôi `_wp_`).
+- Endpoint **không** được nối trực tiếp lên Distribution/Core (mặc định chặn ở L1).
+- VPN Gateway là **chức năng Firewall** (device_type Firewall, tên có VPN).
+- Area **Data Center** bao gồm Edge/Security/DMZ/Core/Distribution.
+- Thiết bị Server/NAS/Storage/Server Switch bắt buộc nằm trong **Area Server/Monitor** và **đặt cùng hàng hoặc ngay dưới DMZ**.
+- Access Switch phải nằm trong **area nghiệp vụ** (Head Office/Department/Project/IT).
+- Server chỉ được kết nối lên **Server Distribution Switch**.
 
 ### 2.5 Xuất dữ liệu
 - Sinh PPTX/Excel theo layout mode đã chọn.

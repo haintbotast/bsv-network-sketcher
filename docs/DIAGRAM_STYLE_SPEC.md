@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-27  
+> **Cập nhật:** 2026-01-29  
 > **Mục tiêu:** Chuẩn hóa hình khối, nét vẽ, màu sắc, chữ và nền cho toàn hệ thống (UI + Konva + export).
 
 ---
@@ -67,7 +67,7 @@
   - **Tier 7: Office** (Office floors, building access) - **mặc định**
   - **Tier 8: Department** (Department-specific networks)
   - **Tier 9: Project** (Project-specific networks)
-  - **Tier 10: Servers** (Datacenter, servers, storage)
+  - **Tier 10: Servers/Monitoring** (Datacenter, servers, storage, monitor/NOC/NMS)
 - Mỗi tier có **width factor** riêng:
   - Tier 0-4 (Infrastructure): rộng hơn (1.3-1.5x), tối đa 2 areas/hàng
   - Tier 5-6 (Campus/Branch): vừa phải (1.1-1.2x), tối đa 3 areas/hàng
@@ -75,6 +75,14 @@
   - Tier 10 (Servers): vừa phải (1.2x), tối đa 3 areas/hàng
 - Mỗi tier **tự xuống dòng (wrap)** theo hàng dựa trên max width của tier đó.
 - Khoảng cách giữa Area: 0.8 inch (AREA_GAP).
+
+**Quy ước bổ sung (bắt buộc):**
+- **VPN Gateway là chức năng của Firewall** → thể hiện bằng `device_type=Firewall` và tên có `VPN` (màu firewall), **không tạo device_type riêng**.
+- **Area Data Center** bao gồm **Edge/Security/DMZ/Core/Distribution** (không tách rời thành các area con nếu không cần).
+- **Area Server/Monitor** ưu tiên đặt **cùng hàng hoặc ngay dưới DMZ** (không rơi sâu xuống các tầng Office/Department/Project).
+- Thiết bị **Server/NAS/Storage/Server Switch** không được nằm trong area Project/Office/IT; phải gom về **Area Server** hoặc **Area Monitor**.
+- **Access Switch** phải nằm **trong area nghiệp vụ** (Head Office/Department/Project/IT), **không tạo area Access riêng**.
+- **Server Switch** được xem là **Distribution Switch** trong lớp Server; server chỉ kết nối lên **Server Distribution Switch**.
 
 ---
 
@@ -95,11 +103,11 @@
 
 | Đối tượng | Shape | Ghi chú |
 |----------|-------|--------|
-| Area | Rectangle bo góc | Nền nhạt, label góc trên trái, **không viền**, có **đổ bóng nhẹ** |
+| Area | Rectangle bo góc | Nền nhạt xám nhẹ, label góc trên trái, **không viền**, có **đổ bóng nhẹ** |
 | Device | Rectangle bo góc | Màu theo loại thiết bị, **không viền**, có **đổ bóng nhẹ** |
 | Waypoint | Diamond hoặc Circle | Không hiện label khi zoom out |
-| Link | Line | Bắt đầu từ **port anchor** trên device; màu theo purpose; nét liền/đứt |
-| Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor** |
+| Link | Line | L1 ưu tiên **đường thẳng ngắn nhất** giữa port; L2/L3 dùng Manhattan; màu theo purpose; nét liền/đứt |
+| Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor**, có thể xoay theo hướng link; auto-scale theo zoom (0.6-1.15) và tự giãn để tránh chồng lấn |
 
 ### 4.1 Kích thước chuẩn (tham chiếu)
 
@@ -148,6 +156,7 @@
 |--------|-----------|---------|
 | Router / ISP | 70,130,180 | Steel Blue |
 | FW / Firewall | 220,80,80 | Red |
+| VPN / VPN-Gateway | 220,80,80 | Dùng màu Firewall (VPN là chức năng Firewall) |
 | Core-SW / Core | 34,139,34 | Green |
 | Dist | 60,179,113 | Green |
 | Access-SW / Access | 0,139,139 | Cyan |

@@ -45,6 +45,10 @@ class AutoLayoutOptions(BaseModel):
         default="L1",
         description="View mode: 'L1' (physical), 'L2' (VLAN grouping), or 'L3' (subnet grouping)."
     )
+    normalize_topology: bool = Field(
+        default=False,
+        description="If True, auto-normalize areas/devices (Security/Server/Monitor) before layout."
+    )
 
     class Config:
         json_schema_extra = {
@@ -55,7 +59,8 @@ class AutoLayoutOptions(BaseModel):
                 "group_by_area": True,
                 "layout_scope": "area",
                 "anchor_routing": True,
-                "overview_mode": "l1-only"
+                "overview_mode": "l1-only",
+                "normalize_topology": False,
             }
         }
 

@@ -1,5 +1,7 @@
 """L1 Link endpoints."""
 
+import re
+
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import CurrentUser, DBSession
@@ -32,6 +34,65 @@ PURPOSE_COLORS = {
     "VPN": [0, 176, 240],     # Cyan
     "DEFAULT": [0, 0, 0],     # Black
 }
+
+ENDPOINT_TYPES = {"PC", "AP"}
+ENDPOINT_NAME_RE = re.compile(r"\b(PC|PRN|PRINTER|CAM|CCTV|PHONE|IPPHONE|ENDPOINT|CLIENT|TERMINAL)\b", re.IGNORECASE)
+CORE_NAME_RE = re.compile(r"\bCORE\b|SW-CORE|CORE-SW", re.IGNORECASE)
+DIST_NAME_RE = re.compile(r"\bDIST\b|DISTR", re.IGNORECASE)
+SERVER_NAME_RE = re.compile(r"\b(SERVER|SRV|APP|WEB|DB|NAS|SAN|STORAGE|BACKUP)\b", re.IGNORECASE)
+SERVER_SWITCH_RE = re.compile(r"\b(SW|SWITCH)\b", re.IGNORECASE)
+SERVER_AREA_RE = re.compile(r"\bSERVER|STORAGE\b", re.IGNORECASE)
+
+
+def _is_endpoint_device(device) -> bool:
+    dtype = (getattr(device, "device_type", "") or "").upper()
+    if dtype in ENDPOINT_TYPES:
+        return True
+    return bool(ENDPOINT_NAME_RE.search(getattr(device, "name", "") or ""))
+
+
+def _is_core_or_dist_device(device) -> bool:
+    name = getattr(device, "name", "") or ""
+    dtype = (getattr(device, "device_type", "") or "").upper()
+    if dtype == "SWITCH" and (CORE_NAME_RE.search(name) or DIST_NAME_RE.search(name)):
+        return True
+    return bool(CORE_NAME_RE.search(name) or DIST_NAME_RE.search(name))
+
+
+def _is_server_device(device) -> bool:
+    dtype = (getattr(device, "device_type", "") or "").upper()
+    if dtype in {"SERVER", "STORAGE"}:
+        return True
+    return bool(SERVER_NAME_RE.search(getattr(device, "name", "") or ""))
+
+
+def _is_server_distribution_switch(device) -> bool:
+    dtype = (getattr(device, "device_type", "") or "").upper()
+    name = getattr(device, "name", "") or ""
+    area_name = getattr(getattr(device, "area", None), "name", "") or ""
+    if dtype != "SWITCH":
+        return False
+    if SERVER_NAME_RE.search(name) and SERVER_SWITCH_RE.search(name):
+        return True
+    if SERVER_AREA_RE.search(area_name):
+        return True
+    if DIST_NAME_RE.search(name) and SERVER_NAME_RE.search(name):
+        return True
+    return False
+
+
+def _endpoint_uplink_violation(from_device, to_device) -> bool:
+    return (_is_endpoint_device(from_device) and _is_core_or_dist_device(to_device)) or (
+        _is_endpoint_device(to_device) and _is_core_or_dist_device(from_device)
+    )
+
+
+def _server_uplink_violation(from_device, to_device) -> bool:
+    if _is_server_device(from_device) and not _is_server_distribution_switch(to_device):
+        return True
+    if _is_server_device(to_device) and not _is_server_distribution_switch(from_device):
+        return True
+    return False
 
 
 async def _verify_project_access(db: DBSession, project_id: str, user_id: str):
@@ -114,6 +175,17 @@ async def create_new_link(
             detail=f"Port '{data.to_port}' trên device '{data.to_device}' đã được sử dụng",
         )
 
+    if _endpoint_uplink_violation(from_device, to_device):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Endpoint không được kết nối trực tiếp lên Distribution/Core (phải qua Access).",
+        )
+    if _server_uplink_violation(from_device, to_device):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Server chỉ được kết nối lên Server Distribution Switch.",
+        )
+
     link = await create_link(db, project_id, from_device, to_device, data)
     link = await get_link_by_id(db, link.id)
     return _link_to_response(link)
@@ -174,6 +246,19 @@ async def update_existing_link(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Device '{data.to_device}' không tồn tại",
             )
+
+    effective_from = from_device or link.from_device
+    effective_to = to_device or link.to_device
+    if effective_from and effective_to and _endpoint_uplink_violation(effective_from, effective_to):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Endpoint không được kết nối trực tiếp lên Distribution/Core (phải qua Access).",
+        )
+    if effective_from and effective_to and _server_uplink_violation(effective_from, effective_to):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Server chỉ được kết nối lên Server Distribution Switch.",
+        )
 
     link = await update_link(db, link, data, from_device, to_device)
     link = await get_link_by_id(db, link.id)
@@ -245,6 +330,23 @@ async def bulk_create_links(
                     "row": row,
                     "code": "L1_LINK_DUP",
                     "message": "Link đã tồn tại",
+                })
+                continue
+
+            if _endpoint_uplink_violation(from_device, to_device):
+                errors.append({
+                    "entity": "link",
+                    "row": row,
+                    "code": "ENDPOINT_UPLINK_INVALID",
+                    "message": "Endpoint không được kết nối trực tiếp lên Distribution/Core (phải qua Access).",
+                })
+                continue
+            if _server_uplink_violation(from_device, to_device):
+                errors.append({
+                    "entity": "link",
+                    "row": row,
+                    "code": "SERVER_UPLINK_INVALID",
+                    "message": "Server chỉ được kết nối lên Server Distribution Switch.",
                 })
                 continue
 

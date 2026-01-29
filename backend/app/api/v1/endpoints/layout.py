@@ -2,6 +2,8 @@
 Auto-Layout API endpoint.
 """
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +11,7 @@ from app.db.session import get_db
 from app.services import device as device_service
 from app.services import link as link_service
 from app.services import area as area_service
+from app.schemas.area import AreaCreate
 from app.services.layout_models import LayoutConfig
 from app.services.simple_layer_layout import simple_layer_layout
 from app.services.layout_cache import get_cache
@@ -24,6 +27,279 @@ from app.schemas.layout import (
 
 
 router = APIRouter()
+
+AREA_PREFIX_RE = re.compile(r"^([A-Za-z0-9]{2,6})(\s*-\s*)")
+SECURITY_AREA_KEYWORDS = ["security", "firewall", "fw", "ids", "ips", "vpn", "soc"]
+SERVER_AREA_KEYWORDS = ["server", "servers", "storage", "nas", "san"]
+MONITOR_AREA_KEYWORDS = ["monitor", "monitoring", "noc", "nms"]
+DMZ_AREA_KEYWORDS = ["dmz", "proxy"]
+DATACENTER_AREA_KEYWORDS = ["datacenter", "data center", "dc"]
+
+SECURITY_DEVICE_KEYWORDS = ["firewall", "fw", "ids", "ips", "vpn", "security"]
+ROUTER_DEVICE_KEYWORDS = ["router", "rtr"]
+SERVER_DEVICE_KEYWORDS = ["server", "srv", "app", "web", "db", "backup"]
+STORAGE_DEVICE_KEYWORDS = ["storage", "nas", "san"]
+MONITOR_DEVICE_KEYWORDS = ["monitor", "monitoring", "noc", "nms"]
+SERVER_SWITCH_KEYWORDS = ["server", "srv", "storage", "nas"]
+ACCESS_SWITCH_KEYWORDS = ["access", "acc"]
+DMZ_DEVICE_KEYWORDS = ["dmz", "waf", "proxy"]
+
+DEPT_AREA_KEYWORDS = ["department", "dept"]
+PROJECT_AREA_KEYWORDS = ["project", "proj"]
+IT_AREA_KEYWORDS = ["it"]
+HO_AREA_KEYWORDS = ["head office", "hq", "office", "headquarter", "headquarters"]
+
+
+def _normalize(text: str | None) -> str:
+    return (text or "").strip().lower()
+
+
+def _infer_area_prefix(areas: list) -> str:
+    counts: dict[str, int] = {}
+    for area in areas:
+        match = AREA_PREFIX_RE.match(area.name or "")
+        if not match:
+            continue
+        prefix = f"{match.group(1)}{match.group(2)}"
+        counts[prefix] = counts.get(prefix, 0) + 1
+    if not counts:
+        return ""
+    return max(counts.items(), key=lambda item: item[1])[0]
+
+
+def _find_area_by_keywords(areas: list, keywords: list[str]) -> object | None:
+    for area in areas:
+        label = _normalize(area.name)
+        if any(keyword in label for keyword in keywords):
+            return area
+    return None
+
+
+def _find_best_access_area(areas: list, device_name: str) -> object | None:
+    name = _normalize(device_name)
+    if any(keyword in name for keyword in ["dept", "department"]):
+        return _find_area_by_keywords(areas, DEPT_AREA_KEYWORDS)
+    if any(keyword in name for keyword in ["project", "proj"]):
+        return _find_area_by_keywords(areas, PROJECT_AREA_KEYWORDS)
+    if " it" in f" {name} " or name.endswith("it") or name.startswith("it"):
+        return _find_area_by_keywords(areas, IT_AREA_KEYWORDS)
+    if any(keyword in name for keyword in ["ho", "hq", "head"]):
+        return _find_area_by_keywords(areas, HO_AREA_KEYWORDS)
+    return None
+
+
+def _classify_area_kind(name: str | None) -> str | None:
+    label = _normalize(name)
+    if any(keyword in label for keyword in DATACENTER_AREA_KEYWORDS):
+        return "datacenter"
+    if any(keyword in label for keyword in MONITOR_AREA_KEYWORDS):
+        return "monitor"
+    if any(keyword in label for keyword in SERVER_AREA_KEYWORDS):
+        return "server"
+    if any(keyword in label for keyword in SECURITY_AREA_KEYWORDS):
+        return "security"
+    if any(keyword in label for keyword in DMZ_AREA_KEYWORDS):
+        return "dmz"
+    if any(keyword in label for keyword in ["edge", "wan", "internet", "isp"]):
+        return "edge"
+    return None
+
+
+def _is_monitor_device(device) -> bool:
+    name = _normalize(getattr(device, "name", ""))
+    return any(keyword in name for keyword in MONITOR_DEVICE_KEYWORDS)
+
+
+def _is_server_device(device) -> bool:
+    dtype = _normalize(getattr(device, "device_type", ""))
+    name = _normalize(getattr(device, "name", ""))
+    if dtype in {"server", "storage"}:
+        return True
+    if any(keyword in name for keyword in SERVER_DEVICE_KEYWORDS + STORAGE_DEVICE_KEYWORDS):
+        return True
+    if "sw" in name and any(keyword in name for keyword in SERVER_DEVICE_KEYWORDS + STORAGE_DEVICE_KEYWORDS):
+        return True
+    return False
+
+
+def _is_security_device(device) -> bool:
+    dtype = _normalize(getattr(device, "device_type", ""))
+    name = _normalize(getattr(device, "name", ""))
+    if "waf" in name:
+        return False
+    if dtype == "firewall":
+        return True
+    return any(keyword in name for keyword in SECURITY_DEVICE_KEYWORDS)
+
+
+def _is_dmz_device(device) -> bool:
+    name = _normalize(getattr(device, "name", ""))
+    return any(keyword in name for keyword in DMZ_DEVICE_KEYWORDS)
+
+
+def _is_router_device(device) -> bool:
+    dtype = _normalize(getattr(device, "device_type", ""))
+    name = _normalize(getattr(device, "name", ""))
+    if dtype == "router":
+        return True
+    return any(keyword in name for keyword in ROUTER_DEVICE_KEYWORDS)
+
+
+def _is_access_switch(device) -> bool:
+    dtype = _normalize(getattr(device, "device_type", ""))
+    name = _normalize(getattr(device, "name", ""))
+    if dtype == "switch" and any(keyword in name for keyword in ACCESS_SWITCH_KEYWORDS):
+        return True
+    return False
+
+
+def _is_distribution_switch(device) -> bool:
+    dtype = _normalize(getattr(device, "device_type", ""))
+    name = _normalize(getattr(device, "name", ""))
+    if dtype != "switch":
+        return False
+    if "dist" in name or "distribution" in name:
+        return True
+    if "core" in name:
+        return True
+    if any(keyword in name for keyword in SERVER_SWITCH_KEYWORDS):
+        return True
+    return False
+
+
+async def _ensure_area(
+    db: AsyncSession,
+    project_id: str,
+    areas: list,
+    name: str,
+    next_row: int,
+) -> tuple[object, int]:
+    existing = next((area for area in areas if _normalize(area.name) == _normalize(name)), None)
+    if existing:
+        return existing, next_row
+    area = await area_service.create_area(
+        db,
+        project_id,
+        AreaCreate(name=name, grid_row=next_row, grid_col=1),
+    )
+    areas.append(area)
+    return area, next_row + 1
+
+
+async def _normalize_topology(
+    db: AsyncSession,
+    project_id: str,
+    areas: list,
+    devices: list,
+    links: list,
+) -> tuple[list, list]:
+    if not areas or not devices:
+        return areas, devices
+
+    prefix = _infer_area_prefix(areas)
+    datacenter_area = _find_area_by_keywords(areas, DATACENTER_AREA_KEYWORDS)
+    server_area = _find_area_by_keywords(areas, SERVER_AREA_KEYWORDS)
+    monitor_area = _find_area_by_keywords(areas, MONITOR_AREA_KEYWORDS)
+
+    next_row = max((area.grid_row for area in areas), default=1) + 1
+
+    if not datacenter_area:
+        has_infra = any(
+            _is_security_device(device) or _is_router_device(device) or _is_distribution_switch(device)
+            for device in devices
+        )
+        if has_infra:
+            datacenter_area, next_row = await _ensure_area(
+                db,
+                project_id,
+                areas,
+                f"{prefix}Data Center" if prefix else "Data Center",
+                next_row,
+            )
+    if not server_area:
+        server_area, next_row = await _ensure_area(
+            db,
+            project_id,
+            areas,
+            f"{prefix}Servers" if prefix else "Servers",
+            next_row,
+        )
+    if not monitor_area:
+        monitor_area, next_row = await _ensure_area(
+            db,
+            project_id,
+            areas,
+            f"{prefix}Monitor" if prefix else "Monitor",
+            next_row,
+        )
+
+    area_by_id = {area.id: area for area in areas}
+    device_by_id = {device.id: device for device in devices}
+    device_area_id = {device.id: device.area_id for device in devices}
+    area_kind_by_id = {
+        area_id: _classify_area_kind(area.name) for area_id, area in area_by_id.items()
+    }
+    neighbor_area_index: dict[str, dict[str, int]] = {}
+    for link in links:
+        from_id = getattr(link, "from_device_id", None)
+        to_id = getattr(link, "to_device_id", None)
+        if not from_id or not to_id:
+            continue
+        from_area = device_area_id.get(from_id)
+        to_area = device_area_id.get(to_id)
+        if not from_area or not to_area:
+            continue
+        neighbor_area_index.setdefault(from_id, {})
+        neighbor_area_index.setdefault(to_id, {})
+        neighbor_area_index[from_id][to_area] = neighbor_area_index[from_id].get(to_area, 0) + 1
+        neighbor_area_index[to_id][from_area] = neighbor_area_index[to_id].get(from_area, 0) + 1
+    updated = False
+
+    for device in devices:
+        current_area = area_by_id.get(device.area_id)
+        area_kind = _classify_area_kind(current_area.name if current_area else None)
+        target_area = None
+
+        if _is_monitor_device(device):
+            target_area = monitor_area
+        elif _is_server_device(device):
+            target_area = server_area
+        elif _is_access_switch(device):
+            target_area = _find_best_access_area(areas, device.name)
+            if not target_area:
+                neighbors = neighbor_area_index.get(device.id, {})
+                if neighbors:
+                    sorted_neighbors = sorted(
+                        neighbors.items(),
+                        key=lambda item: item[1],
+                        reverse=True,
+                    )
+                    for area_id, _count in sorted_neighbors:
+                        kind = area_kind_by_id.get(area_id)
+                        if kind not in {"datacenter", "server", "monitor"}:
+                            target_area = area_by_id.get(area_id)
+                            break
+        elif datacenter_area and (
+            _is_security_device(device)
+            or _is_router_device(device)
+            or _is_distribution_switch(device)
+            or _is_dmz_device(device)
+            or "core" in _normalize(getattr(device, "name", ""))
+        ):
+            target_area = datacenter_area
+        elif datacenter_area and area_kind == "datacenter":
+            target_area = None
+
+        if target_area and device.area_id != target_area.id:
+            device.area_id = target_area.id
+            updated = True
+
+    if updated:
+        await db.commit()
+
+    areas = await area_service.get_areas(db, project_id)
+    devices = await device_service.get_devices(db, project_id)
+    return areas, devices
 
 
 @router.post("/projects/{project_id}/auto-layout", response_model=LayoutResult)
@@ -68,6 +344,8 @@ async def compute_auto_layout(
         areas = await area_service.get_areas(db, project_id)
         if not areas:
             raise HTTPException(status_code=404, detail="No areas found in project")
+        if options.normalize_topology and options.apply_to_db:
+            areas, devices = await _normalize_topology(db, project_id, areas, devices, links)
     elif view_mode == "L2":
         # Load L2 assignments and segments
         from app.db.models import InterfaceL2Assignment, L2Segment
@@ -106,6 +384,7 @@ async def compute_auto_layout(
         "group_by_area": options.group_by_area,
         "layout_scope": options.layout_scope,
         "view_mode": options.view_mode,
+        "normalize_topology": options.normalize_topology,
     }
 
     # Different cache keys for different views
@@ -241,7 +520,7 @@ async def apply_layout_to_db(db: AsyncSession, device_layouts: list[dict]) -> No
                 })
 
     # Update area positions based on device bounds
-    AREA_PADDING = 0.3  # Padding around devices in inches
+    AREA_PADDING = 0.35  # Padding around devices in inches
 
     for area_id, devices in area_devices.items():
         if not devices:
@@ -284,9 +563,9 @@ def compute_layout_l1(
     """Compute L1 layout: area-based with minimized area visuals (compact spacing)."""
     AREA_MIN_WIDTH = 3.0
     AREA_MIN_HEIGHT = 1.5
-    AREA_GAP = 0.5  # Reduced from 0.8 for compactness
-    AREA_PADDING = 0.15  # Reduced from 0.25 for compactness
-    LABEL_BAND = 0.35
+    AREA_GAP = 0.9
+    AREA_PADDING = 0.3
+    LABEL_BAND = 0.45
     MAX_ROW_WIDTH_BASE = 12.0
 
     # Tier characteristics for enhanced layout (11 tiers: 0-10)
@@ -314,9 +593,9 @@ def compute_layout_l1(
             # Tier 0: Edge/WAN
             (0, ["edge", "wan", "internet", "isp"]),
             # Tier 1: Security
-            (1, ["security", "firewall", "fw", "ids", "ips", "waf", "vpn"]),
+            (1, ["security", "firewall", "fw", "ids", "ips", "waf", "vpn", "soc"]),
             # Tier 2: DMZ
-            (2, ["dmz", "proxy"]),
+            (2, ["dmz", "proxy", "datacenter", "data center", "dc"]),
             # Tier 3: Core
             (3, ["core"]),
             # Tier 4: Distribution
@@ -332,7 +611,7 @@ def compute_layout_l1(
             # Tier 9: Project
             (9, ["project", "proj", "it"]),
             # Tier 10: Servers
-            (10, ["server", "servers", "storage", "nas", "dc", "data center", "datacenter"]),
+            (10, ["server", "servers", "storage", "nas", "monitor", "monitoring", "noc", "nms"]),
         ]
         for tier, keywords in tier_hints:
             if any(keyword in label for keyword in keywords):
@@ -345,7 +624,7 @@ def compute_layout_l1(
         dtype = normalize(getattr(device, "device_type", ""))
         tier_keywords = [
             (0, ["edge", "wan", "internet", "isp"]),
-            (1, ["firewall", "fw", "ids", "ips", "waf", "security", "vpn"]),
+            (1, ["firewall", "fw", "ids", "ips", "waf", "security", "vpn", "soc"]),
             (2, ["dmz", "proxy"]),
             (3, ["core"]),
             (4, ["distribution", "dist"]),
@@ -354,13 +633,17 @@ def compute_layout_l1(
             (7, ["office", "floor"]),
             (8, ["department", "dept"]),
             (9, ["project", "proj"]),
-            (10, ["server", "storage", "nas", "san", "datacenter", "dc"]),
+            (10, ["server", "storage", "nas", "san", "monitor", "monitoring", "noc", "nms"]),
         ]
         for tier, keywords in tier_keywords:
             if any(keyword in name for keyword in keywords):
                 return tier
+        if _is_distribution_switch(device):
+            return 4
         # Fallback by device_type
         if dtype == "firewall":
+            return 1
+        if dtype == "vpn":
             return 1
         if dtype == "router":
             return 0
@@ -445,9 +728,22 @@ def compute_layout_l1(
             return 0.0
         return max(area_meta[aid]["computed_height"] for aid in row)
 
+    def order_tiers(area_tiers: dict[int, list[str]]) -> list[int]:
+        ordered = sorted(area_tiers.keys())
+        if 10 in ordered:
+            ordered.remove(10)
+            if 2 in ordered:
+                insert_at = ordered.index(2) + 1
+            elif 1 in ordered:
+                insert_at = ordered.index(1) + 1
+            else:
+                insert_at = 0
+            ordered.insert(insert_at, 10)
+        return ordered
+
     def compute_macro_positions(area_tiers: dict[int, list[str]]) -> dict[str, tuple[float, float]]:
         positions: dict[str, tuple[float, float]] = {}
-        ordered_tiers = sorted(area_tiers.keys())
+        ordered_tiers = order_tiers(area_tiers)
 
         # Layout luôn là top-to-bottom (vertical) theo NS gốc
         current_y = 0.0
@@ -569,7 +865,10 @@ def compute_layout_l1(
         device_hint = min(device_tiers) if device_tiers else None
 
         if area_hint is not None and device_hint is not None:
-            tier = min(area_hint, device_hint)
+            if area_hint in {1, 2, 10}:
+                tier = area_hint
+            else:
+                tier = min(area_hint, device_hint)
         elif area_hint is not None:
             tier = area_hint
         elif device_hint is not None:
@@ -622,7 +921,7 @@ def compute_layout_l1(
         ordered.extend(remaining)
         return ordered
 
-    ordered_tiers = sorted(area_tiers.keys())
+    ordered_tiers = order_tiers(area_tiers)
     prev_tier_ids: list[str] = []
     for tier in ordered_tiers:
         area_ids = area_tiers[tier]
@@ -750,7 +1049,7 @@ def compute_layout_l2(
     GROUP_MIN_HEIGHT = 1.5
     GROUP_GAP = 0.5
     GROUP_PADDING = 0.15
-    LABEL_BAND = 0.35
+    LABEL_BAND = 0.45
 
     # Create VLAN mapping
     vlan_map = {seg.id: {"vlan_id": seg.vlan_id, "name": seg.name} for seg in l2_segments}
@@ -904,7 +1203,7 @@ def compute_layout_l3(
     GROUP_MIN_HEIGHT = 1.5
     GROUP_GAP = 0.5
     GROUP_PADDING = 0.15
-    LABEL_BAND = 0.35
+    LABEL_BAND = 0.45
     ROUTER_GAP = 1.0
 
     # Map device_id -> subnets

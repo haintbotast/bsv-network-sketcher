@@ -967,8 +967,8 @@ function computeAutoLayoutTuning() {
   const deviceCount = devices.value.length
   const density = Math.min(1, Math.max(0, (deviceCount - 20) / 60))
   // Layout luôn top-to-bottom, auto-tune layer_gap dựa trên density
-  const layer_gap = Number((0.5 + density * 0.7).toFixed(2))  // 0.5-1.2 inches
-  const node_spacing = Number((0.35 + density * 0.2).toFixed(2))  // 0.35-0.55 inches
+  const layer_gap = Number((0.9 + density * 1.0).toFixed(2))  // 0.9-1.9 inches
+  const node_spacing = Number((0.6 + density * 0.4).toFixed(2))  // 0.6-1.0 inches
   return { layer_gap, node_spacing }
 }
 
@@ -998,7 +998,8 @@ async function runAutoLayoutAuto(projectId: string, force = false) {
       group_by_area: hasAreas,
       layout_scope: 'project',
       anchor_routing: true,
-      overview_mode: 'l1-only'
+      overview_mode: 'l1-only',
+      normalize_topology: true
     })
     autoLayoutAutoAppliedProjects.add(projectId)
     await loadProjectData(projectId)

@@ -272,6 +272,7 @@ const visibleAreas = computed(() => {
 
       // L1 view: areas fully visible with clear borders (NS gốc style)
       const areaOpacity = 0.95
+      const areaFill = adjustHexLightness(area.fill, -0.06)
 
       const isSelected = props.selectedId === area.id
       return {
@@ -289,7 +290,7 @@ const visibleAreas = computed(() => {
           y: 0,
           width: rect.width,
           height: rect.height,
-          fill: area.fill,
+          fill: areaFill,
           opacity: areaOpacity,
           stroke: isSelected ? '#d66c3b' : 'transparent',
           strokeWidth: isSelected ? 2 : 0,
@@ -415,7 +416,7 @@ const ROLE_ORDER_SUB = ['access', 'endpoint']
 
 const DEVICE_COLORS: Array<{ match: (device: DeviceModel) => boolean; color: [number, number, number] }> = [
   { match: device => device.type === 'Router' || /RTR|ROUTER|ISP/i.test(device.name), color: [70, 130, 180] },
-  { match: device => device.type === 'Firewall' || /FW|FIREWALL/i.test(device.name), color: [220, 80, 80] },
+  { match: device => device.type === 'Firewall' || /FW|FIREWALL|VPN|SECURITY/i.test(device.name), color: [220, 80, 80] },
   { match: device => /CORE|SW-CORE/i.test(device.name), color: [34, 139, 34] },
   { match: device => /DIST|DISTR/i.test(device.name), color: [60, 179, 113] },
   { match: device => /ACC|ACCESS/i.test(device.name), color: [0, 139, 139] },
@@ -426,6 +427,16 @@ const DEVICE_COLORS: Array<{ match: (device: DeviceModel) => boolean; color: [nu
 
 function rgbToHex(rgb: [number, number, number]) {
   return `#${rgb.map(value => value.toString(16).padStart(2, '0')).join('')}`
+}
+
+function adjustHexLightness(hex: string, delta: number) {
+  const cleaned = hex.replace('#', '')
+  if (cleaned.length !== 6) return hex
+  const r = parseInt(cleaned.slice(0, 2), 16)
+  const g = parseInt(cleaned.slice(2, 4), 16)
+  const b = parseInt(cleaned.slice(4, 6), 16)
+  const adjust = (value: number) => Math.min(255, Math.max(0, Math.round(value + 255 * delta)))
+  return `#${[adjust(r), adjust(g), adjust(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`
 }
 
 function resolveDeviceFill(device: DeviceModel) {
@@ -675,11 +686,56 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
-const PORT_SLOTS = 12
-const PORT_EDGE_INSET = 4
+const PORT_EDGE_INSET = 6
 const PORT_LABEL_HEIGHT = 16
 const PORT_LABEL_PADDING = 8
-const PORT_LABEL_OFFSET = 6
+const PORT_LABEL_OFFSET = 10
+const BUNDLE_GAP = 14
+const BUNDLE_STUB = 14
+const AREA_CLEARANCE = 14
+const AREA_ANCHOR_OFFSET = 12
+const LABEL_SCALE_MIN = 0.6
+const LABEL_SCALE_MAX = 1.15
+
+const PORT_FAMILY_ORDER = [
+  'TE', 'TEN', 'GI', 'GE', 'FA', 'ETH', 'ET', 'MGMT', 'MG', 'PO', 'PORT-CHANNEL',
+  'VL', 'VLAN', 'LO', 'LOOPBACK'
+]
+
+function normalizePortName(portName: string) {
+  return portName.trim()
+}
+
+function parsePortName(portName?: string) {
+  if (!portName) return null
+  const text = normalizePortName(portName)
+  const match = text.match(/^([A-Za-z-]+)\s*(.*)$/)
+  if (!match) return { family: text.toUpperCase(), nums: [] }
+  const family = match[1].toUpperCase()
+  const nums = match[2]
+    .split(/[\/\s]+/)
+    .map(part => Number.parseInt(part, 10))
+    .filter(n => !Number.isNaN(n))
+  return { family, nums }
+}
+
+function comparePorts(a: string, b: string) {
+  const pa = parsePortName(a)
+  const pb = parsePortName(b)
+  if (!pa || !pb) return a.localeCompare(b)
+  const rankA = PORT_FAMILY_ORDER.indexOf(pa.family)
+  const rankB = PORT_FAMILY_ORDER.indexOf(pb.family)
+  const orderA = rankA === -1 ? PORT_FAMILY_ORDER.length : rankA
+  const orderB = rankB === -1 ? PORT_FAMILY_ORDER.length : rankB
+  if (orderA !== orderB) return orderA - orderB
+  const len = Math.max(pa.nums.length, pb.nums.length)
+  for (let i = 0; i < len; i += 1) {
+    const va = pa.nums[i] ?? -1
+    const vb = pb.nums[i] ?? -1
+    if (va !== vb) return va - vb
+  }
+  return a.localeCompare(b)
+}
 
 function extractPortIndex(portName?: string) {
   if (!portName) return null
@@ -688,14 +744,7 @@ function extractPortIndex(portName?: string) {
   return Number.parseInt(match[1], 10)
 }
 
-function portRatio(portName?: string) {
-  const index = extractPortIndex(portName)
-  if (index == null || Number.isNaN(index)) return 0.5
-  const slot = index % PORT_SLOTS
-  return (slot + 0.5) / PORT_SLOTS
-}
-
-function computePortAnchor(
+function computePortAnchorFallback(
   rect: { x: number; y: number; width: number; height: number },
   target: { x: number; y: number },
   portName?: string
@@ -703,7 +752,8 @@ function computePortAnchor(
   const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
   const dx = target.x - center.x
   const dy = target.y - center.y
-  const ratio = portRatio(portName)
+  const index = extractPortIndex(portName)
+  const ratio = index == null || Number.isNaN(index) ? 0.5 : ((index % 12) + 0.5) / 12
   if (Math.abs(dx) >= Math.abs(dy)) {
     const x = dx >= 0 ? rect.x + rect.width : rect.x
     const y = rect.y + PORT_EDGE_INSET + (rect.height - PORT_EDGE_INSET * 2) * ratio
@@ -714,38 +764,329 @@ function computePortAnchor(
   return { x, y }
 }
 
+function computeSide(
+  rect: { x: number; y: number; width: number; height: number },
+  target: { x: number; y: number }
+) {
+  const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+  const dx = target.x - center.x
+  const dy = target.y - center.y
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? 'right' : 'left'
+  }
+  return dy >= 0 ? 'bottom' : 'top'
+}
+
+const devicePortList = computed(() => {
+  const map = new Map<string, string[]>()
+  const addPort = (deviceId?: string | null, port?: string | null) => {
+    if (!deviceId || !port) return
+    const list = map.get(deviceId) || []
+    if (!list.includes(port)) list.push(port)
+    map.set(deviceId, list)
+  }
+
+  const isL1 = (props.viewMode || 'L1') === 'L1'
+  props.links.forEach(link => {
+    addPort(link.fromDeviceId, link.fromPort)
+    addPort(link.toDeviceId, link.toPort)
+  })
+
+  if (!isL1) {
+    props.l2Assignments?.forEach(assign => {
+      addPort(assign.device_id, assign.interface_name)
+    })
+  }
+
+  map.forEach((ports, deviceId) => {
+    ports.sort(comparePorts)
+    map.set(deviceId, ports)
+  })
+  return map
+})
+
+const devicePortOrder = computed(() => {
+  const map = new Map<string, Map<string, number>>()
+  devicePortList.value.forEach((ports, deviceId) => {
+    const order = new Map<string, number>()
+    ports.forEach((port, index) => {
+      order.set(port, index)
+    })
+    map.set(deviceId, order)
+  })
+  return map
+})
+
+const devicePortNeighbors = computed(() => {
+  const map = new Map<string, Map<string, { xSum: number; ySum: number; count: number }>>()
+
+  const add = (deviceId: string, port: string, neighbor: { x: number; y: number }) => {
+    const deviceMap = map.get(deviceId) || new Map<string, { xSum: number; ySum: number; count: number }>()
+    const entry = deviceMap.get(port) || { xSum: 0, ySum: 0, count: 0 }
+    entry.xSum += neighbor.x
+    entry.ySum += neighbor.y
+    entry.count += 1
+    deviceMap.set(port, entry)
+    map.set(deviceId, deviceMap)
+  }
+
+  props.links.forEach(link => {
+    const fromRect = deviceViewMap.value.get(link.fromDeviceId)
+    const toRect = deviceViewMap.value.get(link.toDeviceId)
+    if (!fromRect || !toRect) return
+    const fromCenter = { x: fromRect.x + fromRect.width / 2, y: fromRect.y + fromRect.height / 2 }
+    const toCenter = { x: toRect.x + toRect.width / 2, y: toRect.y + toRect.height / 2 }
+    if (link.fromPort) add(link.fromDeviceId, link.fromPort, toCenter)
+    if (link.toPort) add(link.toDeviceId, link.toPort, fromCenter)
+  })
+
+  return map
+})
+
+const devicePortSideMap = computed(() => {
+  const map = new Map<string, Map<string, Record<string, number>>>()
+
+  const bump = (deviceId: string, port: string, side: string) => {
+    const deviceMap = map.get(deviceId) || new Map<string, Record<string, number>>()
+    const record = deviceMap.get(port) || { left: 0, right: 0, top: 0, bottom: 0 }
+    record[side] = (record[side] || 0) + 1
+    deviceMap.set(port, record)
+    map.set(deviceId, deviceMap)
+  }
+
+  props.links.forEach(link => {
+    const fromRect = deviceViewMap.value.get(link.fromDeviceId)
+    const toRect = deviceViewMap.value.get(link.toDeviceId)
+    if (!fromRect || !toRect) return
+    const fromSide = computeSide(fromRect, { x: toRect.x + toRect.width / 2, y: toRect.y + toRect.height / 2 })
+    const toSide = computeSide(toRect, { x: fromRect.x + fromRect.width / 2, y: fromRect.y + fromRect.height / 2 })
+    if (link.fromPort) bump(link.fromDeviceId, link.fromPort, fromSide)
+    if (link.toPort) bump(link.toDeviceId, link.toPort, toSide)
+  })
+
+  const resolved = new Map<string, Map<string, string>>()
+  map.forEach((portVotes, deviceId) => {
+    const portSide = new Map<string, string>()
+    portVotes.forEach((votes, port) => {
+      const entries = Object.entries(votes) as Array<[string, number]>
+      entries.sort((a, b) => b[1] - a[1])
+      portSide.set(port, entries[0]?.[0] || 'right')
+    })
+    resolved.set(deviceId, portSide)
+  })
+  return resolved
+})
+
+const devicePortAnchors = computed(() => {
+  const map = new Map<string, Map<string, { x: number; y: number; side: string }>>()
+
+  devicePortList.value.forEach((ports, deviceId) => {
+    const rect = deviceViewMap.value.get(deviceId)
+    if (!rect || ports.length === 0) return
+    const sideMap = devicePortSideMap.value.get(deviceId) || new Map<string, string>()
+    const orderMap = devicePortOrder.value.get(deviceId) || new Map<string, number>()
+    const neighborMap = devicePortNeighbors.value.get(deviceId) || new Map<string, { xSum: number; ySum: number; count: number }>()
+    const buckets: Record<string, string[]> = { left: [], right: [], top: [], bottom: [] }
+
+    ports.forEach(port => {
+      const side = sideMap.get(port) || 'right'
+      buckets[side].push(port)
+    })
+
+    const anchors = new Map<string, { x: number; y: number; side: string }>()
+    ;(['left', 'right'] as const).forEach(side => {
+      const list = buckets[side]
+      const count = list.length
+      if (!count) return
+      list.sort((a, b) => {
+        const na = neighborMap.get(a)
+        const nb = neighborMap.get(b)
+        const ay = na ? na.ySum / na.count : rect.y + rect.height / 2
+        const by = nb ? nb.ySum / nb.count : rect.y + rect.height / 2
+        if (ay !== by) return ay - by
+        return (orderMap.get(a) ?? 0) - (orderMap.get(b) ?? 0)
+      })
+      const spacing = (rect.height - PORT_EDGE_INSET * 2) / (count + 1)
+      list.forEach((port, index) => {
+        const y = rect.y + PORT_EDGE_INSET + spacing * (index + 1)
+        const x = side === 'left' ? rect.x : rect.x + rect.width
+        anchors.set(port, { x, y, side })
+      })
+    })
+    ;(['top', 'bottom'] as const).forEach(side => {
+      const list = buckets[side]
+      const count = list.length
+      if (!count) return
+      list.sort((a, b) => {
+        const na = neighborMap.get(a)
+        const nb = neighborMap.get(b)
+        const ax = na ? na.xSum / na.count : rect.x + rect.width / 2
+        const bx = nb ? nb.xSum / nb.count : rect.x + rect.width / 2
+        if (ax !== bx) return ax - bx
+        return (orderMap.get(a) ?? 0) - (orderMap.get(b) ?? 0)
+      })
+      const spacing = (rect.width - PORT_EDGE_INSET * 2) / (count + 1)
+      list.forEach((port, index) => {
+        const x = rect.x + PORT_EDGE_INSET + spacing * (index + 1)
+        const y = side === 'top' ? rect.y : rect.y + rect.height
+        anchors.set(port, { x, y, side })
+      })
+    })
+
+    map.set(deviceId, anchors)
+  })
+
+  return map
+})
+
+function resolvePortAnchor(
+  deviceId: string,
+  rect: { x: number; y: number; width: number; height: number },
+  target: { x: number; y: number },
+  portName?: string
+) {
+  if (portName) {
+    const anchors = devicePortAnchors.value.get(deviceId)
+    const anchor = anchors?.get(portName)
+    if (anchor) return anchor
+  }
+  return { ...computePortAnchorFallback(rect, target, portName), side: computeSide(rect, target) }
+}
+
 function computePortLabelPlacement(
   anchor: { x: number; y: number },
   center: { x: number; y: number },
-  textWidth: number
+  textWidth: number,
+  labelHeight: number,
+  labelOffset: number
 ) {
   const dx = anchor.x - center.x
   const dy = anchor.y - center.y
   if (Math.abs(dx) >= Math.abs(dy)) {
-    const x = dx >= 0 ? anchor.x + PORT_LABEL_OFFSET : anchor.x - textWidth - PORT_LABEL_OFFSET
-    const y = anchor.y - PORT_LABEL_HEIGHT / 2
+    const x = dx >= 0 ? anchor.x + labelOffset : anchor.x - textWidth - labelOffset
+    const y = anchor.y - labelHeight / 2
     return { x, y }
   }
   const x = anchor.x - textWidth / 2
-  const y = dy >= 0 ? anchor.y + PORT_LABEL_OFFSET : anchor.y - PORT_LABEL_HEIGHT - PORT_LABEL_OFFSET
+  const y = dy >= 0 ? anchor.y + labelOffset : anchor.y - labelHeight - labelOffset
   return { x, y }
 }
+
+function normalizeVector(dx: number, dy: number) {
+  const len = Math.hypot(dx, dy)
+  if (!len) return { x: 0, y: 0 }
+  return { x: dx / len, y: dy / len }
+}
+
+function pointInRect(
+  point: { x: number; y: number },
+  rect: { x: number; y: number; width: number; height: number },
+  margin = 0
+) {
+  return (
+    point.x >= rect.x - margin &&
+    point.x <= rect.x + rect.width + margin &&
+    point.y >= rect.y - margin &&
+    point.y <= rect.y + rect.height + margin
+  )
+}
+
+function segmentIntersectsRect(
+  p1: { x: number; y: number },
+  p2: { x: number; y: number },
+  rect: { x: number; y: number; width: number; height: number },
+  margin = 0
+) {
+  if (pointInRect(p1, rect, margin) || pointInRect(p2, rect, margin)) return true
+
+  const left = rect.x - margin
+  const right = rect.x + rect.width + margin
+  const top = rect.y - margin
+  const bottom = rect.y + rect.height + margin
+
+  const edges = [
+    [{ x: left, y: top }, { x: right, y: top }],
+    [{ x: right, y: top }, { x: right, y: bottom }],
+    [{ x: right, y: bottom }, { x: left, y: bottom }],
+    [{ x: left, y: bottom }, { x: left, y: top }]
+  ]
+
+  const ccw = (a: any, b: any, c: any) => (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x)
+  const intersects = (a: any, b: any, c: any, d: any) => ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d)
+
+  return edges.some(([a, b]) => intersects(p1, p2, a, b))
+}
+
+const linkBundleIndex = computed(() => {
+  const map = new Map<string, { index: number; total: number }>()
+  const grouped = new Map<string, string[]>()
+
+  const linkKey = (link: LinkModel) => {
+    const from = link.fromDeviceId
+    const to = link.toDeviceId
+    return from < to ? `${from}|${to}` : `${to}|${from}`
+  }
+
+  props.links.forEach(link => {
+    const key = linkKey(link)
+    const list = grouped.get(key) || []
+    list.push(link.id)
+    grouped.set(key, list)
+  })
+
+  grouped.forEach(list => {
+    list.sort()
+    list.forEach((id, idx) => {
+      map.set(id, { index: idx, total: list.length })
+    })
+  })
+  return map
+})
+
+const areaBundleIndex = computed(() => {
+  const map = new Map<string, { index: number; total: number }>()
+  const grouped = new Map<string, string[]>()
+
+  const areaKey = (fromArea: string, toArea: string) =>
+    fromArea < toArea ? `${fromArea}|${toArea}` : `${toArea}|${fromArea}`
+
+  props.links.forEach(link => {
+    const fromArea = deviceAreaMap.value.get(link.fromDeviceId)
+    const toArea = deviceAreaMap.value.get(link.toDeviceId)
+    if (!fromArea || !toArea || fromArea === toArea) return
+    const key = areaKey(fromArea, toArea)
+    const list = grouped.get(key) || []
+    list.push(link.id)
+    grouped.set(key, list)
+  })
+
+  grouped.forEach(list => {
+    list.sort()
+    list.forEach((id, idx) => {
+      map.set(id, { index: idx, total: list.length })
+    })
+  })
+
+  return map
+})
 
 function computeAreaAnchor(
   areaRect: { x: number; y: number; width: number; height: number },
   fromPoint: { x: number; y: number },
-  targetPoint: { x: number; y: number }
+  targetPoint: { x: number; y: number },
+  shift = 0,
+  edgeOffset = 0
 ) {
   const dx = targetPoint.x - fromPoint.x
   const dy = targetPoint.y - fromPoint.y
-  const inset = 6
+  const inset = 12
   if (Math.abs(dx) >= Math.abs(dy)) {
-    const x = dx >= 0 ? areaRect.x + areaRect.width : areaRect.x
-    const y = clamp(fromPoint.y, areaRect.y + inset, areaRect.y + areaRect.height - inset)
+    const x = dx >= 0 ? areaRect.x + areaRect.width + edgeOffset : areaRect.x - edgeOffset
+    const y = clamp(fromPoint.y + shift, areaRect.y + inset, areaRect.y + areaRect.height - inset)
     return { x, y }
   }
-  const y = dy >= 0 ? areaRect.y + areaRect.height : areaRect.y
-  const x = clamp(fromPoint.x, areaRect.x + inset, areaRect.x + areaRect.width - inset)
+  const y = dy >= 0 ? areaRect.y + areaRect.height + edgeOffset : areaRect.y - edgeOffset
+  const x = clamp(fromPoint.x + shift, areaRect.x + inset, areaRect.x + areaRect.width - inset)
   return { x, y }
 }
 
@@ -757,30 +1098,44 @@ const visibleLinks = computed(() => {
       if (!fromView || !toView) return null
       const fromCenter = { x: fromView.x + fromView.width / 2, y: fromView.y + fromView.height / 2 }
       const toCenter = { x: toView.x + toView.width / 2, y: toView.y + toView.height / 2 }
-      const fromAnchor = computePortAnchor(fromView, toCenter, link.fromPort)
-      const toAnchor = computePortAnchor(toView, fromCenter, link.toPort)
+      const fromAnchor = resolvePortAnchor(link.fromDeviceId, fromView, toCenter, link.fromPort)
+      const toAnchor = resolvePortAnchor(link.toDeviceId, toView, fromCenter, link.toPort)
       const fromAreaId = deviceAreaMap.value.get(link.fromDeviceId)
       const toAreaId = deviceAreaMap.value.get(link.toDeviceId)
       const fromArea = fromAreaId ? areaViewMap.value.get(fromAreaId) : null
       const toArea = toAreaId ? areaViewMap.value.get(toAreaId) : null
 
       let points: number[] = []
+      const isL1 = (props.viewMode || 'L1') === 'L1'
+      const bundle = linkBundleIndex.value.get(link.id)
+      const areaBundle = areaBundleIndex.value.get(link.id)
+      const scale = clamp(props.viewport.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
+      const bundleOffset = bundle && bundle.total > 1
+        ? (bundle.index - (bundle.total - 1) / 2) * (BUNDLE_GAP * scale)
+        : 0
+      const areaBundleOffset = areaBundle && areaBundle.total > 1
+        ? (areaBundle.index - (areaBundle.total - 1) / 2) * (BUNDLE_GAP * scale)
+        : 0
+      const interBundleOffset = areaBundleOffset + bundleOffset * 0.5
+      const bundleStub = BUNDLE_STUB * scale
+      const anchorOffset = AREA_ANCHOR_OFFSET * scale
 
       // Orthogonal routing for all links (NS gốc style)
       if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
         // Inter-area links: use corridor routing
-        const fromAreaAnchor = computeAreaAnchor(fromArea, fromAnchor, toAnchor)
-        const toAreaAnchor = computeAreaAnchor(toArea, toAnchor, fromAnchor)
+        const fromAreaAnchor = computeAreaAnchor(fromArea, fromAnchor, toAnchor, interBundleOffset, anchorOffset)
+        const toAreaAnchor = computeAreaAnchor(toArea, toAnchor, fromAnchor, interBundleOffset, anchorOffset)
         const bounds = areaBounds.value
         if (bounds) {
-          const corridorGap = 24
+          const corridorGap = 32 + Math.abs(interBundleOffset)
           const dx = toAnchor.x - fromAnchor.x
           const dy = toAnchor.y - fromAnchor.y
           if (Math.abs(dx) >= Math.abs(dy)) {
             const topY = bounds.minY - corridorGap
             const bottomY = bounds.maxY + corridorGap
             const midY = (fromAnchor.y + toAnchor.y) / 2
-            const corridorY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
+            const corridorBaseY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
+            const corridorY = corridorBaseY + interBundleOffset
             points = [
               fromAnchor.x, fromAnchor.y,
               fromAreaAnchor.x, fromAreaAnchor.y,
@@ -793,7 +1148,8 @@ const visibleLinks = computed(() => {
             const leftX = bounds.minX - corridorGap
             const rightX = bounds.maxX + corridorGap
             const midX = (fromAnchor.x + toAnchor.x) / 2
-            const corridorX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
+            const corridorBaseX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
+            const corridorX = corridorBaseX + interBundleOffset
             points = [
               fromAnchor.x, fromAnchor.y,
               fromAreaAnchor.x, fromAreaAnchor.y,
@@ -804,7 +1160,7 @@ const visibleLinks = computed(() => {
             ]
           }
         } else {
-          const midX = (fromAnchor.x + toAnchor.x) / 2
+          const midX = (fromAnchor.x + toAnchor.x) / 2 + interBundleOffset
           points = [
             fromAnchor.x, fromAnchor.y,
             fromAreaAnchor.x, fromAreaAnchor.y,
@@ -813,6 +1169,54 @@ const visibleLinks = computed(() => {
             toAreaAnchor.x, toAreaAnchor.y,
             toAnchor.x, toAnchor.y
           ]
+        }
+      } else if (isL1) {
+        // L1 intra-area: shortest straight segment between ports, bundle if needed
+        const dx = toAnchor.x - fromAnchor.x
+        const dy = toAnchor.y - fromAnchor.y
+        const dir = normalizeVector(dx, dy)
+        const perp = normalizeVector(-dir.y, dir.x)
+        if (bundleOffset !== 0 && (dir.x !== 0 || dir.y !== 0)) {
+          const fromStub = { x: fromAnchor.x + dir.x * bundleStub, y: fromAnchor.y + dir.y * bundleStub }
+          const toStub = { x: toAnchor.x - dir.x * bundleStub, y: toAnchor.y - dir.y * bundleStub }
+          const fromShift = { x: fromStub.x + perp.x * bundleOffset, y: fromStub.y + perp.y * bundleOffset }
+          const toShift = { x: toStub.x + perp.x * bundleOffset, y: toStub.y + perp.y * bundleOffset }
+          points = [
+            fromAnchor.x, fromAnchor.y,
+            fromShift.x, fromShift.y,
+            toShift.x, toShift.y,
+            toAnchor.x, toAnchor.y
+          ]
+        } else {
+          points = [fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y]
+        }
+
+        if (bundleOffset === 0) {
+          const blockedAreas = []
+          areaViewMap.value.forEach((rect, areaId) => {
+            if (areaId === fromAreaId || areaId === toAreaId) return
+            if (segmentIntersectsRect({ x: fromAnchor.x, y: fromAnchor.y }, { x: toAnchor.x, y: toAnchor.y }, rect, AREA_CLEARANCE)) {
+              blockedAreas.push(rect)
+            }
+          })
+          if (blockedAreas.length) {
+            const midA = { x: fromAnchor.x, y: toAnchor.y }
+            const midB = { x: toAnchor.x, y: fromAnchor.y }
+            const score = (a: { x: number; y: number }) => {
+              let hits = 0
+              areaViewMap.value.forEach((rect, areaId) => {
+                if (areaId === fromAreaId || areaId === toAreaId) return
+                if (segmentIntersectsRect(fromAnchor, a, rect, AREA_CLEARANCE)) hits += 1
+                if (segmentIntersectsRect(a, toAnchor, rect, AREA_CLEARANCE)) hits += 1
+              })
+              const length = Math.hypot(a.x - fromAnchor.x, a.y - fromAnchor.y) + Math.hypot(toAnchor.x - a.x, toAnchor.y - a.y)
+              return hits * 10000 + length
+            }
+            const scoreA = score(midA)
+            const scoreB = score(midB)
+            const mid = scoreA <= scoreB ? midA : midB
+            points = [fromAnchor.x, fromAnchor.y, mid.x, mid.y, toAnchor.x, toAnchor.y]
+          }
         }
       } else {
         // Intra-area links: orthogonal (Manhattan) routing
@@ -865,13 +1269,38 @@ const visibleLinks = computed(() => {
 const linkPortLabels = computed(() => {
   if ((props.viewMode || 'L1') !== 'L1') return []
   const linkMap = new Map(visibleLinks.value.map(link => [link.id, link]))
+  const labelScale = clamp(props.viewport.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
+  const labelHeight = PORT_LABEL_HEIGHT * labelScale
+  const labelPadding = PORT_LABEL_PADDING * labelScale
+  const labelOffset = PORT_LABEL_OFFSET * labelScale
+  const fontSize = 10 * labelScale
+  const textPadX = 4 * labelScale
+  const textPadY = 2 * labelScale
+  const minLabelWidth = 24 * labelScale
+  const charWidth = 6 * labelScale
 
-  const labels: Array<{
+  const rawLabels: Array<{
     id: string
-    group: { x: number; y: number }
-    bg: { x: number; y: number; width: number; height: number; fill: string; cornerRadius: number; opacity: number; shadowColor: string; shadowBlur: number; shadowOffset: { x: number; y: number }; shadowOpacity: number }
-    text: { x: number; y: number; text: string; fontSize: number; fill: string }
+    deviceId: string
+    areaId: string | null
+    side: string
+    width: number
+    height: number
+    text: string
+    angle: number
+    center: { x: number; y: number }
+    rect: { x: number; y: number; width: number; height: number }
+    fontSize: number
+    textPadX: number
+    textPadY: number
   }> = []
+
+  const computeAngle = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+    const angle = Math.atan2(to.y - from.y, to.x - from.x) * (180 / Math.PI)
+    if (angle > 90) return angle - 180
+    if (angle < -90) return angle + 180
+    return angle
+  }
 
   props.links.forEach(link => {
     const entry = linkMap.get(link.id)
@@ -883,43 +1312,176 @@ const linkPortLabels = computed(() => {
     const placeLabel = (
       id: string,
       text: string,
-      anchor: { x: number; y: number },
-      center: { x: number; y: number }
+      anchor: { x: number; y: number; side?: string },
+      center: { x: number; y: number },
+      neighbor: { x: number; y: number },
+      deviceId: string,
+      deviceRect: { x: number; y: number; width: number; height: number }
     ) => {
       if (!text) return
-      const width = Math.max(text.length * 6 + PORT_LABEL_PADDING, 24)
-      const pos = computePortLabelPlacement(anchor, center, width)
-      labels.push({
+      const width = Math.max(text.length * charWidth + labelPadding, minLabelWidth)
+      const pos = computePortLabelPlacement(anchor, center, width, labelHeight, labelOffset)
+      const angle = computeAngle(anchor, neighbor)
+      rawLabels.push({
         id,
-        group: { x: pos.x, y: pos.y },
-        bg: {
-          x: 0,
-          y: 0,
-          width,
-          height: PORT_LABEL_HEIGHT,
-          fill: '#ffffff',
-          cornerRadius: 4,
-          opacity: 0.92,
-          shadowColor: 'rgba(0, 0, 0, 0.2)',
-          shadowBlur: 4,
-          shadowOffset: { x: 0, y: 2 },
-          shadowOpacity: 0.2
-        },
-        text: {
-          x: 4,
-          y: 2,
-          text,
-          fontSize: 10,
-          fill: '#2b2a28'
-        }
+        deviceId,
+        areaId: deviceAreaMap.value.get(deviceId) || null,
+        side: anchor.side || computeSide(deviceRect, neighbor),
+        width,
+        height: labelHeight,
+        text,
+        angle,
+        center: { x: pos.x + width / 2, y: pos.y + labelHeight / 2 },
+        rect: deviceRect,
+        fontSize,
+        textPadX,
+        textPadY
       })
     }
 
-    if (fromText) placeLabel(`${link.id}-from`, fromText, entry.fromAnchor, entry.fromCenter)
-    if (toText) placeLabel(`${link.id}-to`, toText, entry.toAnchor, entry.toCenter)
+    const fromNeighbor = entry.points.length >= 4
+      ? { x: entry.points[2], y: entry.points[3] }
+      : entry.toAnchor
+    const toNeighbor = entry.points.length >= 4
+      ? { x: entry.points[entry.points.length - 4], y: entry.points[entry.points.length - 3] }
+      : entry.fromAnchor
+
+    const fromRect = deviceViewMap.value.get(link.fromDeviceId)
+    const toRect = deviceViewMap.value.get(link.toDeviceId)
+    if (fromRect && fromText) {
+      placeLabel(
+        `${link.id}-from`,
+        fromText,
+        entry.fromAnchor,
+        entry.fromCenter,
+        fromNeighbor,
+        link.fromDeviceId,
+        fromRect
+      )
+    }
+    if (toRect && toText) {
+      placeLabel(
+        `${link.id}-to`,
+        toText,
+        entry.toAnchor,
+        entry.toCenter,
+        toNeighbor,
+        link.toDeviceId,
+        toRect
+      )
+    }
   })
 
-  return labels
+  const bySide = new Map<string, typeof rawLabels>()
+  rawLabels.forEach(label => {
+    const key = `${label.deviceId}-${label.side}`
+    const list = bySide.get(key) || []
+    list.push(label)
+    bySide.set(key, list)
+  })
+
+  bySide.forEach(list => {
+    if (!list.length) return
+    const side = list[0].side
+    if (side === 'left' || side === 'right') {
+      list.sort((a, b) => a.center.y - b.center.y)
+      let cursor = list[0].center.y
+      let prev = list[0]
+      list.forEach((label, idx) => {
+        if (idx === 0) return
+        const minGap = (prev.height + label.height) / 2 + 4 * labelScale
+        if (label.center.y < cursor + minGap) {
+          label.center.y = cursor + minGap
+        }
+        cursor = label.center.y
+        prev = label
+      })
+    } else {
+      list.sort((a, b) => a.center.x - b.center.x)
+      let cursor = list[0].center.x
+      let prev = list[0]
+      list.forEach((label, idx) => {
+        if (idx === 0) return
+        const minGap = (prev.width + label.width) / 2 + 6 * labelScale
+        if (label.center.x < cursor + minGap) {
+          label.center.x = cursor + minGap
+        }
+        cursor = label.center.x
+        prev = label
+      })
+    }
+  })
+
+  const byAreaSide = new Map<string, typeof rawLabels>()
+  rawLabels.forEach(label => {
+    const key = `${label.areaId ?? 'global'}-${label.side}`
+    const list = byAreaSide.get(key) || []
+    list.push(label)
+    byAreaSide.set(key, list)
+  })
+
+  byAreaSide.forEach(list => {
+    if (!list.length) return
+    const side = list[0].side
+    if (side === 'left' || side === 'right') {
+      list.sort((a, b) => a.center.y - b.center.y)
+      let cursor = list[0].center.y
+      let prev = list[0]
+      list.forEach((label, idx) => {
+        if (idx === 0) return
+        const minGap = (prev.height + label.height) / 2 + 4 * labelScale
+        if (label.center.y < cursor + minGap) {
+          label.center.y = cursor + minGap
+        }
+        cursor = label.center.y
+        prev = label
+      })
+    } else {
+      list.sort((a, b) => a.center.x - b.center.x)
+      let cursor = list[0].center.x
+      let prev = list[0]
+      list.forEach((label, idx) => {
+        if (idx === 0) return
+        const minGap = (prev.width + label.width) / 2 + 6 * labelScale
+        if (label.center.x < cursor + minGap) {
+          label.center.x = cursor + minGap
+        }
+        cursor = label.center.x
+        prev = label
+      })
+    }
+  })
+
+  return rawLabels.map(label => ({
+    id: label.id,
+    group: {
+      x: label.center.x,
+      y: label.center.y,
+      rotation: label.angle,
+      offsetX: label.width / 2,
+      offsetY: label.height / 2
+    },
+    bg: {
+      x: 0,
+      y: 0,
+      width: label.width,
+      height: label.height,
+      fill: '#ffffff',
+      cornerRadius: 4 * labelScale,
+      opacity: 0.92,
+      shadowColor: 'rgba(0, 0, 0, 0.2)',
+      shadowBlur: 4 * labelScale,
+      shadowOffset: { x: 0, y: 2 },
+      shadowOpacity: 0.2
+    },
+    text: {
+      x: label.textPadX,
+      y: label.textPadY,
+      text: label.text,
+      fontSize: label.fontSize,
+      fill: '#2b2a28'
+    }
+  }))
 })
 
 // L2 Labels - VLAN info on devices

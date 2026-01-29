@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.1
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-01-27
+> **Cập nhật:** 2026-01-29
 > **Nguồn:** Trích từ `WEB_APP_DEVELOPMENT_PLAN.md`.
 
 Section này cung cấp mapping chi tiết giữa source code gốc của Network Sketcher và các component tương ứng trong Web App, **chỉ để tham chiếu** logic nghiệp vụ.
@@ -36,6 +36,9 @@ https://github.com/cisco-open/network-sketcher
   - Tier 5-6: Sites (Campus, Branch)
   - Tier 7-9: Local (Office, Department, Project)
   - Tier 10: Servers/Storage
+- **Bổ sung cho web app:** Monitor/NOC/NMS thuộc **Tier 10**; VPN Gateway được biểu diễn như **Firewall** (màu/role Security).
+- **Bổ sung cho web app:** Area Server/Monitor được **xếp ngay dưới DMZ** (để gần khối Security/DMZ theo thực tế triển khai).
+- **Bổ sung cho web app:** Area Data Center gom **Edge/Security/DMZ/Core/Distribution** trong một khối khi có yêu cầu nghiệp vụ.
 - Mỗi tier có **width factor** và **max areas per row** riêng để tối ưu bố cục.
 - Default tier: **7 (Office)** - phổ biến nhất cho các area không xác định được.
 - Overview mặc định **chỉ L1/flow** để giữ sạch bố cục; L2/L3 chỉ hiển thị ở view riêng.

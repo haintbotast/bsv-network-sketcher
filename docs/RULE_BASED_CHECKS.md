@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-27  
+> **Cập nhật:** 2026-01-29  
 > **Mục tiêu:** Định nghĩa các kiểm tra tối thiểu thay cho golden files, đảm bảo đúng logic và không vỡ bố cục.
 
 ---
@@ -51,6 +51,11 @@
 - **RB-005:** L3 address chỉ gán lên interface tồn tại.
 - **RB-006:** Không được thay đổi số lượng node/link so với input sau layout.
 - **RB-007:** Liên kết khác Area bắt buộc đi qua Waypoint area (đuôi `_wp_`).
+- **RB-008:** Endpoint **không được** kết nối trực tiếp lên **Distribution/Core**; phải đi qua Access.
+- **RB-009:** VPN Gateway là chức năng Firewall → device phải được nhận diện như Firewall (device_type hoặc tên).
+- **RB-010:** Thiết bị Server/NAS/Storage/Server Switch phải nằm trong **Area Server/Monitor** (không nằm trong Project/Office/IT).
+- **RB-011:** Access Switch phải nằm trong **Area nghiệp vụ** (Head Office/Department/Project/IT), không thuộc area Access riêng.
+- **RB-012:** Server chỉ được kết nối lên **Server Distribution Switch**.
 
 ---
 
@@ -79,6 +84,8 @@
 - **RB-202:** Nếu `custom` thiếu tham số bố cục, fallback ISO và sinh WARN.
 - **RB-203:** Bố cục thiết bị trong Area tuân theo top‑to‑bottom tier (Core/Dist → Access → Endpoints).
 - **RB-204:** Overview (nếu bật) chỉ hiển thị L1/flow (không render nhãn L2/L3).
+- **RB-205:** Nếu có **Area Data Center**, các thiết bị Edge/Security/DMZ/Core/Distribution phải nằm trong area này (cảnh báo nếu nằm ngoài).
+- **RB-206:** Area Server/Monitor ưu tiên đặt **cùng hàng hoặc ngay dưới DMZ** (cảnh báo nếu thấp hơn quá 1 tier).
 
 ---
 

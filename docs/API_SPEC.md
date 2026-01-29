@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.1
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-01-27
+> **Cập nhật:** 2026-01-29
 > **Mục tiêu:** Đặc tả API phục vụ nhập liệu trực tiếp, quản lý dự án và xuất dữ liệu.
 
 ---
@@ -105,7 +105,8 @@ POST /projects/{project_id}/invalidate-layout-cache
   "group_by_area": true,
   "layout_scope": "project|area",
   "anchor_routing": true,
-  "overview_mode": "l1-only"
+  "overview_mode": "l1-only",
+  "normalize_topology": false
 }
 ```
 
@@ -121,6 +122,7 @@ POST /projects/{project_id}/invalidate-layout-cache
 **Ghi chú:**
 - `group_by_area=true` là mặc định theo AI Context: layout 2 tầng (macro Area + micro Device).
 - `overview_mode="l1-only"` để tránh đè nhãn L2/L3 trong overview.
+- `normalize_topology=true` sẽ tự tạo Area Data Center/Server/Monitor (nếu thiếu) và chuyển device theo quy ước (Access vào area nghiệp vụ, Server về Server, Edge/Security/DMZ/Core/Dist vào Data Center).
 
 ---
 
@@ -176,7 +178,7 @@ POST /projects/{id}/import
 
 - `AREA_NAME_DUP`, `AREA_GRID_INVALID`, `AREA_SIZE_INVALID`
 - `DEVICE_NAME_DUP`, `DEVICE_TYPE_INVALID`, `DEVICE_SIZE_INVALID`, `AREA_NOT_FOUND`
-- `DEVICE_NOT_FOUND`, `PORT_FORMAT_INVALID`, `L1_LINK_DUP`
+- `DEVICE_NOT_FOUND`, `PORT_FORMAT_INVALID`, `L1_LINK_DUP`, `ENDPOINT_UPLINK_INVALID`, `SERVER_UPLINK_INVALID`
 - `PORT_CHANNEL_MEMBERS_INVALID`
 - `PORT_CHANNEL_MEMBER_DUP`
 - `VIRTUAL_PORT_TYPE_INVALID`
@@ -504,6 +506,32 @@ Response (400 Bad Request - port format sai):
       "field": "from_port",
       "code": "PORT_FORMAT_INVALID",
       "message": "Port 'Gi0/1' không hợp lệ. Phải có khoảng trắng giữa loại và số (vd: 'Gi 0/1')"
+    }
+  ]
+}
+```
+
+Response (400 Bad Request - endpoint uplink sai tầng):
+```json
+{
+  "errors": [
+    {
+      "entity": "link",
+      "code": "ENDPOINT_UPLINK_INVALID",
+      "message": "Endpoint không được kết nối trực tiếp lên Distribution/Core (phải qua Access)."
+    }
+  ]
+}
+```
+
+Response (400 Bad Request - server uplink sai tầng):
+```json
+{
+  "errors": [
+    {
+      "entity": "link",
+      "code": "SERVER_UPLINK_INVALID",
+      "message": "Server chỉ được kết nối lên Server Distribution Switch."
     }
   ]
 }

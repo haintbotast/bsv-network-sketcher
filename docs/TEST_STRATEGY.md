@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.1
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-01-27
+> **Cập nhật:** 2026-01-29  
 > **Mục tiêu:** Quy định chiến lược kiểm thử và golden files.
 
 ## 1. Kiểm thử backend
@@ -207,6 +207,7 @@ test.describe('Diagram Editor', () => {
 | Rule | Loại test | Mô tả tối thiểu |
 |---|---|---|
 | RB-001..RB-005 | Unit | Validate liên kết/port/interface tồn tại, L1/L2/L3 hợp lệ |
+| RB-008..RB-012 | Unit | Validate endpoint uplink, VPN/Firewall, Server area, Access placement, Server uplink |
 | RB-006 | Integration | So sánh số lượng node/link trước & sau layout |
 | RB-101..RB-104 | Integration | Kiểm tra chồng lấn, nằm trong area, link xuyên node |
 | RB-121..RB-122 | Integration | Kiểm tra va chạm nhãn/nhãn lên node/link |
@@ -215,11 +216,13 @@ test.describe('Diagram Editor', () => {
 
 **Checklist regression bắt buộc (rule-based):**
 - [ ] RB-001..RB-005: dữ liệu liên lớp hợp lệ, không tạo interface ảo sai.
+- [ ] RB-008..RB-012: endpoint không uplink trực tiếp lên core/dist; VPN nhận diện đúng; Server/NAS/Storage vào Area Server/Monitor; Access vào area nghiệp vụ; Server chỉ uplink lên Server Distribution.
 - [ ] RB-006: số lượng node/link trước & sau layout không đổi.
 - [ ] RB-101..RB-104: không chồng lấn; device nằm trong area; link không xuyên node.
 - [ ] RB-121..RB-122: nhãn không đè lên node/link; interface tag hợp lệ.
 - [ ] RB-141..RB-143: cảnh báo khoảng cách hiển thị đúng khi vi phạm ngưỡng.
 - [ ] RB-201..RB-202: hướng layout đúng mode; custom thiếu tham số -> fallback ISO + cảnh báo.
+- [ ] RB-205..RB-206: cảnh báo đúng khi Edge/Security/DMZ/Core/Dist nằm ngoài Data Center; Server/Monitor placement gần DMZ.
 
 **Bộ dữ liệu:**
 - **Small:** ~10 devices, 10–20 links → `templates/samples/small.json`

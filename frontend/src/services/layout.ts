@@ -13,6 +13,7 @@ export interface AutoLayoutOptions {
   anchor_routing?: boolean
   overview_mode?: 'l1-only'
   view_mode?: 'L1' | 'L2' | 'L3'
+  normalize_topology?: boolean
 }
 
 export interface DeviceLayout {
@@ -88,6 +89,7 @@ export async function autoLayout(
     anchor_routing: true,
     overview_mode: 'l1-only',
     view_mode: 'L1',
+    normalize_topology: false,
     ...options
   }
 

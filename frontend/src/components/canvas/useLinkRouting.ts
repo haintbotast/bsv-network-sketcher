@@ -753,6 +753,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       }>>()
       const portPairRank = new Map<string, Map<string, { rank: number; count: number; neighborId: string }>>()
       const portNeighborDevice = new Map<string, Map<string, string>>()
+      const portForcedSide = new Map<string, Map<string, 'left' | 'right' | 'top' | 'bottom'>>()
 
       const registerPairRank = (deviceId: string, port: string, rank: number, count: number, neighborId: string) => {
         const deviceMap = portPairRank.get(deviceId) || new Map<string, { rank: number; count: number; neighborId: string }>()
@@ -764,6 +765,12 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         const deviceMap = portNeighborDevice.get(deviceId) || new Map<string, string>()
         deviceMap.set(port, neighborId)
         portNeighborDevice.set(deviceId, deviceMap)
+      }
+
+      const registerForcedSide = (deviceId: string, port: string, side: 'left' | 'right' | 'top' | 'bottom') => {
+        const deviceMap = portForcedSide.get(deviceId) || new Map<string, 'left' | 'right' | 'top' | 'bottom'>()
+        deviceMap.set(port, side)
+        portForcedSide.set(deviceId, deviceMap)
       }
 
       const ensureStats = (deviceId: string, port: string) => {
@@ -885,6 +892,34 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         })
       })
 
+      pairGroups.forEach(list => {
+        if (list.length < 2) return
+        const first = list[0]
+        const aRect = deviceViewMap.value.get(first.fromDeviceId)
+        const bRect = deviceViewMap.value.get(first.toDeviceId)
+        if (!aRect || !bRect) return
+        const aCenter = { x: aRect.x + aRect.width / 2, y: aRect.y + aRect.height / 2 }
+        const bCenter = { x: bRect.x + bRect.width / 2, y: bRect.y + bRect.height / 2 }
+        const axis = Math.abs(bCenter.x - aCenter.x) >= Math.abs(bCenter.y - aCenter.y) ? 'x' : 'y'
+
+        list.forEach(entry => {
+          if (!entry.fromPort || !entry.toPort) return
+          const fromRect = deviceViewMap.value.get(entry.fromDeviceId)
+          const toRect = deviceViewMap.value.get(entry.toDeviceId)
+          if (!fromRect || !toRect) return
+          const fromCenter = { x: fromRect.x + fromRect.width / 2, y: fromRect.y + fromRect.height / 2 }
+          const toCenter = { x: toRect.x + toRect.width / 2, y: toRect.y + toRect.height / 2 }
+          const fromSide = axis === 'x'
+            ? (toCenter.x >= fromCenter.x ? 'right' : 'left')
+            : (toCenter.y >= fromCenter.y ? 'bottom' : 'top')
+          const toSide = axis === 'x'
+            ? (fromCenter.x >= toCenter.x ? 'right' : 'left')
+            : (fromCenter.y >= toCenter.y ? 'bottom' : 'top')
+          registerForcedSide(entry.fromDeviceId, entry.fromPort, fromSide)
+          registerForcedSide(entry.toDeviceId, entry.toPort, toSide)
+        })
+      })
+
       const overrides: AnchorOverrideMap = new Map()
       const portEdgeInset = renderTuning.value.port_edge_inset ?? 0
       let overrideCount = 0
@@ -899,6 +934,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         const neighborMap = devicePortNeighbors.value.get(deviceId) || new Map<string, { xSum: number; ySum: number; count: number }>()
         const pairMap = portPairRank.get(deviceId) || new Map<string, { rank: number; count: number; neighborId: string }>()
         const neighborDeviceMap = portNeighborDevice.get(deviceId) || new Map<string, string>()
+        const forcedSideMap = portForcedSide.get(deviceId) || new Map<string, 'left' | 'right' | 'top' | 'bottom'>()
         const buckets: Record<'left' | 'right' | 'top' | 'bottom', Array<{
           port: string
           coord: number | null
@@ -911,7 +947,10 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         ports.forEach(port => {
           const stats = deviceStats.get(port)
           let side = (sideMap.get(port) || 'right') as 'left' | 'right' | 'top' | 'bottom'
-          if (stats) {
+          const forcedSide = forcedSideMap.get(port)
+          if (forcedSide) {
+            side = forcedSide
+          } else if (stats) {
             const entries = Object.entries(stats.votes) as Array<[string, number]>
             entries.sort((a, b) => b[1] - a[1])
             if (entries[0]?.[1] > 0) {

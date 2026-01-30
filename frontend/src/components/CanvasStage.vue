@@ -27,7 +27,6 @@
           @click="() => emitSelect(area.id, 'area')"
         >
           <v-rect :config="area.rect" />
-          <v-text :config="area.label" />
         </v-group>
       </v-layer>
 
@@ -60,6 +59,17 @@
         >
           <v-rect :config="device.rect" />
           <v-text :config="device.label" />
+        </v-group>
+      </v-layer>
+
+      <v-layer ref="areaLabelLayerRef" :config="layerTransform">
+        <v-group
+          v-for="label in visibleAreaLabels"
+          :key="label.id"
+          :config="label.group"
+          @click="() => emitSelect(label.id, 'area')"
+        >
+          <v-text :config="label.text" />
         </v-group>
       </v-layer>
 
@@ -165,6 +175,7 @@ const layoutViewport = ref<Viewport>({ ...props.viewport })
 
 const gridLayerRef = ref()
 const areaLayerRef = ref()
+const areaLabelLayerRef = ref()
 const groupLayerRef = ref()
 const linkLayerRef = ref()
 const deviceLayerRef = ref()
@@ -347,6 +358,17 @@ const visibleAreas = computed(() => {
       }
     })
   return visible
+})
+
+const visibleAreaLabels = computed(() => {
+  if (!visibleAreas.value.length) return []
+  return visibleAreas.value
+    .filter(area => area.label.text)
+    .map(area => ({
+      id: area.id,
+      group: { x: area.group.x, y: area.group.y },
+      text: { ...area.label }
+    }))
 })
 
 // VLAN Groups for L2 view
@@ -2044,6 +2066,7 @@ function emitSelect(id: string, type: 'device' | 'area') {
 function batchDraw() {
   gridLayerRef.value?.getNode()?.batchDraw()
   areaLayerRef.value?.getNode()?.batchDraw()
+  areaLabelLayerRef.value?.getNode()?.batchDraw()
   groupLayerRef.value?.getNode()?.batchDraw()
   linkLayerRef.value?.getNode()?.batchDraw()
   deviceLayerRef.value?.getNode()?.batchDraw()

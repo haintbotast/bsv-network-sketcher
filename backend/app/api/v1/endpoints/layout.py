@@ -314,6 +314,92 @@ async def _normalize_topology(
     return areas, devices
 
 
+async def _create_or_update_waypoint_areas(
+    db: AsyncSession,
+    project_id: str,
+    response: dict,
+    areas: list,
+    links: list,
+    devices: list,
+) -> None:
+    """Tạo/cập nhật waypoint areas cho inter-area links."""
+    import json
+    from sqlalchemy import select
+    from app.db.models import Area, generate_uuid
+
+    # Build device→area map
+    device_area = {d.id: d.area_id for d in devices if d.area_id}
+    area_name_map = {a.id: a.name for a in areas}
+
+    # Tìm unique inter-area pairs
+    inter_pairs: set[tuple[str, str]] = set()
+    for link in links:
+        fa = device_area.get(link.from_device_id)
+        ta = device_area.get(link.to_device_id)
+        if fa and ta and fa != ta:
+            pair = tuple(sorted([fa, ta]))
+            inter_pairs.add(pair)
+
+    if not inter_pairs:
+        return
+
+    # Area layout lookup (từ compute_layout_l1)
+    area_layouts = response.get("areas") or []
+    area_layout_map = {a.id: a for a in area_layouts}
+
+    # Load existing waypoints (idempotency)
+    existing_result = await db.execute(
+        select(Area).where(Area.project_id == project_id, Area.name.like("%_wp_"))
+    )
+    existing_wp = {a.name: a for a in existing_result.scalars().all()}
+
+    wp_style = json.dumps({
+        "fill_color_rgb": [245, 245, 245],
+        "stroke_color_rgb": [180, 180, 180],
+        "stroke_width": 0.5,
+    })
+
+    for aid_a, aid_b in inter_pairs:
+        names = sorted([area_name_map.get(aid_a, ""), area_name_map.get(aid_b, "")])
+        wp_name = f"{names[0]}_{names[1]}_wp_"
+
+        la = area_layout_map.get(aid_a)
+        lb = area_layout_map.get(aid_b)
+        if not la or not lb:
+            continue
+
+        # Midpoint giữa 2 area centers
+        mid_x = (la.x + la.width / 2 + lb.x + lb.width / 2) / 2 - 0.3
+        mid_y = (la.y + la.height / 2 + lb.y + lb.height / 2) / 2 - 0.2
+
+        if wp_name in existing_wp:
+            wp = existing_wp[wp_name]
+            wp.position_x = mid_x
+            wp.position_y = mid_y
+            wp_id = wp.id
+        else:
+            wp_id = generate_uuid()
+            wp = Area(
+                id=wp_id,
+                project_id=project_id,
+                name=wp_name,
+                grid_row=99,
+                grid_col=99,
+                position_x=mid_x,
+                position_y=mid_y,
+                width=0.6,
+                height=0.4,
+                style_json=wp_style,
+            )
+            db.add(wp)
+
+        area_layouts.append(AreaLayout(
+            id=wp_id, name=wp_name, x=mid_x, y=mid_y, width=0.6, height=0.4,
+        ))
+
+    await db.flush()
+
+
 @router.post("/projects/{project_id}/auto-layout", response_model=LayoutResult)
 async def compute_auto_layout(
     project_id: str,
@@ -434,7 +520,9 @@ async def compute_auto_layout(
     try:
         if view_mode == "L1":
             if options.group_by_area:
-                response = compute_layout_l1(devices, links, areas, config, options.layout_scope, layout_tuning)
+                # Lọc bỏ waypoint areas (_wp_) - chúng sẽ được tạo/cập nhật riêng
+                non_wp_areas = [a for a in areas if not a.name.endswith("_wp_")]
+                response = compute_layout_l1(devices, links, non_wp_areas, config, options.layout_scope, layout_tuning)
             else:
                 layout_result = simple_layer_layout(devices, links, config)
                 response = {
@@ -467,6 +555,12 @@ async def compute_auto_layout(
         raise HTTPException(
             status_code=500,
             detail=f"Layout computation failed: {str(e)}"
+        )
+
+    # Tạo waypoint areas cho inter-area links (trước cache và apply_to_db)
+    if options.apply_to_db and options.group_by_area and view_mode == "L1":
+        await _create_or_update_waypoint_areas(
+            db, project_id, response, areas, links, devices
         )
 
     # Cache result

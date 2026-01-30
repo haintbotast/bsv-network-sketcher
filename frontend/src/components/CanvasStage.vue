@@ -295,12 +295,14 @@ const visibleAreas = computed(() => {
         }
       }
 
+      const isWaypoint = area.name.endsWith('_wp_')
       const isSubZone = SUB_ZONES.has(zone)
-      const fontSize = isSubZone ? 12 : 14
+      const fontSize = isWaypoint ? 0 : (isSubZone ? 12 : 14)
 
       // L1 view: areas fully visible with clear borders (NS gốc style)
-      const areaOpacity = 0.95
-      const areaFill = adjustHexLightness(area.fill, -0.06)
+      // Waypoint areas: nhỏ, mờ, viền nét đứt
+      const areaOpacity = isWaypoint ? 0.3 : 0.95
+      const areaFill = isWaypoint ? '#f5f5f5' : adjustHexLightness(area.fill, -0.06)
 
       const isSelected = props.selectedId === area.id
       return {
@@ -320,20 +322,21 @@ const visibleAreas = computed(() => {
           height: rect.height,
           fill: areaFill,
           opacity: areaOpacity,
-          stroke: isSelected ? '#d66c3b' : 'transparent',
-          strokeWidth: isSelected ? 2 : 0,
-          cornerRadius: 10,
-          shadowColor: 'rgba(28, 28, 28, 0.25)',
-          shadowBlur: 14,
-          shadowOffset: { x: 0, y: 6 },
-          shadowOpacity: 0.18,
+          stroke: isWaypoint ? '#b4b4b4' : (isSelected ? '#d66c3b' : 'transparent'),
+          strokeWidth: isWaypoint ? 1 : (isSelected ? 2 : 0),
+          dash: isWaypoint ? [4, 3] : [],
+          cornerRadius: isWaypoint ? 4 : 10,
+          shadowColor: isWaypoint ? 'transparent' : 'rgba(28, 28, 28, 0.25)',
+          shadowBlur: isWaypoint ? 0 : 14,
+          shadowOffset: { x: 0, y: isWaypoint ? 0 : 6 },
+          shadowOpacity: isWaypoint ? 0 : 0.18,
           shadowForStrokeEnabled: false
         },
         label: {
           x: labelAlign === 'right' ? rect.width - TEXT_PADDING : TEXT_PADDING,
           y: labelY,
           width: Math.max(rect.width - TEXT_PADDING * 2, 0),
-          text: area.name,
+          text: isWaypoint ? '' : area.name,
           fontSize,
           fill: '#3f3a33',
           opacity: 1.0,
@@ -679,12 +682,15 @@ const visibleDevices = computed(() => {
 })
 
 const areaBounds = computed(() => {
+  // Loại trừ waypoint areas (_wp_) khỏi bounding box
+  const wpIds = new Set(props.areas.filter(a => a.name.endsWith('_wp_')).map(a => a.id))
   let minX = 0
   let minY = 0
   let maxX = 0
   let maxY = 0
   let hasBounds = false
-  areaViewMap.value.forEach(rect => {
+  areaViewMap.value.forEach((rect, id) => {
+    if (wpIds.has(id)) return
     if (!hasBounds) {
       minX = rect.x
       minY = rect.y
@@ -1170,6 +1176,33 @@ const areaBundleIndex = computed(() => {
   return map
 })
 
+// Map: "areaIdA|areaIdB" → waypoint area center (cho inter-area link routing)
+const waypointAreaMap = computed(() => {
+  const map = new Map<string, { cx: number; cy: number }>()
+  const wpAreas = props.areas.filter(a => a.name.endsWith('_wp_'))
+  if (wpAreas.length === 0) return map
+
+  const nonWpAreas = props.areas.filter(a => !a.name.endsWith('_wp_'))
+  const areaKey = (a: string, b: string) => a < b ? `${a}|${b}` : `${b}|${a}`
+
+  for (const wp of wpAreas) {
+    const rect = areaViewMap.value.get(wp.id)
+    if (!rect) continue
+    for (let i = 0; i < nonWpAreas.length; i++) {
+      for (let j = i + 1; j < nonWpAreas.length; j++) {
+        const names = [nonWpAreas[i].name, nonWpAreas[j].name].sort()
+        if (wp.name === `${names[0]}_${names[1]}_wp_`) {
+          map.set(areaKey(nonWpAreas[i].id, nonWpAreas[j].id), {
+            cx: rect.x + rect.width / 2,
+            cy: rect.y + rect.height / 2,
+          })
+        }
+      }
+    }
+  }
+  return map
+})
+
 function computeAreaAnchor(
   areaRect: { x: number; y: number; width: number; height: number },
   fromPoint: { x: number; y: number },
@@ -1480,56 +1513,76 @@ const buildVisibleLinks = (useCache: boolean) => {
       if (!routed) {
         // Orthogonal routing for all links (fallback)
         if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
-          // Inter-area links: use corridor routing
-          const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, anchorOffset)
-          const toAreaAnchor = computeAreaAnchor(toArea, toExit, fromExit, interBundleOffset, anchorOffset)
-          const bounds = areaBounds.value
-          if (bounds) {
-            const corridorGap = renderTuning.value.corridor_gap + renderTuning.value.area_clearance + Math.abs(interBundleOffset)
-            const dx = toAnchor.x - fromAnchor.x
-            const dy = toAnchor.y - fromAnchor.y
-            if (Math.abs(dx) >= Math.abs(dy)) {
-              const topY = bounds.minY - corridorGap
-              const bottomY = bounds.maxY + corridorGap
-              const midY = (fromAnchor.y + toAnchor.y) / 2
-              const corridorBaseY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
-              const corridorY = corridorBaseY + interBundleOffset
-              points = []
-              pushPoint(points, fromAnchor.x, fromAnchor.y)
-              pushPoint(points, fromExit.x, fromExit.y)
-              pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-              pushPoint(points, fromAreaAnchor.x, corridorY)
-              pushPoint(points, toAreaAnchor.x, corridorY)
-              pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-              pushPoint(points, toExit.x, toExit.y)
-              pushPoint(points, toAnchor.x, toAnchor.y)
-            } else {
-              const leftX = bounds.minX - corridorGap
-              const rightX = bounds.maxX + corridorGap
-              const midX = (fromAnchor.x + toAnchor.x) / 2
-              const corridorBaseX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
-              const corridorX = corridorBaseX + interBundleOffset
-              points = []
-              pushPoint(points, fromAnchor.x, fromAnchor.y)
-              pushPoint(points, fromExit.x, fromExit.y)
-              pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-              pushPoint(points, corridorX, fromAreaAnchor.y)
-              pushPoint(points, corridorX, toAreaAnchor.y)
-              pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-              pushPoint(points, toExit.x, toExit.y)
-              pushPoint(points, toAnchor.x, toAnchor.y)
-            }
-          } else {
-            const midX = (fromAnchor.x + toAnchor.x) / 2 + interBundleOffset
+          // Check for waypoint area between this area pair
+          const wpKey = fromAreaId < toAreaId ? `${fromAreaId}|${toAreaId}` : `${toAreaId}|${fromAreaId}`
+          const wp = waypointAreaMap.value.get(wpKey)
+
+          if (wp) {
+            // Route qua waypoint center
+            const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, { x: wp.cx, y: wp.cy }, interBundleOffset, anchorOffset)
+            const toAreaAnchor = computeAreaAnchor(toArea, toExit, { x: wp.cx, y: wp.cy }, interBundleOffset, anchorOffset)
             points = []
             pushPoint(points, fromAnchor.x, fromAnchor.y)
             pushPoint(points, fromExit.x, fromExit.y)
             pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-            pushPoint(points, midX, fromAreaAnchor.y)
-            pushPoint(points, midX, toAreaAnchor.y)
+            pushPoint(points, wp.cx, fromAreaAnchor.y)
+            pushPoint(points, wp.cx, wp.cy)
+            pushPoint(points, wp.cx, toAreaAnchor.y)
             pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
             pushPoint(points, toExit.x, toExit.y)
             pushPoint(points, toAnchor.x, toAnchor.y)
+          } else {
+            // Fallback: corridor routing
+            const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, anchorOffset)
+            const toAreaAnchor = computeAreaAnchor(toArea, toExit, fromExit, interBundleOffset, anchorOffset)
+            const bounds = areaBounds.value
+            if (bounds) {
+              const corridorGap = renderTuning.value.corridor_gap + renderTuning.value.area_clearance + Math.abs(interBundleOffset)
+              const dx = toAnchor.x - fromAnchor.x
+              const dy = toAnchor.y - fromAnchor.y
+              if (Math.abs(dx) >= Math.abs(dy)) {
+                const topY = bounds.minY - corridorGap
+                const bottomY = bounds.maxY + corridorGap
+                const midY = (fromAnchor.y + toAnchor.y) / 2
+                const corridorBaseY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
+                const corridorY = corridorBaseY + interBundleOffset
+                points = []
+                pushPoint(points, fromAnchor.x, fromAnchor.y)
+                pushPoint(points, fromExit.x, fromExit.y)
+                pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+                pushPoint(points, fromAreaAnchor.x, corridorY)
+                pushPoint(points, toAreaAnchor.x, corridorY)
+                pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+                pushPoint(points, toExit.x, toExit.y)
+                pushPoint(points, toAnchor.x, toAnchor.y)
+              } else {
+                const leftX = bounds.minX - corridorGap
+                const rightX = bounds.maxX + corridorGap
+                const midX = (fromAnchor.x + toAnchor.x) / 2
+                const corridorBaseX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
+                const corridorX = corridorBaseX + interBundleOffset
+                points = []
+                pushPoint(points, fromAnchor.x, fromAnchor.y)
+                pushPoint(points, fromExit.x, fromExit.y)
+                pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+                pushPoint(points, corridorX, fromAreaAnchor.y)
+                pushPoint(points, corridorX, toAreaAnchor.y)
+                pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+                pushPoint(points, toExit.x, toExit.y)
+                pushPoint(points, toAnchor.x, toAnchor.y)
+              }
+            } else {
+              const midX = (fromAnchor.x + toAnchor.x) / 2 + interBundleOffset
+              points = []
+              pushPoint(points, fromAnchor.x, fromAnchor.y)
+              pushPoint(points, fromExit.x, fromExit.y)
+              pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+              pushPoint(points, midX, fromAreaAnchor.y)
+              pushPoint(points, midX, toAreaAnchor.y)
+              pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+              pushPoint(points, toExit.x, toExit.y)
+              pushPoint(points, toAnchor.x, toAnchor.y)
+            }
           }
         } else if (isL1) {
           // L1 intra-area: straight segment between ports, bundle if needed

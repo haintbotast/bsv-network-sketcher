@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.1
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-01-26
+> **Cập nhật:** 2026-01-30
 > **Mục tiêu:** Hướng dẫn triển khai tối giản cho môi trường nội bộ.
 
 ---
@@ -197,15 +197,142 @@ rsync -av --exclude='node_modules' --exclude='venv' --exclude='__pycache__' \
 
 ---
 
-## 8. Khắc phục sự cố
+## 8. Quản lý process (kiểm tra / dừng / khởi động lại)
 
-- DB bị khóa → chờ, kiểm tra WAL/worker.
+### 8.1. Kiểm tra process đang chạy
+
+```bash
+# Kiểm tra tất cả process BE/FE
+ps aux | grep -E "uvicorn|vite" | grep -v grep
+
+# Chỉ kiểm tra backend (Uvicorn)
+ps aux | grep uvicorn | grep -v grep
+
+# Chỉ kiểm tra frontend (Vite)
+ps aux | grep vite | grep -v grep
+
+# Kiểm tra cổng đang lắng nghe
+ss -tlnp | grep -E "8000|5173"
+```
+
+Nếu không có kết quả → process không chạy, cần khởi động lại.
+
+### 8.2. Kiểm tra sức khỏe nhanh
+
+```bash
+# Backend: gọi API health
+curl -s http://localhost:8000/health
+# Kỳ vọng: {"status":"healthy"}
+
+# Frontend: kiểm tra Vite dev server
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5173
+# Kỳ vọng: 200
+```
+
+### 8.3. Dừng process
+
+```bash
+# Dừng backend (Uvicorn)
+pkill -f "uvicorn app.main:app"
+
+# Dừng frontend (Vite)
+pkill -f "vite.*--port 5173"
+
+# Dừng cả hai
+pkill -f "uvicorn app.main:app" ; pkill -f "vite.*--port 5173"
+
+# Nếu pkill không dừng được, dùng kill -9
+pkill -9 -f "uvicorn app.main:app"
+pkill -9 -f "vite.*--port 5173"
+```
+
+### 8.4. Khởi động lại
+
+```bash
+# --- Backend ---
+cd /opt/bsv-ns-deploy/backend
+source venv/bin/activate
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 > logs/uvicorn.log 2>&1 &
+echo "Backend PID: $!"
+
+# --- Frontend ---
+cd /opt/bsv-ns-deploy/frontend
+npm run dev -- --port 5173 > logs/vite.log 2>&1 &
+echo "Frontend PID: $!"
+```
+
+### 8.5. Khởi động lại toàn bộ (stop + sync + start)
+
+Khi cần restart sạch kèm cập nhật code mới nhất:
+
+```bash
+# 1. Dừng tất cả
+pkill -f "uvicorn app.main:app" ; pkill -f "vite.*--port 5173"
+sleep 2
+
+# 2. Sync code mới nhất
+rsync -av --delete \
+  --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' \
+  --exclude='data' --exclude='logs' --exclude='exports' \
+  /home/<user>/Projects/bsv/bsv-network-sketcher/backend/ \
+  /opt/bsv-ns-deploy/backend/
+
+rsync -av --delete \
+  --exclude='node_modules' --exclude='dist' --exclude='logs' \
+  /home/<user>/Projects/bsv/bsv-network-sketcher/frontend/ \
+  /opt/bsv-ns-deploy/frontend/
+
+# 3. Khởi động backend
+cd /opt/bsv-ns-deploy/backend
+source venv/bin/activate
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 > logs/uvicorn.log 2>&1 &
+
+# 4. Khởi động frontend
+cd /opt/bsv-ns-deploy/frontend
+npm run dev -- --port 5173 > logs/vite.log 2>&1 &
+
+# 5. Kiểm tra
+sleep 3
+ps aux | grep -E "uvicorn|vite" | grep -v grep
+curl -s http://localhost:8000/health
+```
+
+### 8.6. Xem log khi gặp sự cố
+
+```bash
+# Backend log (theo dõi real-time)
+tail -f /opt/bsv-ns-deploy/backend/logs/uvicorn.log
+
+# Frontend log (theo dõi real-time)
+tail -f /opt/bsv-ns-deploy/frontend/logs/vite.log
+
+# Xem 50 dòng cuối
+tail -50 /opt/bsv-ns-deploy/backend/logs/uvicorn.log
+tail -50 /opt/bsv-ns-deploy/frontend/logs/vite.log
+```
+
+### 8.7. Xử lý sự cố thường gặp
+
+| Triệu chứng | Nguyên nhân có thể | Cách xử lý |
+|---|---|---|
+| `curl localhost:8000` không phản hồi | Uvicorn không chạy hoặc crash | Kiểm tra log, khởi động lại backend |
+| `curl localhost:5173` không phản hồi | Vite không chạy | Kiểm tra log, khởi động lại frontend |
+| Cổng bị chiếm (`Address already in use`) | Process cũ chưa dừng hẳn | `pkill -9 -f uvicorn` hoặc `pkill -9 -f vite`, đợi 2s rồi start lại |
+| Backend crash liên tục | Lỗi code hoặc thiếu dependency | Xem log, sửa code hoặc chạy `pip install -r requirements.txt` |
+| Frontend HMR không hoạt động | Vite watcher lỗi | Restart Vite; kiểm tra `fs.inotify.max_user_watches` trên Linux |
+| API trả 500 | Lỗi backend logic | Xem `logs/uvicorn.log` để tìm traceback |
+| DB bị khóa (`database is locked`) | Nhiều writer đồng thời hoặc WAL | Đợi hoặc restart backend; kiểm tra WAL mode |
+
+---
+
+## 9. Khắc phục sự cố khác
+
 - Import lỗi → xem logs + kiểm tra schema.
 - Export timeout → tăng timeout hoặc kiểm tra ProcessPool.
 
 ---
 
-## 8.1. Tạo admin ban đầu (bắt buộc khi tắt đăng ký)
+## 9.1. Tạo admin ban đầu (bắt buộc khi tắt đăng ký)
 
 - **Khuyến nghị:** tắt đăng ký tự do (`ALLOW_SELF_REGISTER=false`).
 - Tạo admin trực tiếp trong DB bằng script nội bộ.
@@ -213,7 +340,7 @@ rsync -av --exclude='node_modules' --exclude='venv' --exclude='__pycache__' \
 
 ---
 
-## 9. Tài liệu liên quan
+## 10. Tài liệu liên quan
 
 - `WEB_APP_DEVELOPMENT_PLAN.md`
 - `docs/TEST_STRATEGY.md`

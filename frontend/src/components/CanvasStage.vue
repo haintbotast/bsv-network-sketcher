@@ -1080,6 +1080,24 @@ function resolvePortAnchor(
   return { ...computePortAnchorFallback(rect, target, portName), side: computeSide(rect, target) }
 }
 
+type Rect = { x: number; y: number; width: number; height: number }
+type AnchorOverrideMap = Map<string, Map<string, { x: number; y: number; side: string }>>
+
+function resolvePortAnchorWithOverrides(
+  deviceId: string,
+  rect: { x: number; y: number; width: number; height: number },
+  target: { x: number; y: number },
+  portName?: string,
+  overrides?: AnchorOverrideMap
+) {
+  if (portName && overrides) {
+    const deviceOverrides = overrides.get(deviceId)
+    const anchor = deviceOverrides?.get(portName)
+    if (anchor) return anchor
+  }
+  return resolvePortAnchor(deviceId, rect, target, portName)
+}
+
 function computePortLabelPlacement(
   anchor: { x: number; y: number },
   center: { x: number; y: number },
@@ -1330,7 +1348,6 @@ const buildVisibleLinks = (useCache: boolean) => {
     )
     : null
 
-  const occupancy = new Map<string, number>()
   const areaRects = Array.from(areaViewMap.value.entries()).map(([id, rect]) => ({ id, rect }))
   const deviceRects = Array.from(deviceViewMap.value.entries()).map(([id, rect]) => ({ id, rect }))
 
@@ -1350,7 +1367,6 @@ const buildVisibleLinks = (useCache: boolean) => {
     areaCenters.set(id, { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 })
   })
 
-  const laneGroups = new Map<string, Array<{ id: string; order: number; portBias: number }>>()
   const laneAxisByPair = new Map<string, 'x' | 'y'>()
 
   const getPairKey = (fromArea: string, toArea: string) =>
@@ -1370,139 +1386,48 @@ const buildVisibleLinks = (useCache: boolean) => {
     return axis
   }
 
-  const linkMetas = props.links.map(link => {
-    const fromView = deviceViewMap.value.get(link.fromDeviceId)
-    const toView = deviceViewMap.value.get(link.toDeviceId)
-    if (!fromView || !toView) return null
-    const fromCenter = { x: fromView.x + fromView.width / 2, y: fromView.y + fromView.height / 2 }
-    const toCenter = { x: toView.x + toView.width / 2, y: toView.y + toView.height / 2 }
-    const fromAnchor = resolvePortAnchor(link.fromDeviceId, fromView, toCenter, link.fromPort)
-    const toAnchor = resolvePortAnchor(link.toDeviceId, toView, fromCenter, link.toPort)
-    const fromAreaId = deviceAreaMap.value.get(link.fromDeviceId)
-    const toAreaId = deviceAreaMap.value.get(link.toDeviceId)
-    const fromArea = fromAreaId ? areaViewMap.value.get(fromAreaId) : null
-    const toArea = toAreaId ? areaViewMap.value.get(toAreaId) : null
+  const buildLinkMetaData = (anchorOverrides?: AnchorOverrideMap) => {
+    const laneGroups = new Map<string, Array<{ id: string; order: number; portBias: number }>>()
+    const linkMetas = props.links.map(link => {
+      const fromView = deviceViewMap.value.get(link.fromDeviceId)
+      const toView = deviceViewMap.value.get(link.toDeviceId)
+      if (!fromView || !toView) return null
+      const fromCenter = { x: fromView.x + fromView.width / 2, y: fromView.y + fromView.height / 2 }
+      const toCenter = { x: toView.x + toView.width / 2, y: toView.y + toView.height / 2 }
+      const fromAnchor = resolvePortAnchorWithOverrides(link.fromDeviceId, fromView, toCenter, link.fromPort, anchorOverrides)
+      const toAnchor = resolvePortAnchorWithOverrides(link.toDeviceId, toView, fromCenter, link.toPort, anchorOverrides)
+      const fromAreaId = deviceAreaMap.value.get(link.fromDeviceId)
+      const toAreaId = deviceAreaMap.value.get(link.toDeviceId)
+      const fromArea = fromAreaId ? areaViewMap.value.get(fromAreaId) : null
+      const toArea = toAreaId ? areaViewMap.value.get(toAreaId) : null
 
-    if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
-      const axis = resolveLaneAxis(fromAreaId, toAreaId)
-      const order = axis === 'y'
-        ? (fromAnchor.y + toAnchor.y) / 2
-        : (fromAnchor.x + toAnchor.x) / 2
-      const fromOrder = link.fromPort
-        ? devicePortOrder.value.get(link.fromDeviceId)?.get(link.fromPort)
-        : null
-      const toOrder = link.toPort
-        ? devicePortOrder.value.get(link.toDeviceId)?.get(link.toPort)
-        : null
-      const fromCount = link.fromPort
-        ? (devicePortList.value.get(link.fromDeviceId)?.length ?? 0)
-        : 0
-      const toCount = link.toPort
-        ? (devicePortList.value.get(link.toDeviceId)?.length ?? 0)
-        : 0
-      const fromNorm = fromOrder != null && fromCount > 1 ? fromOrder / (fromCount - 1) : null
-      const toNorm = toOrder != null && toCount > 1 ? toOrder / (toCount - 1) : null
-      const portBias = ((fromNorm ?? 0.5) + (toNorm ?? 0.5)) / 2
-      const key = getPairKey(fromAreaId, toAreaId)
-      const list = laneGroups.get(key) || []
-      list.push({ id: link.id, order, portBias })
-      laneGroups.set(key, list)
-    }
-
-    return {
-      link,
-      fromView,
-      toView,
-      fromCenter,
-      toCenter,
-      fromAnchor,
-      toAnchor,
-      fromAreaId,
-      toAreaId,
-      fromArea,
-      toArea
-    }
-  })
-
-  const labelObstacles: Array<{ linkId: string; rect: Rect }> = []
-  if (isL1View) {
-    const labelScale = clamp(layoutViewport.value.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
-    const labelHeight = PORT_LABEL_HEIGHT * labelScale
-    const labelPadding = PORT_LABEL_PADDING * labelScale
-    const labelOffset = renderTuning.value.port_label_offset * labelScale
-    const minLabelWidth = 24 * labelScale
-    const charWidth = 6 * labelScale
-    const baseGap = Math.max(2, Math.min(renderTuning.value.label_gap_x, renderTuning.value.label_gap_y) * 0.5 * labelScale)
-
-    const buildLabelRect = (
-      linkId: string,
-      text: string | undefined,
-      anchor: { x: number; y: number },
-      center: { x: number; y: number },
-      neighbor: { x: number; y: number }
-    ) => {
-      const content = text?.trim()
-      if (!content) return
-      const width = Math.max(content.length * charWidth + labelPadding, minLabelWidth)
-      const height = labelHeight
-      const dx = neighbor.x - anchor.x
-      const dy = neighbor.y - anchor.y
-      const len = Math.hypot(dx, dy)
-      let cx: number
-      let cy: number
-      if (len < 1) {
-        const pos = computePortLabelPlacement(anchor, center, width, height, labelOffset)
-        cx = pos.x + width / 2
-        cy = pos.y + height / 2
-      } else {
-        const offset = (width / 2 + 4) / len
-        cx = anchor.x + dx * offset
-        cy = anchor.y + dy * offset
+      if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
+        const axis = resolveLaneAxis(fromAreaId, toAreaId)
+        const order = axis === 'y'
+          ? (fromAnchor.y + toAnchor.y) / 2
+          : (fromAnchor.x + toAnchor.x) / 2
+        const fromOrder = link.fromPort
+          ? devicePortOrder.value.get(link.fromDeviceId)?.get(link.fromPort)
+          : null
+        const toOrder = link.toPort
+          ? devicePortOrder.value.get(link.toDeviceId)?.get(link.toPort)
+          : null
+        const fromCount = link.fromPort
+          ? (devicePortList.value.get(link.fromDeviceId)?.length ?? 0)
+          : 0
+        const toCount = link.toPort
+          ? (devicePortList.value.get(link.toDeviceId)?.length ?? 0)
+          : 0
+        const fromNorm = fromOrder != null && fromCount > 1 ? fromOrder / (fromCount - 1) : null
+        const toNorm = toOrder != null && toCount > 1 ? toOrder / (toCount - 1) : null
+        const portBias = ((fromNorm ?? 0.5) + (toNorm ?? 0.5)) / 2
+        const key = getPairKey(fromAreaId, toAreaId)
+        const list = laneGroups.get(key) || []
+        list.push({ id: link.id, order, portBias })
+        laneGroups.set(key, list)
       }
-      labelObstacles.push({
-        linkId,
-        rect: {
-          x: cx - width / 2 - baseGap,
-          y: cy - height / 2 - baseGap,
-          width: width + baseGap * 2,
-          height: height + baseGap * 2,
-        }
-      })
-    }
 
-    linkMetas.forEach(meta => {
-      if (!meta) return
-      buildLabelRect(meta.link.id, meta.link.fromPort, meta.fromAnchor, meta.fromCenter, meta.toCenter)
-      buildLabelRect(meta.link.id, meta.link.toPort, meta.toAnchor, meta.toCenter, meta.fromCenter)
-    })
-  }
-
-  const laneIndex = new Map<string, { index: number; total: number }>()
-  laneGroups.forEach(list => {
-    list.sort((a, b) => {
-      const primary = a.order - b.order
-      if (primary !== 0) return primary
-      const secondary = a.portBias - b.portBias
-      if (secondary !== 0) return secondary
-      return a.id.localeCompare(b.id)
-    })
-    list.forEach((entry, idx) => {
-      laneIndex.set(entry.id, { index: idx, total: list.length })
-    })
-  })
-
-  const cache = new Map<string, {
-    points: number[]
-    fromAnchor: { x: number; y: number; side?: string }
-    toAnchor: { x: number; y: number; side?: string }
-    fromCenter: { x: number; y: number }
-    toCenter: { x: number; y: number }
-  }>()
-
-  const links = linkMetas
-    .map(meta => {
-      if (!meta) return null
-      const {
+      return {
         link,
         fromView,
         toView,
@@ -1514,290 +1439,563 @@ const buildVisibleLinks = (useCache: boolean) => {
         toAreaId,
         fromArea,
         toArea
-      } = meta
+      }
+    })
 
-      let points: number[] = []
-      const isL1 = isL1View
-      const bundle = linkBundleIndex.value.get(link.id)
-      const areaBundle = laneIndex.get(link.id) || areaBundleIndex.value.get(link.id)
-      const bundleOffset = bundle && bundle.total > 1
-        ? (bundle.index - (bundle.total - 1) / 2) * (renderTuning.value.bundle_gap * scale)
-        : 0
-      const interAreaBundleGap = renderTuning.value.bundle_gap * scale
-        * (areaBundle && areaBundle.total > 4 ? 1.9 : 1.6)
-      const areaBundleOffset = areaBundle && areaBundle.total > 1
-        ? (areaBundle.index - (areaBundle.total - 1) / 2) * interAreaBundleGap
-        : 0
-      const interBundleOffset = areaBundleOffset + bundleOffset * 0.5
-      const bundleStub = renderTuning.value.bundle_stub * scale
-      const anchorOffset = (renderTuning.value.area_anchor_offset + renderTuning.value.area_clearance) * scale
-      const exitStub = Math.max(renderTuning.value.bundle_stub, renderTuning.value.area_clearance) * scale
+    const labelObstacles: Array<{ linkId: string; rect: Rect }> = []
+    if (isL1View) {
+      const labelScale = clamp(layoutViewport.value.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
+      const labelHeight = PORT_LABEL_HEIGHT * labelScale
+      const labelPadding = PORT_LABEL_PADDING * labelScale
+      const labelOffset = renderTuning.value.port_label_offset * labelScale
+      const minLabelWidth = 24 * labelScale
+      const charWidth = 6 * labelScale
+      const baseGap = Math.max(2, Math.min(renderTuning.value.label_gap_x, renderTuning.value.label_gap_y) * 0.5 * labelScale)
 
-      const pushPoint = (arr: number[], x: number, y: number) => {
-        const len = arr.length
-        if (len >= 2 && arr[len - 2] === x && arr[len - 1] === y) return
-        arr.push(x, y)
+      const buildLabelRect = (
+        linkId: string,
+        text: string | undefined,
+        anchor: { x: number; y: number },
+        center: { x: number; y: number },
+        neighbor: { x: number; y: number }
+      ) => {
+        const content = text?.trim()
+        if (!content) return
+        const width = Math.max(content.length * charWidth + labelPadding, minLabelWidth)
+        const height = labelHeight
+        const dx = neighbor.x - anchor.x
+        const dy = neighbor.y - anchor.y
+        const len = Math.hypot(dx, dy)
+        let cx: number
+        let cy: number
+        if (len < 1) {
+          const pos = computePortLabelPlacement(anchor, center, width, height, labelOffset)
+          cx = pos.x + width / 2
+          cy = pos.y + height / 2
+        } else {
+          const offset = (width / 2 + 4) / len
+          cx = anchor.x + dx * offset
+          cy = anchor.y + dy * offset
+        }
+        labelObstacles.push({
+          linkId,
+          rect: {
+            x: cx - width / 2 - baseGap,
+            y: cy - height / 2 - baseGap,
+            width: width + baseGap * 2,
+            height: height + baseGap * 2,
+          }
+        })
       }
 
-      const isIntraArea = fromAreaId && toAreaId && fromAreaId === toAreaId
-      const obstacles: Array<{ x: number; y: number; width: number; height: number }> = []
-      deviceRects.forEach(({ id, rect }) => {
-        if (id === link.fromDeviceId || id === link.toDeviceId) return
-        obstacles.push(rect)
+      linkMetas.forEach(meta => {
+        if (!meta) return
+        buildLabelRect(meta.link.id, meta.link.fromPort, meta.fromAnchor, meta.fromCenter, meta.toCenter)
+        buildLabelRect(meta.link.id, meta.link.toPort, meta.toAnchor, meta.toCenter, meta.fromCenter)
       })
-      if (!isIntraArea) {
-        // Inter-area links né cả areas khác
-        areaRects.forEach(({ id, rect }) => {
-          if (id === fromAreaId || id === toAreaId) return
+    }
+
+    const laneIndex = new Map<string, { index: number; total: number }>()
+    laneGroups.forEach(list => {
+      list.sort((a, b) => {
+        const primary = a.order - b.order
+        if (primary !== 0) return primary
+        const secondary = a.portBias - b.portBias
+        if (secondary !== 0) return secondary
+        return a.id.localeCompare(b.id)
+      })
+      list.forEach((entry, idx) => {
+        laneIndex.set(entry.id, { index: idx, total: list.length })
+      })
+    })
+
+    return { linkMetas, laneIndex, labelObstacles }
+  }
+
+  const buildAnchorOverrides = (
+    linkMetas: Array<any>,
+    cache: Map<string, { points: number[]; fromAnchor: { x: number; y: number; side?: string }; toAnchor: { x: number; y: number; side?: string } }>
+  ): AnchorOverrideMap => {
+    const portStats = new Map<string, Map<string, {
+      votes: Record<'left' | 'right' | 'top' | 'bottom', number>
+      coords: Record<'left' | 'right' | 'top' | 'bottom', { sum: number; count: number }>
+    }>>()
+
+    const ensureStats = (deviceId: string, port: string) => {
+      const deviceMap = portStats.get(deviceId) || new Map()
+      if (!deviceMap.has(port)) {
+        deviceMap.set(port, {
+          votes: { left: 0, right: 0, top: 0, bottom: 0 },
+          coords: {
+            left: { sum: 0, count: 0 },
+            right: { sum: 0, count: 0 },
+            top: { sum: 0, count: 0 },
+            bottom: { sum: 0, count: 0 }
+          }
+        })
+        portStats.set(deviceId, deviceMap)
+      }
+      return deviceMap.get(port)!
+    }
+
+    const record = (deviceId: string, port: string, side: 'left' | 'right' | 'top' | 'bottom', coord: number) => {
+      const entry = ensureStats(deviceId, port)
+      entry.votes[side] += 1
+      entry.coords[side].sum += coord
+      entry.coords[side].count += 1
+    }
+
+    linkMetas.forEach(meta => {
+      if (!meta) return
+      const entry = cache.get(meta.link.id)
+      if (!entry) return
+      const pts = entry.points
+      const fromNext = pts.length >= 4
+        ? { x: pts[2], y: pts[3] }
+        : { x: entry.toAnchor.x, y: entry.toAnchor.y }
+      const toPrev = pts.length >= 4
+        ? { x: pts[pts.length - 4], y: pts[pts.length - 3] }
+        : { x: entry.fromAnchor.x, y: entry.fromAnchor.y }
+      const fromSide = (entry.fromAnchor.side || computeSide(meta.fromView, meta.toCenter)) as 'left' | 'right' | 'top' | 'bottom'
+      const toSide = (entry.toAnchor.side || computeSide(meta.toView, meta.fromCenter)) as 'left' | 'right' | 'top' | 'bottom'
+
+      if (meta.link.fromPort) {
+        const coord = fromSide === 'left' || fromSide === 'right' ? fromNext.y : fromNext.x
+        record(meta.link.fromDeviceId, meta.link.fromPort, fromSide, coord)
+      }
+      if (meta.link.toPort) {
+        const coord = toSide === 'left' || toSide === 'right' ? toPrev.y : toPrev.x
+        record(meta.link.toDeviceId, meta.link.toPort, toSide, coord)
+      }
+    })
+
+    const overrides: AnchorOverrideMap = new Map()
+    const portEdgeInset = renderTuning.value.port_edge_inset
+    let overrideCount = 0
+
+    devicePortList.value.forEach((ports, deviceId) => {
+      const rect = deviceViewMap.value.get(deviceId)
+      if (!rect || ports.length === 0) return
+      const deviceStats = portStats.get(deviceId)
+      if (!deviceStats) return
+      const sideMap = devicePortSideMap.value.get(deviceId) || new Map<string, string>()
+      const orderMap = devicePortOrder.value.get(deviceId) || new Map<string, number>()
+      const neighborMap = devicePortNeighbors.value.get(deviceId) || new Map<string, { xSum: number; ySum: number; count: number }>()
+      const buckets: Record<'left' | 'right' | 'top' | 'bottom', Array<{
+        port: string
+        coord: number | null
+        neighborCoord: number | null
+        order: number
+      }>> = { left: [], right: [], top: [], bottom: [] }
+
+      ports.forEach(port => {
+        const stats = deviceStats.get(port)
+        let side = (sideMap.get(port) || 'right') as 'left' | 'right' | 'top' | 'bottom'
+        if (stats) {
+          const entries = Object.entries(stats.votes) as Array<[string, number]>
+          entries.sort((a, b) => b[1] - a[1])
+          if (entries[0]?.[1] > 0) {
+            side = entries[0][0] as 'left' | 'right' | 'top' | 'bottom'
+          }
+        }
+
+        let coord: number | null = null
+        if (stats) {
+          const coordEntry = stats.coords[side]
+          if (coordEntry.count > 0) coord = coordEntry.sum / coordEntry.count
+        }
+        const neighbor = neighborMap.get(port)
+        const neighborCoord = neighbor
+          ? (side === 'left' || side === 'right' ? neighbor.ySum / neighbor.count : neighbor.xSum / neighbor.count)
+          : null
+
+        buckets[side].push({
+          port,
+          coord,
+          neighborCoord,
+          order: orderMap.get(port) ?? 0
+        })
+      })
+
+      const anchors = new Map<string, { x: number; y: number; side: string }>()
+      ;(['left', 'right'] as const).forEach(side => {
+        const list = buckets[side]
+        const count = list.length
+        if (!count) return
+        list.sort((a, b) => {
+          if (a.coord != null && b.coord != null && a.coord !== b.coord) return a.coord - b.coord
+          if (a.coord != null && b.coord == null) return -1
+          if (a.coord == null && b.coord != null) return 1
+          if (a.neighborCoord != null && b.neighborCoord != null && a.neighborCoord !== b.neighborCoord) return a.neighborCoord - b.neighborCoord
+          if (a.neighborCoord != null && b.neighborCoord == null) return -1
+          if (a.neighborCoord == null && b.neighborCoord != null) return 1
+          return a.order - b.order
+        })
+        const spacing = (rect.height - portEdgeInset * 2) / (count + 1)
+        list.forEach((entry, index) => {
+          const y = rect.y + portEdgeInset + spacing * (index + 1)
+          const x = side === 'left' ? rect.x : rect.x + rect.width
+          anchors.set(entry.port, { x, y, side })
+        })
+      })
+
+      ;(['top', 'bottom'] as const).forEach(side => {
+        const list = buckets[side]
+        const count = list.length
+        if (!count) return
+        list.sort((a, b) => {
+          if (a.coord != null && b.coord != null && a.coord !== b.coord) return a.coord - b.coord
+          if (a.coord != null && b.coord == null) return -1
+          if (a.coord == null && b.coord != null) return 1
+          if (a.neighborCoord != null && b.neighborCoord != null && a.neighborCoord !== b.neighborCoord) return a.neighborCoord - b.neighborCoord
+          if (a.neighborCoord != null && b.neighborCoord == null) return -1
+          if (a.neighborCoord == null && b.neighborCoord != null) return 1
+          return a.order - b.order
+        })
+        const spacing = (rect.width - portEdgeInset * 2) / (count + 1)
+        list.forEach((entry, index) => {
+          const x = rect.x + portEdgeInset + spacing * (index + 1)
+          const y = side === 'top' ? rect.y : rect.y + rect.height
+          anchors.set(entry.port, { x, y, side })
+        })
+      })
+
+      if (anchors.size) {
+        overrides.set(deviceId, anchors)
+        overrideCount += anchors.size
+      }
+    })
+
+    if (overrideCount === 0) return new Map()
+    return overrides
+  }
+
+  const routeLinks = (
+    linkMetas: Array<any>,
+    laneIndex: Map<string, { index: number; total: number }>,
+    labelObstacles: Array<{ linkId: string; rect: Rect }>
+  ) => {
+    const occupancy = new Map<string, number>()
+    const cache = new Map<string, {
+      points: number[]
+      fromAnchor: { x: number; y: number; side?: string }
+      toAnchor: { x: number; y: number; side?: string }
+      fromCenter: { x: number; y: number }
+      toCenter: { x: number; y: number }
+    }>()
+
+    const links = linkMetas
+      .map(meta => {
+        if (!meta) return null
+        const {
+          link,
+          fromView,
+          toView,
+          fromCenter,
+          toCenter,
+          fromAnchor,
+          toAnchor,
+          fromAreaId,
+          toAreaId,
+          fromArea,
+          toArea
+        } = meta
+
+        let points: number[] = []
+        const isL1 = isL1View
+        const bundle = linkBundleIndex.value.get(link.id)
+        const areaBundle = laneIndex.get(link.id) || areaBundleIndex.value.get(link.id)
+        const bundleOffset = bundle && bundle.total > 1
+          ? (bundle.index - (bundle.total - 1) / 2) * (renderTuning.value.bundle_gap * scale)
+          : 0
+        const interAreaBundleGap = renderTuning.value.bundle_gap * scale
+          * (areaBundle && areaBundle.total > 4 ? 1.9 : 1.6)
+        const areaBundleOffset = areaBundle && areaBundle.total > 1
+          ? (areaBundle.index - (areaBundle.total - 1) / 2) * interAreaBundleGap
+          : 0
+        const interBundleOffset = areaBundleOffset + bundleOffset * 0.5
+        const bundleStub = renderTuning.value.bundle_stub * scale
+        const anchorOffset = (renderTuning.value.area_anchor_offset + renderTuning.value.area_clearance) * scale
+        const exitStub = Math.max(renderTuning.value.bundle_stub, renderTuning.value.area_clearance) * scale
+
+        const pushPoint = (arr: number[], x: number, y: number) => {
+          const len = arr.length
+          if (len >= 2 && arr[len - 2] === x && arr[len - 1] === y) return
+          arr.push(x, y)
+        }
+
+        const isIntraArea = fromAreaId && toAreaId && fromAreaId === toAreaId
+        const obstacles: Array<{ x: number; y: number; width: number; height: number }> = []
+        deviceRects.forEach(({ id, rect }) => {
+          if (id === link.fromDeviceId || id === link.toDeviceId) return
           obstacles.push(rect)
         })
-      }
-      if (isL1 && labelObstacles.length) {
-        labelObstacles.forEach(entry => {
-          if (entry.linkId === link.id) return
-          obstacles.push(entry.rect)
-        })
-      }
-
-      const lineBlocked = isL1 && obstacles.some(rect =>
-        segmentIntersectsRect(
-          { x: fromAnchor.x, y: fromAnchor.y },
-          { x: toAnchor.x, y: toAnchor.y },
-          rect,
-          clearance
-        )
-      )
-      const directAllowed = isL1 && !lineBlocked
-
-      const fromSide = fromAnchor.side || computeSide(fromView, toCenter)
-      const toSide = toAnchor.side || computeSide(toView, fromCenter)
-      const fromExit = offsetFromAnchor({ ...fromAnchor, side: fromSide }, exitStub)
-      const toExit = offsetFromAnchor({ ...toAnchor, side: toSide }, exitStub)
-
-      let routed = false
-      if (allowAStar && !directAllowed) {
-        const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
-        const route = routeOrthogonalPath({
-          start: fromExit,
-          end: toExit,
-          obstacles,
-          clearance,
-          grid,
-          occupancy,
-          preferAxis
-        })
-
-        if (route && route.points.length) {
-          const startAxis = fromSide === 'left' || fromSide === 'right' ? 'x' : 'y'
-          const endAxis = toSide === 'left' || toSide === 'right' ? 'x' : 'y'
-          const startConnector = connectOrthogonal(fromAnchor, route.points[0], obstacles, clearance, startAxis)
-          const endConnector = connectOrthogonal(route.points[route.points.length - 1], toAnchor, obstacles, clearance, endAxis)
-
-          const assembled: Array<{ x: number; y: number }> = []
-          appendPoints(assembled, startConnector || [fromAnchor, route.points[0]])
-          appendPoints(assembled, route.points)
-          appendPoints(assembled, endConnector || [route.points[route.points.length - 1], toAnchor])
-
-          const simplified = simplifyOrthogonalPath(assembled, minSegment)
-          simplified.forEach(point => pushPoint(points, point.x, point.y))
-          addOccupancy(occupancy, route.gridPath)
-          routed = true
+        if (!isIntraArea) {
+          // Inter-area links né cả areas khác
+          areaRects.forEach(({ id, rect }) => {
+            if (id === fromAreaId || id === toAreaId) return
+            obstacles.push(rect)
+          })
         }
-      }
+        if (isL1 && labelObstacles.length) {
+          labelObstacles.forEach(entry => {
+            if (entry.linkId === link.id) return
+            obstacles.push(entry.rect)
+          })
+        }
 
-      if (!routed) {
-        // Orthogonal routing for all links (fallback)
-        if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
-          // Check for waypoint area between this area pair
-          const wpKey = fromAreaId < toAreaId ? `${fromAreaId}|${toAreaId}` : `${toAreaId}|${fromAreaId}`
-          const wp = waypointAreaMap.value.get(wpKey)
+        const lineBlocked = isL1 && obstacles.some(rect =>
+          segmentIntersectsRect(
+            { x: fromAnchor.x, y: fromAnchor.y },
+            { x: toAnchor.x, y: toAnchor.y },
+            rect,
+            clearance
+          )
+        )
+        const directAllowed = isL1 && !lineBlocked
 
-          if (wp) {
-            // Route qua waypoint, tách lane trong phạm vi waypoint
-            const axis = resolveLaneAxis(fromAreaId, toAreaId)
-            const wpInset = Math.max(2, 4 * scale)
-            const maxOffsetX = Math.max(0, wp.rect.width / 2 - wpInset)
-            const maxOffsetY = Math.max(0, wp.rect.height / 2 - wpInset)
-            const wpOffsetX = axis === 'x' ? clamp(interBundleOffset, -maxOffsetX, maxOffsetX) : 0
-            const wpOffsetY = axis === 'y' ? clamp(interBundleOffset, -maxOffsetY, maxOffsetY) : 0
-            const wpTarget = { x: wp.cx + wpOffsetX, y: wp.cy + wpOffsetY }
+        const fromSide = fromAnchor.side || computeSide(fromView, toCenter)
+        const toSide = toAnchor.side || computeSide(toView, fromCenter)
+        const fromExit = offsetFromAnchor({ ...fromAnchor, side: fromSide }, exitStub)
+        const toExit = offsetFromAnchor({ ...toAnchor, side: toSide }, exitStub)
 
-            const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, wpTarget, interBundleOffset, anchorOffset)
-            const toAreaAnchor = computeAreaAnchor(toArea, toExit, wpTarget, interBundleOffset, anchorOffset)
-            points = []
-            pushPoint(points, fromAnchor.x, fromAnchor.y)
-            pushPoint(points, fromExit.x, fromExit.y)
-            pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-            pushPoint(points, wpTarget.x, fromAreaAnchor.y)
-            pushPoint(points, wpTarget.x, wpTarget.y)
-            pushPoint(points, wpTarget.x, toAreaAnchor.y)
-            pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-            pushPoint(points, toExit.x, toExit.y)
-            pushPoint(points, toAnchor.x, toAnchor.y)
-          } else {
-            // Fallback: corridor routing
-            const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, anchorOffset)
-            const toAreaAnchor = computeAreaAnchor(toArea, toExit, fromExit, interBundleOffset, anchorOffset)
-            const bounds = areaBounds.value
-            if (bounds) {
-              const corridorGap = renderTuning.value.corridor_gap + renderTuning.value.area_clearance + Math.abs(interBundleOffset)
-              const dx = toAnchor.x - fromAnchor.x
-              const dy = toAnchor.y - fromAnchor.y
-              if (Math.abs(dx) >= Math.abs(dy)) {
-                const topY = bounds.minY - corridorGap
-                const bottomY = bounds.maxY + corridorGap
-                const midY = (fromAnchor.y + toAnchor.y) / 2
-                const corridorBaseY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
-                const corridorY = corridorBaseY + interBundleOffset
-                points = []
-                pushPoint(points, fromAnchor.x, fromAnchor.y)
-                pushPoint(points, fromExit.x, fromExit.y)
-                pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-                pushPoint(points, fromAreaAnchor.x, corridorY)
-                pushPoint(points, toAreaAnchor.x, corridorY)
-                pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-                pushPoint(points, toExit.x, toExit.y)
-                pushPoint(points, toAnchor.x, toAnchor.y)
-              } else {
-                const leftX = bounds.minX - corridorGap
-                const rightX = bounds.maxX + corridorGap
-                const midX = (fromAnchor.x + toAnchor.x) / 2
-                const corridorBaseX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
-                const corridorX = corridorBaseX + interBundleOffset
-                points = []
-                pushPoint(points, fromAnchor.x, fromAnchor.y)
-                pushPoint(points, fromExit.x, fromExit.y)
-                pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-                pushPoint(points, corridorX, fromAreaAnchor.y)
-                pushPoint(points, corridorX, toAreaAnchor.y)
-                pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-                pushPoint(points, toExit.x, toExit.y)
-                pushPoint(points, toAnchor.x, toAnchor.y)
-              }
-            } else {
-              const midX = (fromAnchor.x + toAnchor.x) / 2 + interBundleOffset
+        let routed = false
+        if (allowAStar && !directAllowed) {
+          const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
+          const route = routeOrthogonalPath({
+            start: fromExit,
+            end: toExit,
+            obstacles,
+            clearance,
+            grid,
+            occupancy,
+            preferAxis
+          })
+
+          if (route && route.points.length) {
+            const startAxis = fromSide === 'left' || fromSide === 'right' ? 'x' : 'y'
+            const endAxis = toSide === 'left' || toSide === 'right' ? 'x' : 'y'
+            const startConnector = connectOrthogonal(fromAnchor, route.points[0], obstacles, clearance, startAxis)
+            const endConnector = connectOrthogonal(route.points[route.points.length - 1], toAnchor, obstacles, clearance, endAxis)
+
+            const assembled: Array<{ x: number; y: number }> = []
+            appendPoints(assembled, startConnector || [fromAnchor, route.points[0]])
+            appendPoints(assembled, route.points)
+            appendPoints(assembled, endConnector || [route.points[route.points.length - 1], toAnchor])
+
+            const simplified = simplifyOrthogonalPath(assembled, minSegment)
+            simplified.forEach(point => pushPoint(points, point.x, point.y))
+            addOccupancy(occupancy, route.gridPath)
+            routed = true
+          }
+        }
+
+        if (!routed) {
+          // Orthogonal routing for all links (fallback)
+          if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
+            // Check for waypoint area between this area pair
+            const wpKey = fromAreaId < toAreaId ? `${fromAreaId}|${toAreaId}` : `${toAreaId}|${fromAreaId}`
+            const wp = waypointAreaMap.value.get(wpKey)
+
+            if (wp) {
+              // Route qua waypoint, tách lane trong phạm vi waypoint
+              const axis = resolveLaneAxis(fromAreaId, toAreaId)
+              const wpInset = Math.max(2, 4 * scale)
+              const maxOffsetX = Math.max(0, wp.rect.width / 2 - wpInset)
+              const maxOffsetY = Math.max(0, wp.rect.height / 2 - wpInset)
+              const wpOffsetX = axis === 'x' ? clamp(interBundleOffset, -maxOffsetX, maxOffsetX) : 0
+              const wpOffsetY = axis === 'y' ? clamp(interBundleOffset, -maxOffsetY, maxOffsetY) : 0
+              const wpTarget = { x: wp.cx + wpOffsetX, y: wp.cy + wpOffsetY }
+
+              const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, wpTarget, interBundleOffset, anchorOffset)
+              const toAreaAnchor = computeAreaAnchor(toArea, toExit, wpTarget, interBundleOffset, anchorOffset)
               points = []
               pushPoint(points, fromAnchor.x, fromAnchor.y)
               pushPoint(points, fromExit.x, fromExit.y)
               pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-              pushPoint(points, midX, fromAreaAnchor.y)
-              pushPoint(points, midX, toAreaAnchor.y)
+              pushPoint(points, wpTarget.x, fromAreaAnchor.y)
+              pushPoint(points, wpTarget.x, wpTarget.y)
+              pushPoint(points, wpTarget.x, toAreaAnchor.y)
               pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
               pushPoint(points, toExit.x, toExit.y)
               pushPoint(points, toAnchor.x, toAnchor.y)
-            }
-          }
-        } else if (isL1) {
-          // L1 intra-area: straight segment between ports, bundle if needed
-          // For bundled links, use device centers for consistent perpendicular direction
-          const useCenters = bundleOffset !== 0
-          const dx = useCenters ? (toCenter.x - fromCenter.x) : (toAnchor.x - fromAnchor.x)
-          const dy = useCenters ? (toCenter.y - fromCenter.y) : (toAnchor.y - fromAnchor.y)
-          const dir = normalizeVector(dx, dy)
-          const perp = normalizeVector(-dir.y, dir.x)
-          if (bundleOffset !== 0 && (dir.x !== 0 || dir.y !== 0)) {
-            const fromStub = { x: fromAnchor.x + dir.x * bundleStub, y: fromAnchor.y + dir.y * bundleStub }
-            const toStub = { x: toAnchor.x - dir.x * bundleStub, y: toAnchor.y - dir.y * bundleStub }
-            const fromShift = { x: fromStub.x + perp.x * bundleOffset, y: fromStub.y + perp.y * bundleOffset }
-            const toShift = { x: toStub.x + perp.x * bundleOffset, y: toStub.y + perp.y * bundleOffset }
-            points = [
-              fromAnchor.x, fromAnchor.y,
-              fromShift.x, fromShift.y,
-              toShift.x, toShift.y,
-              toAnchor.x, toAnchor.y
-            ]
-          } else {
-            points = [fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y]
-          }
-
-          if (bundleOffset === 0) {
-            const blockedAreas = []
-            areaViewMap.value.forEach((rect, areaId) => {
-              if (areaId === fromAreaId || areaId === toAreaId) return
-              if (segmentIntersectsRect({ x: fromAnchor.x, y: fromAnchor.y }, { x: toAnchor.x, y: toAnchor.y }, rect, renderTuning.value.area_clearance)) {
-                blockedAreas.push(rect)
+            } else {
+              // Fallback: corridor routing
+              const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, anchorOffset)
+              const toAreaAnchor = computeAreaAnchor(toArea, toExit, fromExit, interBundleOffset, anchorOffset)
+              const bounds = areaBounds.value
+              if (bounds) {
+                const corridorGap = renderTuning.value.corridor_gap + renderTuning.value.area_clearance + Math.abs(interBundleOffset)
+                const dx = toAnchor.x - fromAnchor.x
+                const dy = toAnchor.y - fromAnchor.y
+                if (Math.abs(dx) >= Math.abs(dy)) {
+                  const topY = bounds.minY - corridorGap
+                  const bottomY = bounds.maxY + corridorGap
+                  const midY = (fromAnchor.y + toAnchor.y) / 2
+                  const corridorBaseY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
+                  const corridorY = corridorBaseY + interBundleOffset
+                  points = []
+                  pushPoint(points, fromAnchor.x, fromAnchor.y)
+                  pushPoint(points, fromExit.x, fromExit.y)
+                  pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+                  pushPoint(points, fromAreaAnchor.x, corridorY)
+                  pushPoint(points, toAreaAnchor.x, corridorY)
+                  pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+                  pushPoint(points, toExit.x, toExit.y)
+                  pushPoint(points, toAnchor.x, toAnchor.y)
+                } else {
+                  const leftX = bounds.minX - corridorGap
+                  const rightX = bounds.maxX + corridorGap
+                  const midX = (fromAnchor.x + toAnchor.x) / 2
+                  const corridorBaseX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
+                  const corridorX = corridorBaseX + interBundleOffset
+                  points = []
+                  pushPoint(points, fromAnchor.x, fromAnchor.y)
+                  pushPoint(points, fromExit.x, fromExit.y)
+                  pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+                  pushPoint(points, corridorX, fromAreaAnchor.y)
+                  pushPoint(points, corridorX, toAreaAnchor.y)
+                  pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+                  pushPoint(points, toExit.x, toExit.y)
+                  pushPoint(points, toAnchor.x, toAnchor.y)
+                }
+              } else {
+                const midX = (fromAnchor.x + toAnchor.x) / 2 + interBundleOffset
+                points = []
+                pushPoint(points, fromAnchor.x, fromAnchor.y)
+                pushPoint(points, fromExit.x, fromExit.y)
+                pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+                pushPoint(points, midX, fromAreaAnchor.y)
+                pushPoint(points, midX, toAreaAnchor.y)
+                pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+                pushPoint(points, toExit.x, toExit.y)
+                pushPoint(points, toAnchor.x, toAnchor.y)
               }
-            })
-            if (blockedAreas.length) {
-              const midA = { x: fromAnchor.x, y: toAnchor.y }
-              const midB = { x: toAnchor.x, y: fromAnchor.y }
-              const score = (a: { x: number; y: number }) => {
-                let hits = 0
-                areaViewMap.value.forEach((rect, areaId) => {
-                  if (areaId === fromAreaId || areaId === toAreaId) return
-                  if (segmentIntersectsRect(fromAnchor, a, rect, renderTuning.value.area_clearance)) hits += 1
-                  if (segmentIntersectsRect(a, toAnchor, rect, renderTuning.value.area_clearance)) hits += 1
-                })
-                const length = Math.hypot(a.x - fromAnchor.x, a.y - fromAnchor.y) + Math.hypot(toAnchor.x - a.x, toAnchor.y - a.y)
-                return hits * 10000 + length
-              }
-              const scoreA = score(midA)
-              const scoreB = score(midB)
-              const mid = scoreA <= scoreB ? midA : midB
-              points = [fromAnchor.x, fromAnchor.y, mid.x, mid.y, toAnchor.x, toAnchor.y]
             }
-          }
-        } else {
-          // Intra-area links: orthogonal (Manhattan) routing
-          const dx = toAnchor.x - fromAnchor.x
-          const dy = toAnchor.y - fromAnchor.y
+          } else if (isL1) {
+            // L1 intra-area: straight segment between ports, bundle if needed
+            // For bundled links, use device centers for consistent perpendicular direction
+            const useCenters = bundleOffset !== 0
+            const dx = useCenters ? (toCenter.x - fromCenter.x) : (toAnchor.x - fromAnchor.x)
+            const dy = useCenters ? (toCenter.y - fromCenter.y) : (toAnchor.y - fromAnchor.y)
+            const dir = normalizeVector(dx, dy)
+            const perp = normalizeVector(-dir.y, dir.x)
+            if (bundleOffset !== 0 && (dir.x !== 0 || dir.y !== 0)) {
+              const fromStub = { x: fromAnchor.x + dir.x * bundleStub, y: fromAnchor.y + dir.y * bundleStub }
+              const toStub = { x: toAnchor.x - dir.x * bundleStub, y: toAnchor.y - dir.y * bundleStub }
+              const fromShift = { x: fromStub.x + perp.x * bundleOffset, y: fromStub.y + perp.y * bundleOffset }
+              const toShift = { x: toStub.x + perp.x * bundleOffset, y: toStub.y + perp.y * bundleOffset }
+              points = [
+                fromAnchor.x, fromAnchor.y,
+                fromShift.x, fromShift.y,
+                toShift.x, toShift.y,
+                toAnchor.x, toAnchor.y
+              ]
+            } else {
+              points = [fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y]
+            }
 
-          if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
-            // Very close: direct line
-            points = [fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y]
-          } else if (Math.abs(dx) >= Math.abs(dy)) {
-            // Horizontal dominant: go horizontal first
-            const midX = fromAnchor.x + dx / 2
-            points = [
-              fromAnchor.x, fromAnchor.y,
-              midX, fromAnchor.y,
-              midX, toAnchor.y,
-              toAnchor.x, toAnchor.y
-            ]
+            if (bundleOffset === 0) {
+              const blockedAreas = []
+              areaViewMap.value.forEach((rect, areaId) => {
+                if (areaId === fromAreaId || areaId === toAreaId) return
+                if (segmentIntersectsRect({ x: fromAnchor.x, y: fromAnchor.y }, { x: toAnchor.x, y: toAnchor.y }, rect, renderTuning.value.area_clearance)) {
+                  blockedAreas.push(rect)
+                }
+              })
+              if (blockedAreas.length) {
+                const midA = { x: fromAnchor.x, y: toAnchor.y }
+                const midB = { x: toAnchor.x, y: fromAnchor.y }
+                const score = (a: { x: number; y: number }) => {
+                  let hits = 0
+                  areaViewMap.value.forEach((rect, areaId) => {
+                    if (areaId === fromAreaId || areaId === toAreaId) return
+                    if (segmentIntersectsRect(fromAnchor, a, rect, renderTuning.value.area_clearance)) hits += 1
+                    if (segmentIntersectsRect(a, toAnchor, rect, renderTuning.value.area_clearance)) hits += 1
+                  })
+                  const length = Math.hypot(a.x - fromAnchor.x, a.y - fromAnchor.y) + Math.hypot(toAnchor.x - a.x, toAnchor.y - a.y)
+                  return hits * 10000 + length
+                }
+                const scoreA = score(midA)
+                const scoreB = score(midB)
+                const mid = scoreA <= scoreB ? midA : midB
+                points = [fromAnchor.x, fromAnchor.y, mid.x, mid.y, toAnchor.x, toAnchor.y]
+              }
+            }
           } else {
-            // Vertical dominant: go vertical first
-            const midY = fromAnchor.y + dy / 2
-            points = [
-              fromAnchor.x, fromAnchor.y,
-              fromAnchor.x, midY,
-              toAnchor.x, midY,
-              toAnchor.x, toAnchor.y
-            ]
+            // Intra-area links: orthogonal (Manhattan) routing
+            const dx = toAnchor.x - fromAnchor.x
+            const dy = toAnchor.y - fromAnchor.y
+
+            if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+              // Very close: direct line
+              points = [fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y]
+            } else if (Math.abs(dx) >= Math.abs(dy)) {
+              // Horizontal dominant: go horizontal first
+              const midX = fromAnchor.x + dx / 2
+              points = [
+                fromAnchor.x, fromAnchor.y,
+                midX, fromAnchor.y,
+                midX, toAnchor.y,
+                toAnchor.x, toAnchor.y
+              ]
+            } else {
+              // Vertical dominant: go vertical first
+              const midY = fromAnchor.y + dy / 2
+              points = [
+                fromAnchor.x, fromAnchor.y,
+                fromAnchor.x, midY,
+                toAnchor.x, midY,
+                toAnchor.x, toAnchor.y
+              ]
+            }
           }
         }
-      }
 
-      return {
-        id: link.id,
-        fromAnchor,
-        toAnchor,
-        fromCenter,
-        toCenter,
-        points,
-        config: {
+        return {
+          id: link.id,
+          fromAnchor,
+          toAnchor,
+          fromCenter,
+          toCenter,
           points,
-          stroke: '#2b2a28',
-          strokeWidth: 1.5,
-          lineCap: 'round',
-          lineJoin: 'round',
-          dash: link.style === 'dashed' ? [8, 6] : link.style === 'dotted' ? [2, 4] : [],
-          opacity: 0.8
+          config: {
+            points,
+            stroke: '#2b2a28',
+            strokeWidth: 1.5,
+            lineCap: 'round',
+            lineJoin: 'round',
+            dash: link.style === 'dashed' ? [8, 6] : link.style === 'dotted' ? [2, 4] : [],
+            opacity: 0.8
+          }
         }
-      }
-    })
-    .filter(Boolean) as Array<{ id: string; points: number[]; config: Record<string, unknown> }>
+      })
+      .filter(Boolean) as Array<{ id: string; points: number[]; config: Record<string, unknown> }>
 
-  links.forEach(link => {
-    cache.set(link.id, {
-      points: [...link.points],
-      fromAnchor: { ...link.fromAnchor },
-      toAnchor: { ...link.toAnchor },
-      fromCenter: { ...link.fromCenter },
-      toCenter: { ...link.toCenter }
+    links.forEach(link => {
+      cache.set(link.id, {
+        points: [...link.points],
+        fromAnchor: { ...link.fromAnchor },
+        toAnchor: { ...link.toAnchor },
+        fromCenter: { ...link.fromCenter },
+        toCenter: { ...link.toCenter }
+      })
     })
-  })
 
-  return { links, cache }
+    return { links, cache }
+  }
+
+  const pass1 = buildLinkMetaData()
+  const pass1Result = routeLinks(pass1.linkMetas, pass1.laneIndex, pass1.labelObstacles)
+  const anchorOverrides = buildAnchorOverrides(pass1.linkMetas, pass1Result.cache)
+
+  let finalResult = pass1Result
+  if (anchorOverrides.size > 0) {
+    const pass2 = buildLinkMetaData(anchorOverrides)
+    finalResult = routeLinks(pass2.linkMetas, pass2.laneIndex, pass2.labelObstacles)
+  }
+
+  return { links: finalResult.links, cache: finalResult.cache }
 }
 
 const visibleLinks = computed(() => {

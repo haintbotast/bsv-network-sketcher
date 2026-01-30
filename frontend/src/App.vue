@@ -1179,6 +1179,17 @@ function computeAutoLayoutTuning() {
   return { layer_gap, node_spacing }
 }
 
+function hasStoredLayout() {
+  const epsilon = 0.0001
+  const deviceHasLayout = devices.value.some(device =>
+    Math.abs(device.position_x ?? 0) > epsilon || Math.abs(device.position_y ?? 0) > epsilon
+  )
+  const areaHasLayout = areas.value.some(area =>
+    Math.abs(area.position_x ?? 0) > epsilon || Math.abs(area.position_y ?? 0) > epsilon
+  )
+  return deviceHasLayout || areaHasLayout
+}
+
 function scheduleAutoLayout(projectId: string, force = false) {
   if (autoLayoutTimer) window.clearTimeout(autoLayoutTimer)
   autoLayoutTimer = window.setTimeout(() => {
@@ -1191,6 +1202,10 @@ async function runAutoLayoutAuto(projectId: string, force = false) {
   if (autoLayoutAutoApplying.value) return
   if (!force && autoLayoutAutoAppliedProjects.has(projectId)) return
   if (!devices.value.length) return
+  if (!force && hasStoredLayout()) {
+    autoLayoutAutoAppliedProjects.add(projectId)
+    return
+  }
 
   const hasAreas = areas.value.length > 0
   if (!hasAreas && !links.value.length) return

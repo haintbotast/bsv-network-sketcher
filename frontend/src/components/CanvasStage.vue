@@ -848,16 +848,21 @@ function computePortAnchorFallback(
   const dx = target.x - center.x
   const dy = target.y - center.y
   const index = extractPortIndex(portName)
-  const ratio = index == null || Number.isNaN(index) ? 0.5 : ((index % 12) + 0.5) / 12
+  const portEdgeInset = renderTuning.value.port_edge_inset
+  const usableHeight = Math.max(rect.height - portEdgeInset * 2, 1)
+  const usableWidth = Math.max(rect.width - portEdgeInset * 2, 1)
+  const ratioFromTargetY = clamp((target.y - rect.y - portEdgeInset) / usableHeight, 0.1, 0.9)
+  const ratioFromTargetX = clamp((target.x - rect.x - portEdgeInset) / usableWidth, 0.1, 0.9)
+  const ratio = index == null || Number.isNaN(index)
+    ? (Math.abs(dx) >= Math.abs(dy) ? ratioFromTargetY : ratioFromTargetX)
+    : ((index % 12) + 0.5) / 12
   if (Math.abs(dx) >= Math.abs(dy)) {
     const x = dx >= 0 ? rect.x + rect.width : rect.x
-    const portEdgeInset = renderTuning.value.port_edge_inset
-    const y = rect.y + portEdgeInset + (rect.height - portEdgeInset * 2) * ratio
+    const y = rect.y + portEdgeInset + usableHeight * ratio
     return { x, y }
   }
   const y = dy >= 0 ? rect.y + rect.height : rect.y
-  const portEdgeInset = renderTuning.value.port_edge_inset
-  const x = rect.x + portEdgeInset + (rect.width - portEdgeInset * 2) * ratio
+  const x = rect.x + portEdgeInset + usableWidth * ratio
   return { x, y }
 }
 
@@ -1176,9 +1181,9 @@ const areaBundleIndex = computed(() => {
   return map
 })
 
-// Map: "areaIdA|areaIdB" → waypoint area center (cho inter-area link routing)
+// Map: "areaIdA|areaIdB" → waypoint area rect/center (cho inter-area link routing)
 const waypointAreaMap = computed(() => {
-  const map = new Map<string, { cx: number; cy: number }>()
+  const map = new Map<string, { cx: number; cy: number; rect: { x: number; y: number; width: number; height: number } }>()
   const wpAreas = props.areas.filter(a => a.name.endsWith('_wp_'))
   if (wpAreas.length === 0) return map
 
@@ -1195,6 +1200,7 @@ const waypointAreaMap = computed(() => {
           map.set(areaKey(nonWpAreas[i].id, nonWpAreas[j].id), {
             cx: rect.x + rect.width / 2,
             cy: rect.y + rect.height / 2,
+            rect
           })
         }
       }
@@ -1254,6 +1260,8 @@ const buildVisibleLinks = (useCache: boolean) => {
               points,
               stroke: '#2b2a28',
               strokeWidth: 1.5,
+              lineCap: 'round',
+              lineJoin: 'round',
               dash: link.style === 'dashed' ? [8, 6] : link.style === 'dotted' ? [2, 4] : [],
               opacity: 0.8
             }
@@ -1518,16 +1526,24 @@ const buildVisibleLinks = (useCache: boolean) => {
           const wp = waypointAreaMap.value.get(wpKey)
 
           if (wp) {
-            // Route qua waypoint center
-            const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, { x: wp.cx, y: wp.cy }, interBundleOffset, anchorOffset)
-            const toAreaAnchor = computeAreaAnchor(toArea, toExit, { x: wp.cx, y: wp.cy }, interBundleOffset, anchorOffset)
+            // Route qua waypoint, tách lane trong phạm vi waypoint
+            const axis = resolveLaneAxis(fromAreaId, toAreaId)
+            const wpInset = Math.max(2, 4 * scale)
+            const maxOffsetX = Math.max(0, wp.rect.width / 2 - wpInset)
+            const maxOffsetY = Math.max(0, wp.rect.height / 2 - wpInset)
+            const wpOffsetX = axis === 'x' ? clamp(interBundleOffset, -maxOffsetX, maxOffsetX) : 0
+            const wpOffsetY = axis === 'y' ? clamp(interBundleOffset, -maxOffsetY, maxOffsetY) : 0
+            const wpTarget = { x: wp.cx + wpOffsetX, y: wp.cy + wpOffsetY }
+
+            const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, wpTarget, interBundleOffset, anchorOffset)
+            const toAreaAnchor = computeAreaAnchor(toArea, toExit, wpTarget, interBundleOffset, anchorOffset)
             points = []
             pushPoint(points, fromAnchor.x, fromAnchor.y)
             pushPoint(points, fromExit.x, fromExit.y)
             pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-            pushPoint(points, wp.cx, fromAreaAnchor.y)
-            pushPoint(points, wp.cx, wp.cy)
-            pushPoint(points, wp.cx, toAreaAnchor.y)
+            pushPoint(points, wpTarget.x, fromAreaAnchor.y)
+            pushPoint(points, wpTarget.x, wpTarget.y)
+            pushPoint(points, wpTarget.x, toAreaAnchor.y)
             pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
             pushPoint(points, toExit.x, toExit.y)
             pushPoint(points, toAnchor.x, toAnchor.y)
@@ -1675,6 +1691,8 @@ const buildVisibleLinks = (useCache: boolean) => {
           points,
           stroke: '#2b2a28',
           strokeWidth: 1.5,
+          lineCap: 'round',
+          lineJoin: 'round',
           dash: link.style === 'dashed' ? [8, 6] : link.style === 'dotted' ? [2, 4] : [],
           opacity: 0.8
         }

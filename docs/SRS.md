@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-29  
+> **Cập nhật:** 2026-01-30  
 > **Mục tiêu:** Đặc tả yêu cầu kỹ thuật để triển khai web app theo chuẩn layout network phổ biến.
 
 ---
@@ -35,7 +35,8 @@
 - Sơ đồ L1/L2/L3 hiển thị và chỉnh sửa.
 - Đồng bộ dữ liệu L1→L2→L3 theo quy tắc logic chuẩn (validation chặt chẽ).
 - Auto-layout theo **2 tầng** (macro Area + micro Device), ưu tiên bố cục top‑to‑bottom.
-- Auto-layout mặc định **chạy tự động khi mở project** và **tự chạy lại khi dữ liệu L1 thay đổi** (areas/devices/links); cho phép chạy lại qua UI khi cần.
+- Auto-layout tự động **chỉ chạy khi project chưa có tọa độ layout** (device/area position trống hoặc 0); nếu đã có layout thì **không tự chạy lại**. Cho phép chạy lại khi đổi layout mode hoặc người dùng chủ động.
+- Khoảng cách giữa thiết bị trong auto-layout **tính cả vùng nhãn port (Interface Tag)** để tránh chồng lấn.
 - Overview (nếu bật) chỉ L1/flow; L2/L3 chỉ hiển thị ở view riêng.  
   **Lưu ý:** UI hiện không hiển thị Overview; dùng L1 thay thế.
 - Liên kết khác Area bắt buộc qua **Waypoint area** (đuôi `_wp_`).
@@ -46,6 +47,9 @@
 - Access Switch phải nằm trong **area nghiệp vụ** (Head Office/Department/Project/IT).
 - Server chỉ được kết nối lên **Server Distribution Switch**.
  - Thiết bị Monitor/NOC/NMS được gộp vào **Area IT** (không tạo Area Monitor riêng).
+- Thiết bị trong **Area HO/IT/Department/Project** (không phải Access Switch) chỉ được kết nối **duy nhất** đến **Access Switch cùng Area**.
+- **Access Switch** chỉ được **uplink** lên **Distribution Switch**; các kết nối xuống chỉ được phép tới thiết bị **cùng Area**.
+- **Server Switch** chỉ được kết nối tới **Server/Storage** và **Distribution Switch**.
 
 ### 2.5 Xuất dữ liệu
 - Sinh PPTX/Excel theo layout mode đã chọn.

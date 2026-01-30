@@ -53,6 +53,15 @@ PROJECT_AREA_KEYWORDS = ["project", "proj"]
 IT_AREA_KEYWORDS = ["it"]
 HO_AREA_KEYWORDS = ["head office", "hq", "office", "headquarter", "headquarters"]
 
+# UI uses 120px per logical unit (inch) when mapping to canvas.
+UNIT_PX = 120.0
+LABEL_CHAR_WIDTH_PX = 6.0
+LABEL_PADDING_PX = 8.0
+LABEL_MIN_WIDTH_PX = 24.0
+LABEL_HEIGHT_PX = 16.0
+DEFAULT_DEVICE_WIDTH = 1.2
+DEFAULT_DEVICE_HEIGHT = 0.5
+
 
 def _normalize(text: str | None) -> str:
     return (text or "").strip().lower()
@@ -314,6 +323,130 @@ async def _normalize_topology(
     return areas, devices
 
 
+def _collect_device_ports(links: list, l2_assignments: list | None = None) -> dict[str, set[str]]:
+    ports: dict[str, set[str]] = {}
+
+    def add(device_id: str | None, port: str | None) -> None:
+        if not device_id or not port:
+            return
+        cleaned = port.strip()
+        if not cleaned:
+            return
+        ports.setdefault(device_id, set()).add(cleaned)
+
+    for link in links:
+        add(getattr(link, "from_device_id", None), getattr(link, "from_port", None))
+        add(getattr(link, "to_device_id", None), getattr(link, "to_port", None))
+
+    if l2_assignments:
+        for assignment in l2_assignments:
+            add(getattr(assignment, "device_id", None), getattr(assignment, "interface_name", None))
+
+    return ports
+
+
+def _estimate_label_clearance(ports_by_device: dict[str, set[str]], render_tuning: dict | None) -> tuple[float, float]:
+    if not ports_by_device:
+        return 0.0, 0.0
+
+    max_len = 0
+    for ports in ports_by_device.values():
+        for port in ports:
+            max_len = max(max_len, len(port))
+
+    if max_len <= 0:
+        return 0.0, 0.0
+
+    tuning = render_tuning or {}
+    label_gap_x = float(tuning.get("label_gap_x", 8))
+    label_gap_y = float(tuning.get("label_gap_y", 6))
+    label_offset = float(tuning.get("port_label_offset", 12))
+
+    label_width_px = max(max_len * LABEL_CHAR_WIDTH_PX + LABEL_PADDING_PX, LABEL_MIN_WIDTH_PX)
+    label_width_px += label_gap_x + label_offset
+    label_height_px = LABEL_HEIGHT_PX + label_gap_y + label_offset
+
+    return label_width_px / UNIT_PX, label_height_px / UNIT_PX
+
+
+def _rect_bounds(layout: AreaLayout) -> tuple[float, float, float, float]:
+    left = layout.x
+    top = layout.y
+    right = layout.x + layout.width
+    bottom = layout.y + layout.height
+    return left, top, right, bottom
+
+
+def _point_in_rect(px: float, py: float, rect: tuple[float, float, float, float]) -> bool:
+    left, top, right, bottom = rect
+    return left <= px <= right and top <= py <= bottom
+
+
+def _compute_waypoint_center(
+    la: AreaLayout,
+    lb: AreaLayout,
+    wp_width: float,
+    wp_height: float,
+    clearance: float = 0.15,
+) -> tuple[float, float]:
+    left_a, top_a, right_a, bottom_a = _rect_bounds(la)
+    left_b, top_b, right_b, bottom_b = _rect_bounds(lb)
+
+    overlap_x = min(right_a, right_b) - max(left_a, left_b)
+    overlap_y = min(bottom_a, bottom_b) - max(top_a, top_b)
+
+    if right_a <= left_b:
+        cx = (right_a + left_b) / 2
+    elif right_b <= left_a:
+        cx = (right_b + left_a) / 2
+    else:
+        cx = (max(left_a, left_b) + min(right_a, right_b)) / 2
+
+    if bottom_a <= top_b:
+        cy = (bottom_a + top_b) / 2
+    elif bottom_b <= top_a:
+        cy = (bottom_b + top_a) / 2
+    else:
+        cy = (max(top_a, top_b) + min(bottom_a, bottom_b)) / 2
+
+    acx = (left_a + right_a) / 2
+    acy = (top_a + bottom_a) / 2
+    bcx = (left_b + right_b) / 2
+    bcy = (top_b + bottom_b) / 2
+    dx = bcx - acx
+    dy = bcy - acy
+
+    if overlap_x > 0 and overlap_y > 0:
+        if abs(dx) >= abs(dy):
+            if dx >= 0:
+                cx = max(right_a, right_b) + wp_width / 2 + clearance
+            else:
+                cx = min(left_a, left_b) - wp_width / 2 - clearance
+            cy = (acy + bcy) / 2
+        else:
+            if dy >= 0:
+                cy = max(bottom_a, bottom_b) + wp_height / 2 + clearance
+            else:
+                cy = min(top_a, top_b) - wp_height / 2 - clearance
+            cx = (acx + bcx) / 2
+
+    if _point_in_rect(cx, cy, (left_a, top_a, right_a, bottom_a)) or _point_in_rect(cx, cy, (left_b, top_b, right_b, bottom_b)):
+        if abs(dx) >= abs(dy):
+            if dx >= 0:
+                cx = max(right_a, right_b) + wp_width / 2 + clearance
+            else:
+                cx = min(left_a, left_b) - wp_width / 2 - clearance
+            cy = (acy + bcy) / 2
+        else:
+            if dy >= 0:
+                cy = max(bottom_a, bottom_b) + wp_height / 2 + clearance
+            else:
+                cy = min(top_a, top_b) - wp_height / 2 - clearance
+            cx = (acx + bcx) / 2
+
+    return cx, cy
+
+
 async def _create_or_update_waypoint_areas(
     db: AsyncSession,
     project_id: str,
@@ -359,6 +492,9 @@ async def _create_or_update_waypoint_areas(
         "stroke_width": 0.5,
     })
 
+    wp_width = 0.6
+    wp_height = 0.4
+
     for aid_a, aid_b in inter_pairs:
         names = sorted([area_name_map.get(aid_a, ""), area_name_map.get(aid_b, "")])
         wp_name = f"{names[0]}_{names[1]}_wp_"
@@ -368,9 +504,10 @@ async def _create_or_update_waypoint_areas(
         if not la or not lb:
             continue
 
-        # Midpoint giữa 2 area centers
-        mid_x = (la.x + la.width / 2 + lb.x + lb.width / 2) / 2 - 0.3
-        mid_y = (la.y + la.height / 2 + lb.y + lb.height / 2) / 2 - 0.2
+        # Waypoint đặt ở hành lang giữa 2 area (ưu tiên giữa biên)
+        center_x, center_y = _compute_waypoint_center(la, lb, wp_width, wp_height)
+        mid_x = center_x - wp_width / 2
+        mid_y = center_y - wp_height / 2
 
         if wp_name in existing_wp:
             wp = existing_wp[wp_name]
@@ -387,14 +524,14 @@ async def _create_or_update_waypoint_areas(
                 grid_col=99,
                 position_x=mid_x,
                 position_y=mid_y,
-                width=0.6,
-                height=0.4,
+                width=wp_width,
+                height=wp_height,
                 style_json=wp_style,
             )
             db.add(wp)
 
         area_layouts.append(AreaLayout(
-            id=wp_id, name=wp_name, x=mid_x, y=mid_y, width=0.6, height=0.4,
+            id=wp_id, name=wp_name, x=mid_x, y=mid_y, width=wp_width, height=wp_height,
         ))
 
     await db.flush()
@@ -440,6 +577,7 @@ async def compute_auto_layout(
 
     admin_config = await get_admin_config(db)
     layout_tuning = admin_config.get("layout_tuning", {}) if isinstance(admin_config, dict) else {}
+    render_tuning = admin_config.get("render_tuning", {}) if isinstance(admin_config, dict) else {}
 
     # Load data based on view_mode
     view_mode = options.view_mode
@@ -484,6 +622,21 @@ async def compute_auto_layout(
         if not l3_addresses:
             raise HTTPException(status_code=404, detail="No L3 addresses found in project")
 
+    label_clearance_x = 0.0
+    label_clearance_y = 0.0
+    if view_mode in ("L1", "L2"):
+        ports_by_device = _collect_device_ports(links, l2_assignments if view_mode == "L2" else None)
+        label_clearance_x, label_clearance_y = _estimate_label_clearance(ports_by_device, render_tuning)
+
+    max_device_width = max(
+        [getattr(d, "width", None) or DEFAULT_DEVICE_WIDTH for d in devices] + [DEFAULT_DEVICE_WIDTH]
+    )
+    max_device_height = max(
+        [getattr(d, "height", None) or DEFAULT_DEVICE_HEIGHT for d in devices] + [DEFAULT_DEVICE_HEIGHT]
+    )
+    node_width = max_device_width + label_clearance_x
+    node_height = max_device_height + label_clearance_y
+
     # Check cache
     cache = get_cache()
     options_hash = {
@@ -494,6 +647,7 @@ async def compute_auto_layout(
         "view_mode": options.view_mode,
         "normalize_topology": options.normalize_topology,
         "layout_tuning": layout_tuning,
+        "render_tuning": render_tuning,
     }
 
     # Different cache keys for different views
@@ -515,6 +669,8 @@ async def compute_auto_layout(
     config = LayoutConfig(
         layer_gap=options.layer_gap,
         node_spacing=options.node_spacing,
+        node_width=node_width,
+        node_height=node_height,
     )
 
     try:
@@ -939,6 +1095,8 @@ def compute_layout_l1(
     micro_config = LayoutConfig(
         layer_gap=config.layer_gap,
         node_spacing=config.node_spacing,
+        node_width=config.node_width,
+        node_height=config.node_height,
         max_nodes_per_row=max_nodes_per_row,
         row_gap=row_gap,
         row_stagger=row_stagger,

@@ -538,6 +538,26 @@ Response (400 Bad Request - server uplink sai tầng):
 }
 ```
 
+Response (400 Bad Request - vi phạm quy tắc Access/Area/Server Switch):
+```json
+{
+  "errors": [
+    {
+      "entity": "link",
+      "code": "BUSINESS_AREA_UPLINK_INVALID",
+      "message": "Thiết bị trong Area HO/IT/Department/Project chỉ được kết nối đến Access Switch cùng Area."
+    }
+  ]
+}
+```
+
+Các mã lỗi liên quan khác có thể gặp:
+- `BUSINESS_AREA_SINGLE_UPLINK`
+- `ACCESS_UPLINK_INVALID`
+- `ACCESS_DOWNLINK_INVALID`
+- `SERVER_SWITCH_UPLINK_INVALID`
+- `SERVER_SWITCH_DOWNLINK_INVALID`
+
 ---
 
 ### 10.6 Export

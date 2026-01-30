@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-29  
+> **Cập nhật:** 2026-01-30  
 > **Mục tiêu:** Chuẩn hóa hình khối, nét vẽ, màu sắc, chữ và nền cho toàn hệ thống (UI + Konva + export).
 
 ---
@@ -115,8 +115,10 @@
 | Area | Rectangle bo góc | Nền nhạt xám nhẹ, label góc trên trái, **không viền**, có **đổ bóng nhẹ** |
 | Device | Rectangle bo góc | Màu theo loại thiết bị, **không viền**, có **đổ bóng nhẹ** |
 | Waypoint | Diamond hoặc Circle | Không hiện label khi zoom out |
-| Link | Line | L1 ưu tiên **đường thẳng ngắn nhất** giữa port; nếu bị cản thì dùng Manhattan tránh vật cản; L2/L3 dùng Manhattan; màu theo purpose; nét liền/đứt |
+| Link | Line | L1 ưu tiên **đường thẳng ngắn nhất** giữa port; nếu bị cản thì dùng Manhattan tránh vật cản; L2/L3 dùng Manhattan; màu theo purpose; nét liền/đứt; **bo góc mềm** (lineJoin/lineCap round) |
 | Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor**, có thể xoay theo hướng link; auto-scale theo zoom (0.6-1.15) và tự giãn để tránh chồng lấn |
+
+- Auto-layout cần **tính thêm vùng đệm Interface Tag** khi giãn khoảng cách giữa thiết bị để tránh chồng lấn.
 
 ### 4.1 Kích thước chuẩn (tham chiếu)
 

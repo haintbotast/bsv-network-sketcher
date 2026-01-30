@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-23  
+> **Cập nhật:** 2026-01-30  
 > **Nguyên tắc:** Tối giản nhưng chính xác tuyệt đối, UX tiện dụng, không CLI.
 
 ---
@@ -27,6 +27,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-03:** Thư viện template dữ liệu chuẩn (tạo/sửa/áp dụng phiên bản).
 - **FR-04:** Hiển thị và chỉnh sửa sơ đồ L1/L2/L3 bằng canvas.
 - **FR-05:** Đồng bộ dữ liệu giữa các lớp L1→L2→L3 theo quy tắc logic chuẩn.
+- **FR-05A:** Ràng buộc kết nối L1 theo tầng: thiết bị HO/IT/Department/Project chỉ uplink tới Access cùng Area; Access uplink tới Distribution; Server chỉ nối tới Server Switch.
 - **FR-06:** Xuất PPTX/Excel theo layout mode đã chọn.
 - **FR-07:** Lưu/khôi phục trạng thái, lịch sử xuất.
 - **FR-08:** Tìm kiếm nhanh thiết bị/kết nối trong project.

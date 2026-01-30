@@ -42,6 +42,8 @@ DIST_NAME_RE = re.compile(r"\bDIST\b|DISTR", re.IGNORECASE)
 SERVER_NAME_RE = re.compile(r"\b(SERVER|SRV|APP|WEB|DB|NAS|SAN|STORAGE|BACKUP)\b", re.IGNORECASE)
 SERVER_SWITCH_RE = re.compile(r"\b(SW|SWITCH)\b", re.IGNORECASE)
 SERVER_AREA_RE = re.compile(r"\bSERVER|STORAGE\b", re.IGNORECASE)
+BUSINESS_AREA_RE = re.compile(r"\b(HEAD\s*OFFICE|HQ|HO|DEPARTMENT|DEPT|PROJECT|IT)\b", re.IGNORECASE)
+ACCESS_NAME_RE = re.compile(r"\bACCESS\b|\bACC\b", re.IGNORECASE)
 
 
 def _is_endpoint_device(device) -> bool:
@@ -57,6 +59,29 @@ def _is_core_or_dist_device(device) -> bool:
     if dtype == "SWITCH" and (CORE_NAME_RE.search(name) or DIST_NAME_RE.search(name)):
         return True
     return bool(CORE_NAME_RE.search(name) or DIST_NAME_RE.search(name))
+
+
+def _is_switch_device(device) -> bool:
+    dtype = (getattr(device, "device_type", "") or "").upper()
+    return dtype == "SWITCH"
+
+
+def _area_name(device) -> str:
+    return getattr(getattr(device, "area", None), "name", "") or ""
+
+
+def _is_business_area_device(device) -> bool:
+    return bool(BUSINESS_AREA_RE.search(_area_name(device)))
+
+
+def _is_access_switch(device) -> bool:
+    name = getattr(device, "name", "") or ""
+    return _is_switch_device(device) and bool(ACCESS_NAME_RE.search(name))
+
+
+def _is_distribution_switch(device) -> bool:
+    name = getattr(device, "name", "") or ""
+    return _is_switch_device(device) and bool(DIST_NAME_RE.search(name) or CORE_NAME_RE.search(name))
 
 
 def _is_server_device(device) -> bool:
@@ -81,6 +106,10 @@ def _is_server_distribution_switch(device) -> bool:
     return False
 
 
+def _is_server_switch(device) -> bool:
+    return _is_server_distribution_switch(device)
+
+
 def _endpoint_uplink_violation(from_device, to_device) -> bool:
     return (_is_endpoint_device(from_device) and _is_core_or_dist_device(to_device)) or (
         _is_endpoint_device(to_device) and _is_core_or_dist_device(from_device)
@@ -93,6 +122,62 @@ def _server_uplink_violation(from_device, to_device) -> bool:
     if _is_server_device(to_device) and not _is_server_distribution_switch(from_device):
         return True
     return False
+
+
+def _device_link_count(links: list, device_id: str, exclude_link_id: str | None = None) -> int:
+    count = 0
+    for link in links:
+        if exclude_link_id and getattr(link, "id", None) == exclude_link_id:
+            continue
+        if link.from_device_id == device_id or link.to_device_id == device_id:
+            count += 1
+    return count
+
+
+def _business_area_link_violation(
+    from_device,
+    to_device,
+    link_count_fn,
+) -> tuple[str, str] | None:
+    for device, other in ((from_device, to_device), (to_device, from_device)):
+        if _is_business_area_device(device) and not _is_access_switch(device):
+            same_area = getattr(device, "area_id", None) == getattr(other, "area_id", None)
+            if not (_is_access_switch(other) and same_area):
+                return (
+                    "BUSINESS_AREA_UPLINK_INVALID",
+                    "Thiết bị trong Area HO/IT/Department/Project chỉ được kết nối đến Access Switch cùng Area.",
+                )
+            if link_count_fn(device.id) >= 1:
+                return (
+                    "BUSINESS_AREA_SINGLE_UPLINK",
+                    "Thiết bị trong Area HO/IT/Department/Project chỉ được có 1 uplink lên Access Switch.",
+                )
+    return None
+
+
+def _access_switch_link_violation(from_device, to_device) -> tuple[str, str] | None:
+    for device, other in ((from_device, to_device), (to_device, from_device)):
+        if _is_access_switch(device):
+            if _is_switch_device(other):
+                if not _is_distribution_switch(other):
+                    return ("ACCESS_UPLINK_INVALID", "Access Switch chỉ được uplink lên Distribution Switch.")
+            else:
+                same_area = getattr(device, "area_id", None) == getattr(other, "area_id", None)
+                if not same_area:
+                    return ("ACCESS_DOWNLINK_INVALID", "Access Switch chỉ được kết nối thiết bị cùng Area.")
+    return None
+
+
+def _server_switch_link_violation(from_device, to_device) -> tuple[str, str] | None:
+    for device, other in ((from_device, to_device), (to_device, from_device)):
+        if _is_server_switch(device):
+            if _is_switch_device(other):
+                if not _is_distribution_switch(other):
+                    return ("SERVER_SWITCH_UPLINK_INVALID", "Server Switch chỉ được uplink lên Distribution Switch.")
+            else:
+                if not _is_server_device(other):
+                    return ("SERVER_SWITCH_DOWNLINK_INVALID", "Server Switch chỉ được kết nối tới thiết bị Server/Storage.")
+    return None
 
 
 async def _verify_project_access(db: DBSession, project_id: str, user_id: str):
@@ -175,10 +260,34 @@ async def create_new_link(
             detail=f"Port '{data.to_port}' trên device '{data.to_device}' đã được sử dụng",
         )
 
+    existing_links = await get_links(db, project_id)
+
     if _endpoint_uplink_violation(from_device, to_device):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Endpoint không được kết nối trực tiếp lên Distribution/Core (phải qua Access).",
+        )
+    violation = _business_area_link_violation(
+        from_device,
+        to_device,
+        lambda device_id: _device_link_count(existing_links, device_id),
+    )
+    if violation:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=violation[1],
+        )
+    violation = _access_switch_link_violation(from_device, to_device)
+    if violation:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=violation[1],
+        )
+    violation = _server_switch_link_violation(from_device, to_device)
+    if violation:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=violation[1],
         )
     if _server_uplink_violation(from_device, to_device):
         raise HTTPException(
@@ -249,11 +358,35 @@ async def update_existing_link(
 
     effective_from = from_device or link.from_device
     effective_to = to_device or link.to_device
+    existing_links = await get_links(db, project_id)
     if effective_from and effective_to and _endpoint_uplink_violation(effective_from, effective_to):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Endpoint không được kết nối trực tiếp lên Distribution/Core (phải qua Access).",
         )
+    if effective_from and effective_to:
+        violation = _business_area_link_violation(
+            effective_from,
+            effective_to,
+            lambda device_id: _device_link_count(existing_links, device_id, exclude_link_id=link.id),
+        )
+        if violation:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=violation[1],
+            )
+        violation = _access_switch_link_violation(effective_from, effective_to)
+        if violation:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=violation[1],
+            )
+        violation = _server_switch_link_violation(effective_from, effective_to)
+        if violation:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=violation[1],
+            )
     if effective_from and effective_to and _server_uplink_violation(effective_from, effective_to):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -293,6 +426,12 @@ async def bulk_create_links(
 ) -> L1LinkBulkResponse:
     """Bulk create links."""
     await _verify_project_access(db, project_id, current_user.id)
+
+    existing_links = await get_links(db, project_id)
+    link_counts: dict[str, int] = {}
+    for link in existing_links:
+        link_counts[link.from_device_id] = link_counts.get(link.from_device_id, 0) + 1
+        link_counts[link.to_device_id] = link_counts.get(link.to_device_id, 0) + 1
 
     created = []
     errors = []
@@ -341,6 +480,37 @@ async def bulk_create_links(
                     "message": "Endpoint không được kết nối trực tiếp lên Distribution/Core (phải qua Access).",
                 })
                 continue
+            violation = _business_area_link_violation(
+                from_device,
+                to_device,
+                lambda device_id: link_counts.get(device_id, 0),
+            )
+            if violation:
+                errors.append({
+                    "entity": "link",
+                    "row": row,
+                    "code": violation[0],
+                    "message": violation[1],
+                })
+                continue
+            violation = _access_switch_link_violation(from_device, to_device)
+            if violation:
+                errors.append({
+                    "entity": "link",
+                    "row": row,
+                    "code": violation[0],
+                    "message": violation[1],
+                })
+                continue
+            violation = _server_switch_link_violation(from_device, to_device)
+            if violation:
+                errors.append({
+                    "entity": "link",
+                    "row": row,
+                    "code": violation[0],
+                    "message": violation[1],
+                })
+                continue
             if _server_uplink_violation(from_device, to_device):
                 errors.append({
                     "entity": "link",
@@ -356,6 +526,8 @@ async def bulk_create_links(
                 "name": f"{link_data.from_device}:{link_data.from_port} -> {link_data.to_device}:{link_data.to_port}",
                 "row": row,
             })
+            link_counts[from_device.id] = link_counts.get(from_device.id, 0) + 1
+            link_counts[to_device.id] = link_counts.get(to_device.id, 0) + 1
         except Exception as e:
             errors.append({
                 "entity": "link",

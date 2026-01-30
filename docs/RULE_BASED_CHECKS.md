@@ -57,6 +57,9 @@
 - **RB-010A:** Thiết bị Monitor/NOC/NMS phải nằm trong **Area IT** (không tạo Area Monitor riêng).
 - **RB-011:** Access Switch phải nằm trong **Area nghiệp vụ** (Head Office/Department/Project/IT), không thuộc area Access riêng.
 - **RB-012:** Server chỉ được kết nối lên **Server Distribution Switch**.
+- **RB-013:** Thiết bị trong **Area HO/IT/Department/Project** (không phải Access Switch) chỉ được kết nối **duy nhất** đến **Access Switch cùng Area**.
+- **RB-014:** **Access Switch** chỉ được **uplink** lên **Distribution Switch**; kết nối xuống chỉ tới thiết bị cùng Area.
+- **RB-015:** **Server Switch** chỉ được kết nối tới **Server/Storage** và **Distribution Switch**.
 
 ---
 

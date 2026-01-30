@@ -1424,6 +1424,59 @@ const buildVisibleLinks = (useCache: boolean) => {
     }
   })
 
+  const labelObstacles: Array<{ linkId: string; rect: Rect }> = []
+  if (isL1View) {
+    const labelScale = clamp(layoutViewport.value.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
+    const labelHeight = PORT_LABEL_HEIGHT * labelScale
+    const labelPadding = PORT_LABEL_PADDING * labelScale
+    const labelOffset = renderTuning.value.port_label_offset * labelScale
+    const minLabelWidth = 24 * labelScale
+    const charWidth = 6 * labelScale
+    const baseGap = Math.max(2, Math.min(renderTuning.value.label_gap_x, renderTuning.value.label_gap_y) * 0.5 * labelScale)
+
+    const buildLabelRect = (
+      linkId: string,
+      text: string | undefined,
+      anchor: { x: number; y: number },
+      center: { x: number; y: number },
+      neighbor: { x: number; y: number }
+    ) => {
+      const content = text?.trim()
+      if (!content) return
+      const width = Math.max(content.length * charWidth + labelPadding, minLabelWidth)
+      const height = labelHeight
+      const dx = neighbor.x - anchor.x
+      const dy = neighbor.y - anchor.y
+      const len = Math.hypot(dx, dy)
+      let cx: number
+      let cy: number
+      if (len < 1) {
+        const pos = computePortLabelPlacement(anchor, center, width, height, labelOffset)
+        cx = pos.x + width / 2
+        cy = pos.y + height / 2
+      } else {
+        const offset = (width / 2 + 4) / len
+        cx = anchor.x + dx * offset
+        cy = anchor.y + dy * offset
+      }
+      labelObstacles.push({
+        linkId,
+        rect: {
+          x: cx - width / 2 - baseGap,
+          y: cy - height / 2 - baseGap,
+          width: width + baseGap * 2,
+          height: height + baseGap * 2,
+        }
+      })
+    }
+
+    linkMetas.forEach(meta => {
+      if (!meta) return
+      buildLabelRect(meta.link.id, meta.link.fromPort, meta.fromAnchor, meta.fromCenter, meta.toCenter)
+      buildLabelRect(meta.link.id, meta.link.toPort, meta.toAnchor, meta.toCenter, meta.fromCenter)
+    })
+  }
+
   const laneIndex = new Map<string, { index: number; total: number }>()
   laneGroups.forEach(list => {
     list.sort((a, b) => {
@@ -1497,6 +1550,12 @@ const buildVisibleLinks = (useCache: boolean) => {
         areaRects.forEach(({ id, rect }) => {
           if (id === fromAreaId || id === toAreaId) return
           obstacles.push(rect)
+        })
+      }
+      if (isL1 && labelObstacles.length) {
+        labelObstacles.forEach(entry => {
+          if (entry.linkId === link.id) return
+          obstacles.push(entry.rect)
         })
       }
 

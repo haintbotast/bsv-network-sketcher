@@ -58,7 +58,7 @@
 - Bắt buộc đi qua **Waypoint area** (đuôi `_wp_`), không nối Area‑Area trực tiếp.
 - Link đi qua **anchor** trên biên Area để giảm cắt xuyên.
 - Ưu tiên tuyến **corridor** (ngoài biên Area) cho liên‑area để tránh đi xuyên vùng thiết bị.
-- Routing link ưu tiên **tránh vật cản** (area/device) và **giảm chồng lấn**; nếu không bị cản thì giữ đường thẳng ngắn nhất.
+- Routing link ưu tiên **tránh vật cản** (area/device/**interface tag**) và **giảm chồng lấn**; nếu không bị cản thì giữ đường thẳng ngắn nhất.
 - Liên‑area **tách lane rộng hơn** so với bundle nội‑area để giảm chồng/đè.
 
 **Macro layout (Area):**

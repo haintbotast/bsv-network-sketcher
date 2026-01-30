@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.1
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-01-29  
+> **Cập nhật:** 2026-01-30  
 > **Mục tiêu:** Quy định chiến lược kiểm thử và golden files.
 
 ## 1. Kiểm thử backend
@@ -12,6 +12,7 @@
 - **top‑to‑bottom:** Core/Dist ở hàng trên, Access giữa, Endpoints dưới (ưu tiên cha ở trên con).
 - **_AIR_ spacing:** giữ thẳng cột, không chồng lấn.
 - **same_type_row:** thiết bị cùng loại ưu tiên ở cùng hàng khi `max_nodes_per_row` cho phép.
+- **port_label_band:** giãn khoảng cách thiết bị có tính đến kích thước nhãn cổng.
 - **inter‑area:** link khác Area bắt buộc qua Waypoint area (`_wp_`).
 
 ### 1.2 Kiểm thử overview/L2/L3

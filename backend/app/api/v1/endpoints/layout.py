@@ -623,6 +623,14 @@ async def compute_auto_layout(
 
     node_width = DEFAULT_DEVICE_WIDTH
     node_height = DEFAULT_DEVICE_HEIGHT
+    port_label_band = 0.0
+    if view_mode == "L1":
+        try:
+            port_label_band = float(layout_tuning.get("port_label_band", 0.0))
+        except (TypeError, ValueError):
+            port_label_band = 0.0
+        if port_label_band < 0:
+            port_label_band = 0.0
 
     # Check cache
     cache = get_cache()
@@ -658,6 +666,13 @@ async def compute_auto_layout(
         node_width=node_width,
         node_height=node_height,
     )
+    if view_mode == "L1" and not options.group_by_area and port_label_band:
+        config = LayoutConfig(
+            layer_gap=options.layer_gap + port_label_band,
+            node_spacing=options.node_spacing + port_label_band,
+            node_width=node_width,
+            node_height=node_height,
+        )
 
     try:
         if view_mode == "L1":
@@ -822,6 +837,13 @@ def compute_layout_l1(
 ) -> dict:
     """Compute L1 layout: area-based with minimized area visuals (compact spacing)."""
     tuning = layout_tuning or {}
+    port_label_band = 0.0
+    try:
+        port_label_band = float(tuning.get("port_label_band", 0.0))
+    except (TypeError, ValueError):
+        port_label_band = 0.0
+    if port_label_band < 0:
+        port_label_band = 0.0
     AREA_MIN_WIDTH = 3.0
     AREA_MIN_HEIGHT = 1.5
     AREA_GAP = float(tuning.get("area_gap", 0.9))
@@ -1060,6 +1082,8 @@ def compute_layout_l1(
         area_external_links[to_area] += 1
 
     # Micro layout config (top-to-bottom per AI Context)
+    layer_gap = max(0.0, config.layer_gap + port_label_band)
+    node_spacing = max(0.0, config.node_spacing + port_label_band)
     max_nodes_per_row = tuning.get("max_nodes_per_row")
     try:
         max_nodes_per_row = int(max_nodes_per_row) if max_nodes_per_row is not None else None
@@ -1068,9 +1092,13 @@ def compute_layout_l1(
 
     row_gap = tuning.get("row_gap")
     try:
-        row_gap = float(row_gap) if row_gap is not None else max(0.2, config.node_spacing * 0.6)
+        if row_gap is not None:
+            row_gap = float(row_gap) + port_label_band
+        else:
+            row_gap = max(0.2, node_spacing * 0.6)
     except (TypeError, ValueError):
-        row_gap = max(0.2, config.node_spacing * 0.6)
+        row_gap = max(0.2, node_spacing * 0.6)
+    row_gap = max(0.0, row_gap)
 
     row_stagger = tuning.get("row_stagger")
     try:
@@ -1079,8 +1107,8 @@ def compute_layout_l1(
         row_stagger = 0.5
 
     micro_config = LayoutConfig(
-        layer_gap=config.layer_gap,
-        node_spacing=config.node_spacing,
+        layer_gap=layer_gap,
+        node_spacing=node_spacing,
         node_width=config.node_width,
         node_height=config.node_height,
         max_nodes_per_row=max_nodes_per_row,
@@ -1371,7 +1399,7 @@ def compute_layout_l1(
             l for l in links
             if l.from_device_id in no_area_device_ids and l.to_device_id in no_area_device_ids
         ]
-        layout_result = simple_layer_layout(no_area_devices, no_area_links, config)
+        layout_result = simple_layer_layout(no_area_devices, no_area_links, micro_config)
         for d in layout_result.devices:
             device_layouts.append(DeviceLayout(
                 id=d["id"],

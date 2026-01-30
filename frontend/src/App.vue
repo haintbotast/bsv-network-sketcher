@@ -151,31 +151,35 @@
                 <input type="number" step="0.05" v-model.number="layoutTuningForm.area_gap" />
               </div>
               <div class="form-group">
-                <label>Lề trong của vùng</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.area_padding" />
+                <label>Bù nhãn cổng</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.port_label_band" />
               </div>
             </div>
             <div class="form-row">
+              <div class="form-group">
+                <label>Lề trong của vùng</label>
+                <input type="number" step="0.05" v-model.number="layoutTuningForm.area_padding" />
+              </div>
               <div class="form-group">
                 <label>Lề nhãn khu vực</label>
                 <input type="number" step="0.05" v-model.number="layoutTuningForm.label_band" />
               </div>
+            </div>
+            <div class="form-row">
               <div class="form-group">
                 <label>Giới hạn độ rộng mỗi hàng</label>
                 <input type="number" step="0.1" v-model.number="layoutTuningForm.max_row_width_base" />
               </div>
-            </div>
-            <div class="form-row">
               <div class="form-group">
                 <label>Tối đa node mỗi hàng</label>
                 <input type="number" step="1" min="1" v-model.number="layoutTuningForm.max_nodes_per_row" />
               </div>
+            </div>
+            <div class="form-row">
               <div class="form-group">
                 <label>Khoảng cách giữa hàng</label>
                 <input type="number" step="0.05" v-model.number="layoutTuningForm.row_gap" />
               </div>
-            </div>
-            <div class="form-row">
               <div class="form-group">
                 <label>Độ so‑le hàng (0‑1)</label>
                 <input type="number" step="0.05" min="0" max="1" v-model.number="layoutTuningForm.row_stagger" />
@@ -227,6 +231,14 @@
 
             <button type="button" class="primary" :disabled="adminConfigSaving" @click="saveAdminConfig">
               {{ adminConfigSaving ? 'Đang lưu...' : 'Lưu cấu hình' }}
+            </button>
+            <button
+              type="button"
+              class="secondary"
+              :disabled="autoLayoutManualApplying || !activeProject || !devices.length"
+              @click="runAutoLayoutManual"
+            >
+              {{ autoLayoutManualApplying ? 'Đang chạy...' : 'Chạy lại auto-layout' }}
             </button>
 
             <div class="divider"></div>
@@ -416,6 +428,7 @@ const GRID_FALLBACK_Y = 2.5
 const DEFAULT_LAYOUT_TUNING: LayoutTuning = {
   layer_gap: 1.5,
   node_spacing: 0.8,
+  port_label_band: 0.2,
   area_gap: 1.1,
   area_padding: 0.35,
   label_band: 0.5,
@@ -449,6 +462,7 @@ const adminConfig = ref<AdminConfig>({})
 const layoutTuningForm = reactive({ ...DEFAULT_LAYOUT_TUNING })
 const renderTuningForm = reactive({ ...DEFAULT_RENDER_TUNING })
 const adminConfigSaving = ref(false)
+const autoLayoutManualApplying = ref(false)
 
 const projects = ref<ProjectRecord[]>([])
 const selectedProjectId = ref<string | null>(null)
@@ -1234,6 +1248,39 @@ async function runAutoLayoutAuto(projectId: string, force = false) {
   }
 }
 
+async function runAutoLayoutManual() {
+  if (!activeProject.value || autoLayoutManualApplying.value) return
+  if (!devices.value.length) {
+    setNotice('Chưa có thiết bị để chạy auto-layout.', 'error')
+    return
+  }
+
+  autoLayoutManualApplying.value = true
+  const projectId = activeProject.value.id
+  const hasAreas = areas.value.length > 0
+  try {
+    const tuning = computeAutoLayoutTuning()
+    await autoLayout(projectId, {
+      layer_gap: tuning.layer_gap,
+      node_spacing: tuning.node_spacing,
+      apply_to_db: true,
+      group_by_area: hasAreas,
+      layout_scope: 'project',
+      anchor_routing: true,
+      overview_mode: 'l1-only',
+      normalize_topology: true
+    })
+    autoLayoutAutoAppliedProjects.add(projectId)
+    await loadProjectData(projectId)
+    await invalidateLayoutCache(projectId)
+    setNotice('Đã chạy lại auto-layout.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Chạy lại auto-layout thất bại.', 'error')
+  } finally {
+    autoLayoutManualApplying.value = false
+  }
+}
+
 // Manual auto-layout preview/apply functions removed - auto mode only
 
 onMounted(() => {
@@ -1400,6 +1447,20 @@ onMounted(() => {
   border-radius: 12px;
   padding: 8px 12px;
   cursor: pointer;
+}
+
+.secondary {
+  background: #efe7df;
+  color: #1c1c1c;
+  border: 1px solid #dccfc4;
+  border-radius: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .notice {

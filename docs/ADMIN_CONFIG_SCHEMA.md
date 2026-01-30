@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-29  
+> **Cập nhật:** 2026-01-30  
 > **Mục tiêu:** Chuẩn hóa cấu hình preset/layout/validation cho hệ thống, tránh hardcode.
 
 ---
@@ -19,6 +19,7 @@
   "layout_tuning": {
     "layer_gap": 1.5,
     "node_spacing": 0.8,
+    "port_label_band": 0.2,
     "area_gap": 1.1,
     "area_padding": 0.35,
     "label_band": 0.5,

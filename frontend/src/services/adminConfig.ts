@@ -7,6 +7,7 @@ import { apiRequest } from './api'
 export type LayoutTuning = {
   layer_gap?: number
   node_spacing?: number
+  port_label_band?: number
   area_gap?: number
   area_padding?: number
   label_band?: number

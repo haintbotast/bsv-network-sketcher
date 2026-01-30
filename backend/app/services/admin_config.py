@@ -14,6 +14,7 @@ DEFAULT_ADMIN_CONFIG: Dict[str, Any] = {
     "layout_tuning": {
         "layer_gap": 1.5,
         "node_spacing": 0.8,
+        "port_label_band": 0.2,
         "area_gap": 1.1,
         "area_padding": 0.35,
         "label_band": 0.5,

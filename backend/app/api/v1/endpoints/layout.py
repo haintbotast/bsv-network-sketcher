@@ -577,7 +577,6 @@ async def compute_auto_layout(
 
     admin_config = await get_admin_config(db)
     layout_tuning = admin_config.get("layout_tuning", {}) if isinstance(admin_config, dict) else {}
-    render_tuning = admin_config.get("render_tuning", {}) if isinstance(admin_config, dict) else {}
 
     # Load data based on view_mode
     view_mode = options.view_mode
@@ -622,20 +621,8 @@ async def compute_auto_layout(
         if not l3_addresses:
             raise HTTPException(status_code=404, detail="No L3 addresses found in project")
 
-    label_clearance_x = 0.0
-    label_clearance_y = 0.0
-    if view_mode in ("L1", "L2"):
-        ports_by_device = _collect_device_ports(links, l2_assignments if view_mode == "L2" else None)
-        label_clearance_x, label_clearance_y = _estimate_label_clearance(ports_by_device, render_tuning)
-
-    max_device_width = max(
-        [getattr(d, "width", None) or DEFAULT_DEVICE_WIDTH for d in devices] + [DEFAULT_DEVICE_WIDTH]
-    )
-    max_device_height = max(
-        [getattr(d, "height", None) or DEFAULT_DEVICE_HEIGHT for d in devices] + [DEFAULT_DEVICE_HEIGHT]
-    )
-    node_width = max_device_width + label_clearance_x
-    node_height = max_device_height + label_clearance_y
+    node_width = DEFAULT_DEVICE_WIDTH
+    node_height = DEFAULT_DEVICE_HEIGHT
 
     # Check cache
     cache = get_cache()
@@ -647,7 +634,6 @@ async def compute_auto_layout(
         "view_mode": options.view_mode,
         "normalize_topology": options.normalize_topology,
         "layout_tuning": layout_tuning,
-        "render_tuning": render_tuning,
     }
 
     # Different cache keys for different views

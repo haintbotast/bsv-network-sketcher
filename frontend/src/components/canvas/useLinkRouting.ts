@@ -751,6 +751,20 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         votes: Record<'left' | 'right' | 'top' | 'bottom', number>
         coords: Record<'left' | 'right' | 'top' | 'bottom', { sum: number; count: number }>
       }>>()
+      const portPairRank = new Map<string, Map<string, { rank: number; count: number; neighborId: string }>>()
+      const portNeighborDevice = new Map<string, Map<string, string>>()
+
+      const registerPairRank = (deviceId: string, port: string, rank: number, count: number, neighborId: string) => {
+        const deviceMap = portPairRank.get(deviceId) || new Map<string, { rank: number; count: number; neighborId: string }>()
+        deviceMap.set(port, { rank, count, neighborId })
+        portPairRank.set(deviceId, deviceMap)
+      }
+
+      const registerNeighborDevice = (deviceId: string, port: string, neighborId: string) => {
+        const deviceMap = portNeighborDevice.get(deviceId) || new Map<string, string>()
+        deviceMap.set(port, neighborId)
+        portNeighborDevice.set(deviceId, deviceMap)
+      }
 
       const ensureStats = (deviceId: string, port: string) => {
         const deviceMap = portStats.get(deviceId) || new Map()
@@ -776,6 +790,24 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         entry.coords[side].count += 1
       }
 
+      const isOppositeSide = (a: string, b: string) => {
+        return (
+          (a === 'left' && b === 'right') ||
+          (a === 'right' && b === 'left') ||
+          (a === 'top' && b === 'bottom') ||
+          (a === 'bottom' && b === 'top')
+        )
+      }
+
+      const pairGroups = new Map<string, Array<{
+        fromDeviceId: string
+        toDeviceId: string
+        fromPort?: string
+        toPort?: string
+        fromSide: 'left' | 'right' | 'top' | 'bottom'
+        toSide: 'left' | 'right' | 'top' | 'bottom'
+      }>>()
+
       linkMetas.forEach(meta => {
         if (!meta) return
         const entry = cache.get(meta.link.id)
@@ -793,11 +825,64 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         if (meta.link.fromPort) {
           const coord = fromSide === 'left' || fromSide === 'right' ? fromNext.y : fromNext.x
           record(meta.link.fromDeviceId, meta.link.fromPort, fromSide, coord)
+          registerNeighborDevice(meta.link.fromDeviceId, meta.link.fromPort, meta.link.toDeviceId)
         }
         if (meta.link.toPort) {
           const coord = toSide === 'left' || toSide === 'right' ? toPrev.y : toPrev.x
           record(meta.link.toDeviceId, meta.link.toPort, toSide, coord)
+          registerNeighborDevice(meta.link.toDeviceId, meta.link.toPort, meta.link.fromDeviceId)
         }
+
+        if (meta.link.fromPort && meta.link.toPort) {
+          const a = meta.link.fromDeviceId
+          const b = meta.link.toDeviceId
+          const pairKey = a < b ? `${a}|${b}` : `${b}|${a}`
+          const list = pairGroups.get(pairKey) || []
+          list.push({
+            fromDeviceId: meta.link.fromDeviceId,
+            toDeviceId: meta.link.toDeviceId,
+            fromPort: meta.link.fromPort,
+            toPort: meta.link.toPort,
+            fromSide,
+            toSide
+          })
+          pairGroups.set(pairKey, list)
+        }
+      })
+
+      pairGroups.forEach(list => {
+        if (list.length < 2) return
+        const orientationByDevice = new Map<string, 'left' | 'right' | 'top' | 'bottom'>()
+        let valid = true
+
+        for (const entry of list) {
+          if (!isOppositeSide(entry.fromSide, entry.toSide)) {
+            valid = false
+            break
+          }
+          const fromExisting = orientationByDevice.get(entry.fromDeviceId)
+          if (fromExisting && fromExisting !== entry.fromSide) {
+            valid = false
+            break
+          }
+          orientationByDevice.set(entry.fromDeviceId, entry.fromSide)
+          const toExisting = orientationByDevice.get(entry.toDeviceId)
+          if (toExisting && toExisting !== entry.toSide) {
+            valid = false
+            break
+          }
+          orientationByDevice.set(entry.toDeviceId, entry.toSide)
+        }
+
+        if (!valid) return
+
+        list.forEach(entry => {
+          if (!entry.fromPort || !entry.toPort) return
+          const fromOrder = devicePortOrder.value.get(entry.fromDeviceId)?.get(entry.fromPort) ?? 0
+          const toOrder = devicePortOrder.value.get(entry.toDeviceId)?.get(entry.toPort) ?? 0
+          registerPairRank(entry.fromDeviceId, entry.fromPort, toOrder, list.length, entry.toDeviceId)
+          registerPairRank(entry.toDeviceId, entry.toPort, fromOrder, list.length, entry.fromDeviceId)
+        })
       })
 
       const overrides: AnchorOverrideMap = new Map()
@@ -812,11 +897,15 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         const sideMap = devicePortSideMap.value.get(deviceId) || new Map<string, string>()
         const orderMap = devicePortOrder.value.get(deviceId) || new Map<string, number>()
         const neighborMap = devicePortNeighbors.value.get(deviceId) || new Map<string, { xSum: number; ySum: number; count: number }>()
+        const pairMap = portPairRank.get(deviceId) || new Map<string, { rank: number; count: number; neighborId: string }>()
+        const neighborDeviceMap = portNeighborDevice.get(deviceId) || new Map<string, string>()
         const buckets: Record<'left' | 'right' | 'top' | 'bottom', Array<{
           port: string
           coord: number | null
           neighborCoord: number | null
           order: number
+          pairRank: number | null
+          pairKey: string | null
         }>> = { left: [], right: [], top: [], bottom: [] }
 
         ports.forEach(port => {
@@ -839,12 +928,16 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
           const neighborCoord = neighbor
             ? (side === 'left' || side === 'right' ? neighbor.ySum / neighbor.count : neighbor.xSum / neighbor.count)
             : null
+          const pairInfo = pairMap.get(port)
+          const pairKey = pairInfo?.neighborId || neighborDeviceMap.get(port) || null
 
           buckets[side].push({
             port,
             coord,
             neighborCoord,
-            order: orderMap.get(port) ?? 0
+            order: orderMap.get(port) ?? 0,
+            pairRank: pairInfo?.rank ?? null,
+            pairKey
           })
         })
 
@@ -854,6 +947,11 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
           const count = list.length
           if (!count) return
           list.sort((a, b) => {
+            if (a.pairKey && b.pairKey && a.pairKey === b.pairKey) {
+              const ar = a.pairRank ?? 0
+              const br = b.pairRank ?? 0
+              if (ar !== br) return ar - br
+            }
             if (a.coord != null && b.coord != null && a.coord !== b.coord) return a.coord - b.coord
             if (a.coord != null && b.coord == null) return -1
             if (a.coord == null && b.coord != null) return 1
@@ -875,6 +973,11 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
           const count = list.length
           if (!count) return
           list.sort((a, b) => {
+            if (a.pairKey && b.pairKey && a.pairKey === b.pairKey) {
+              const ar = a.pairRank ?? 0
+              const br = b.pairRank ?? 0
+              if (ar !== br) return ar - br
+            }
             if (a.coord != null && b.coord != null && a.coord !== b.coord) return a.coord - b.coord
             if (a.coord != null && b.coord == null) return -1
             if (a.coord == null && b.coord != null) return 1

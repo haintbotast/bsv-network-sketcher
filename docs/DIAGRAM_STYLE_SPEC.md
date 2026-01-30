@@ -119,6 +119,8 @@
 | Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor**, có thể xoay theo hướng link; auto-scale theo zoom (0.6-1.15) và tự giãn để tránh chồng lấn |
 
 - Auto-layout cần **tính thêm vùng đệm Interface Tag** khi giãn khoảng cách giữa thiết bị để tránh chồng lấn.
+- **Quy tắc nhãn port:** định dạng **chữ cái + khoảng trắng + số hiệu**.  
+  Ví dụ: `Gi 0/1`, `Gi 1/0/48`, `HA 1`, `Port 1`.
 
 ### 4.1 Kích thước chuẩn (tham chiếu)
 

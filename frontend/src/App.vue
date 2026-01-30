@@ -968,7 +968,6 @@ function handleAreaChange(payload: { row: AreaRow }) {
       })
       const index = areas.value.findIndex(area => area.id === payload.row.id)
       if (index >= 0) areas.value[index] = updated
-      scheduleAutoLayout(projectId, true)
     } catch (error: any) {
       setNotice(error?.message || 'Cập nhật area thất bại.', 'error')
     }
@@ -1034,7 +1033,6 @@ function handleDeviceChange(payload: { row: DeviceRow }) {
       })
       const index = devices.value.findIndex(device => device.id === payload.row.id)
       if (index >= 0) devices.value[index] = updated
-      scheduleAutoLayout(projectId, true)
     } catch (error: any) {
       setNotice(error?.message || 'Cập nhật device thất bại.', 'error')
     }
@@ -1096,7 +1094,6 @@ function handleLinkChange(payload: { row: LinkRow }) {
       })
       const index = links.value.findIndex(link => link.id === payload.row.id)
       if (index >= 0) links.value[index] = updated
-      scheduleAutoLayout(projectId, true)
     } catch (error: any) {
       setNotice(error?.message || 'Cập nhật link thất bại.', 'error')
     }

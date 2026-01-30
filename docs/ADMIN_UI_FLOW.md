@@ -12,9 +12,10 @@
 **Luồng đề xuất:**
 1) Mở project và chọn tab **Bố cục** trong panel phải (cạnh **Thuộc tính**)
 2) Điều chỉnh nhóm **Bố cục tổng thể** hoặc **Đường nối & nhãn**
-3) Sửa giá trị → **Validate** → **Save**
-4) Hiển thị diff + audit log entry
-5) Lưu **config version** mới và cho phép khôi phục
+3) (Tuỳ chọn) Bấm **Chạy lại auto-layout** để áp dụng lại bố cục
+4) Sửa giá trị → **Validate** → **Save**
+5) Hiển thị diff + audit log entry
+6) Lưu **config version** mới và cho phép khôi phục
 
 **Hiển thị tối thiểu:**
 - `layout.default_mode`, `layout.allowed_modes`

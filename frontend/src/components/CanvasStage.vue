@@ -28,10 +28,6 @@
         >
           <v-rect :config="area.rect" />
         </v-group>
-      </v-layer>
-
-      <!-- L2/L3 grouping boxes (keep under links/devices) -->
-      <v-layer ref="groupLayerRef" :config="layerTransform">
         <v-group v-for="group in visibleVlanGroups" :key="group.id">
           <v-rect :config="group.rect" />
           <v-text :config="group.label" />
@@ -60,9 +56,6 @@
           <v-rect :config="device.rect" />
           <v-text :config="device.label" />
         </v-group>
-      </v-layer>
-
-      <v-layer ref="areaLabelLayerRef" :config="layerTransform">
         <v-group
           v-for="label in visibleAreaLabels"
           :key="label.id"
@@ -177,11 +170,10 @@ const layoutViewport = ref<Viewport>({ ...props.viewport })
 
 const gridLayerRef = ref()
 const areaLayerRef = ref()
-const areaLabelLayerRef = ref()
-const groupLayerRef = ref()
 const linkLayerRef = ref()
 const deviceLayerRef = ref()
 const overlayLayerRef = ref()
+const visibleLinkCache = ref<RenderLink[]>([])
 const linkRouteCache = ref(new Map<string, {
   points: number[]
   fromAnchor: { x: number; y: number; side?: string }
@@ -1081,6 +1073,15 @@ function resolvePortAnchor(
 }
 
 type Rect = { x: number; y: number; width: number; height: number }
+type RenderLink = {
+  id: string
+  fromAnchor: { x: number; y: number; side?: string }
+  toAnchor: { x: number; y: number; side?: string }
+  fromCenter: { x: number; y: number }
+  toCenter: { x: number; y: number }
+  points: number[]
+  config: Record<string, unknown>
+}
 type AnchorOverrideMap = Map<string, Map<string, { x: number; y: number; side: string }>>
 
 function resolvePortAnchorWithOverrides(
@@ -1999,8 +2000,8 @@ const buildVisibleLinks = (useCache: boolean) => {
 }
 
 const visibleLinks = computed(() => {
-  const result = buildVisibleLinks(isPanning.value)
-  return result.links
+  if (isPanning.value) return buildVisibleLinks(true).links
+  return visibleLinkCache.value
 })
 
 const ARC_RADIUS = 5
@@ -2364,11 +2365,29 @@ function emitSelect(id: string, type: 'device' | 'area') {
 function batchDraw() {
   gridLayerRef.value?.getNode()?.batchDraw()
   areaLayerRef.value?.getNode()?.batchDraw()
-  areaLabelLayerRef.value?.getNode()?.batchDraw()
-  groupLayerRef.value?.getNode()?.batchDraw()
   linkLayerRef.value?.getNode()?.batchDraw()
   deviceLayerRef.value?.getNode()?.batchDraw()
   overlayLayerRef.value?.getNode()?.batchDraw()
+}
+
+let batchDrawRaf = 0
+function scheduleBatchDraw() {
+  if (batchDrawRaf) return
+  batchDrawRaf = requestAnimationFrame(() => {
+    batchDrawRaf = 0
+    batchDraw()
+  })
+}
+
+let refreshLinkRaf = 0
+const scheduleRefreshLinkCache = () => {
+  if (isPanning.value) return
+  if (refreshLinkRaf) return
+  refreshLinkRaf = requestAnimationFrame(() => {
+    refreshLinkRaf = 0
+    if (isPanning.value) return
+    refreshLinkCache()
+  })
 }
 
 function isStageTarget(event: any) {
@@ -2470,15 +2489,24 @@ onBeforeUnmount(() => {
     observer.unobserve(containerRef.value)
   }
   observer = null
+  if (batchDrawRaf) {
+    cancelAnimationFrame(batchDrawRaf)
+    batchDrawRaf = 0
+  }
+  if (refreshLinkRaf) {
+    cancelAnimationFrame(refreshLinkRaf)
+    refreshLinkRaf = 0
+  }
 })
 
 watch([visibleAreas, visibleDevices, visibleLinks, linkPortLabels, l2Labels, l3Labels, stageSize], () => {
-  batchDraw()
+  scheduleBatchDraw()
 })
 
 const refreshLinkCache = () => {
   if (isPanning.value) return
   const result = buildVisibleLinks(false)
+  visibleLinkCache.value = result.links
   if (result.cache) {
     linkRouteCache.value = result.cache
     linkRouteCacheViewport.value = { ...layoutViewport.value }
@@ -2497,9 +2525,9 @@ watch(
     renderTuning
   ],
   () => {
-    if (isPanning.value) return
-    refreshLinkCache()
-  }
+    scheduleRefreshLinkCache()
+  },
+  { immediate: true }
 )
 
 </script>

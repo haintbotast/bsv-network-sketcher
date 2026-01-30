@@ -5,9 +5,10 @@ from app.services.layout_models import LayoutConfig
 
 
 class DummyDevice:
-    def __init__(self, device_id: str, device_type: str) -> None:
+    def __init__(self, device_id: str, device_type: str, name: str | None = None) -> None:
         self.id = device_id
         self.device_type = device_type
+        self.name = name or device_id
 
 
 class DummyLink:
@@ -71,6 +72,27 @@ class SimpleLayerLayoutTests(unittest.TestCase):
         ordered_rows = [rows[key] for key in sorted(rows.keys())]
         self.assertEqual(ordered_rows[0], ["S1", "S2", "S3"])
         self.assertEqual(ordered_rows[1], ["T1", "T2", "T3"])
+
+    def test_group_by_name_affinity_with_numeric_suffix(self) -> None:
+        devices = [
+            DummyDevice("C2", "Switch", "HN-SW-CORE-02"),
+            DummyDevice("D1", "Switch", "HN-SW-DIST-01"),
+            DummyDevice("C1", "Switch", "HN-SW-CORE-01"),
+            DummyDevice("D2", "Switch", "HN-SW-DIST-02"),
+        ]
+        config = LayoutConfig(
+            layer_gap=1.0,
+            node_spacing=0.5,
+            node_width=1.0,
+            node_height=1.0,
+            max_nodes_per_row=10,
+            row_gap=0.2,
+            row_stagger=0.0,
+        )
+
+        result = simple_layer_layout(devices, [], config)
+        layer = sorted([d for d in result.devices if d["layer"] == 1], key=lambda d: d["x"])
+        self.assertEqual([d["id"] for d in layer], ["C1", "C2", "D1", "D2"])
 
 
 if __name__ == "__main__":

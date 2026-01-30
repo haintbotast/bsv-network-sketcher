@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+import re
 import time
 
 from app.services.layout_models import LayoutConfig, LayoutResult
@@ -136,6 +137,66 @@ def simple_layer_layout(devices: list, links: list, config: LayoutConfig) -> Lay
         layer_orders[layer_idx] = ordered_devices
         prev_layer_devices = ordered_devices
 
+    name_token_re = re.compile(r"[^A-Za-z0-9]+")
+    trailing_num_re = re.compile(r"^([A-Z]+)(\d+)$")
+    reserved_site_tokens = {
+        "SW",
+        "SWITCH",
+        "RTR",
+        "ROUTER",
+        "FW",
+        "FIREWALL",
+        "CORE",
+        "DIST",
+        "DISTRIBUTION",
+        "ACCESS",
+        "ACC",
+        "EDGE",
+        "WAN",
+        "DMZ",
+        "SERVER",
+        "SRV",
+        "STORAGE",
+        "NAS",
+        "SAN",
+        "AP",
+        "PC",
+    }
+
+    def tokenize_name(raw: str) -> list[str]:
+        return [token for token in name_token_re.split(raw.upper()) if token]
+
+    def is_site_token(token: str) -> bool:
+        if token in reserved_site_tokens:
+            return False
+        if not (2 <= len(token) <= 5):
+            return False
+        if not token.isalnum():
+            return False
+        return True
+
+    def extract_name_affinity(raw: str) -> tuple[str, str, int | None]:
+        tokens = tokenize_name(raw)
+        if not tokens:
+            return "", raw.strip().upper(), None
+        site = tokens[0] if is_site_token(tokens[0]) else ""
+        suffix = None
+        stem_tokens = list(tokens)
+        if stem_tokens:
+            last = stem_tokens[-1]
+            if last.isdigit():
+                suffix = int(last)
+                stem_tokens = stem_tokens[:-1]
+            else:
+                match = trailing_num_re.match(last)
+                if match:
+                    stem_tokens = stem_tokens[:-1] + [match.group(1)]
+                    suffix = int(match.group(2))
+        if not stem_tokens:
+            stem_tokens = tokens
+        stem = "-".join(stem_tokens)
+        return site, stem, suffix
+
     def build_position_map() -> dict[int, dict[str, int]]:
         return {
             layer_idx: {device.id: idx for idx, device in enumerate(layer_orders[layer_idx])}
@@ -208,6 +269,66 @@ def simple_layer_layout(devices: list, links: list, config: LayoutConfig) -> Lay
     def normalize_device_type(device) -> str:
         dtype = getattr(device, "device_type", None) or "Unknown"
         return str(dtype).strip().lower() or "unknown"
+
+    def affinity_group_key(device) -> tuple[str, str]:
+        name = getattr(device, "name", None) or getattr(device, "id", "")
+        site, stem, _ = extract_name_affinity(str(name))
+        return (site, stem or str(name).strip().upper())
+
+    def affinity_sort_key(device, fallback_index: int) -> tuple[int, int, int]:
+        name = getattr(device, "name", None) or getattr(device, "id", "")
+        _, _, suffix = extract_name_affinity(str(name))
+        if suffix is None:
+            return (1, fallback_index, fallback_index)
+        return (0, suffix, fallback_index)
+
+    def cluster_by_affinity(ordered: list) -> list:
+        if len(ordered) <= 1:
+            return ordered
+        groups: dict[tuple[str, str], list] = {}
+        group_order: list[tuple[str, str]] = []
+        for device in ordered:
+            key = affinity_group_key(device)
+            if key not in groups:
+                groups[key] = []
+                group_order.append(key)
+            groups[key].append(device)
+
+        clustered: list = []
+        for key in group_order:
+            group = groups[key]
+            if len(group) > 1:
+                indexed = list(enumerate(group))
+                indexed.sort(key=lambda item: affinity_sort_key(item[1], item[0]))
+                group = [device for _, device in indexed]
+            clustered.extend(group)
+        return clustered
+
+    def apply_affinity_order(layer_devices: list) -> list:
+        if len(layer_devices) <= 1:
+            return layer_devices
+        blocks: list[list] = []
+        current_type: str | None = None
+        current_block: list = []
+        for device in layer_devices:
+            dtype = normalize_device_type(device)
+            if current_type is None or dtype == current_type:
+                current_block.append(device)
+                current_type = dtype
+            else:
+                blocks.append(current_block)
+                current_block = [device]
+                current_type = dtype
+        if current_block:
+            blocks.append(current_block)
+
+        result: list = []
+        for block in blocks:
+            result.extend(cluster_by_affinity(block))
+        return result
+
+    for layer_idx in layer_indices:
+        layer_orders[layer_idx] = apply_affinity_order(layer_orders[layer_idx])
 
     def split_rows_by_type(ordered: list, max_nodes: int) -> list[list]:
         if max_nodes <= 0:

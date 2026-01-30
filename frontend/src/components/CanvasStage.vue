@@ -43,15 +43,10 @@
       </v-layer>
 
       <v-layer ref="linkLayerRef" :config="layerTransform">
-        <v-line
-          v-for="link in visibleLinks"
+        <v-shape
+          v-for="link in visibleLinkShapes"
           :key="link.id"
           :config="link.config"
-        />
-        <v-shape
-          v-for="arc in linkJumpArcs"
-          :key="arc.id"
-          :config="arc.config"
         />
       </v-layer>
 
@@ -117,7 +112,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AreaModel, DeviceModel, LinkModel, Viewport, ViewMode, L2AssignmentRecord, L3AddressRecord } from '../models/types'
 import { getVisibleBounds, logicalRectToView } from '../utils/viewport'
 import { addOccupancy, buildGridSpec, connectOrthogonal, routeOrthogonalPath, simplifyOrthogonalPath } from '../utils/link_routing'
-import { computeCrossings } from '../utils/line_crossings'
+import { computeCrossings, drawPolylineWithJumps } from '../utils/line_crossings'
 import type { Crossing } from '../utils/line_crossings'
 
 const props = defineProps<{
@@ -1760,55 +1755,30 @@ const linkCrossings = computed<Map<string, Crossing[]>>(() => {
   return computeCrossings(links.map(l => ({ id: l.id, points: l.points })))
 })
 
-// Overlay arcs tại các giao điểm (nhẹ, không ảnh hưởng pan)
-const linkJumpArcs = computed(() => {
-  const arcs: Array<{ id: string; config: Record<string, unknown> }> = []
-  if (isPanning.value) return arcs
+const visibleLinkShapes = computed(() => {
   const crossMap = linkCrossings.value
-  if (crossMap.size === 0) return arcs
-
-  const linkMap = new Map(visibleLinks.value.map(l => [l.id, l]))
   const R = ARC_RADIUS
-
-  for (const [linkId, crossings] of crossMap) {
-    const link = linkMap.get(linkId)
-    if (!link) continue
-    const pts = link.points
+  return visibleLinks.value.map(link => {
+    const crossings = crossMap.get(link.id) || []
     const cfg = link.config
-
-    for (let ci = 0; ci < crossings.length; ci++) {
-      const c = crossings[ci]
-      const seg = c.segmentIndex
-      const x1 = pts[seg * 2], y1 = pts[seg * 2 + 1]
-      const x2 = pts[(seg + 1) * 2], y2 = pts[(seg + 1) * 2 + 1]
-      const isH = Math.abs(y2 - y1) < 0.5
-      const dir = isH ? (x2 > x1 ? 1 : -1) : (y2 > y1 ? 1 : -1)
-
-      arcs.push({
-        id: `${linkId}-arc-${ci}`,
-        config: {
-          sceneFunc: (ctx: any, shape: any) => {
-            ctx.beginPath()
-            if (isH) {
-              ctx.moveTo(c.x - dir * R, c.y)
-              ctx.arc(c.x, c.y, R, dir > 0 ? Math.PI : 0, dir > 0 ? 0 : Math.PI, true)
-            } else {
-              ctx.moveTo(c.x, c.y - dir * R)
-              ctx.arc(c.x, c.y, R, dir > 0 ? -Math.PI / 2 : Math.PI / 2, dir > 0 ? Math.PI / 2 : -Math.PI / 2, true)
-            }
-            ctx.fillStrokeShape(shape)
-          },
-          stroke: cfg.stroke,
-          strokeWidth: cfg.strokeWidth,
-          lineCap: cfg.lineCap,
-          lineJoin: cfg.lineJoin,
-          opacity: cfg.opacity,
-          listening: false,
+    return {
+      id: link.id,
+      config: {
+        sceneFunc: (ctx: any, shape: any) => {
+          ctx.beginPath()
+          drawPolylineWithJumps(ctx, link.points, crossings, R)
+          ctx.fillStrokeShape(shape)
         },
-      })
+        stroke: cfg.stroke,
+        strokeWidth: cfg.strokeWidth,
+        lineCap: cfg.lineCap,
+        lineJoin: cfg.lineJoin,
+        dash: cfg.dash,
+        opacity: cfg.opacity,
+        listening: false,
+      },
     }
-  }
-  return arcs
+  })
 })
 
 const linkPortLabels = computed(() => {

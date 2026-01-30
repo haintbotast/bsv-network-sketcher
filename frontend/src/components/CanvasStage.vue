@@ -1344,6 +1344,7 @@ const buildVisibleLinks = (useCache: boolean) => {
 
   const gridNodeCount = grid ? grid.cols * grid.rows : 0
   const allowAStar = isL1View && grid && props.links.length <= maxRouteLinks && gridNodeCount > 0 && gridNodeCount <= maxGridNodes
+  console.debug('[grid]', 'cols:', grid?.cols, 'rows:', grid?.rows, 'nodes:', gridNodeCount, 'max:', maxGridNodes, 'gridBase:', gridBase, 'allowAStar:', allowAStar, 'scale:', scale)
 
   const areaCenters = new Map<string, { x: number; y: number }>()
   areaRects.forEach(({ id, rect }) => {
@@ -1509,6 +1510,7 @@ const buildVisibleLinks = (useCache: boolean) => {
         )
       )
       const directAllowed = isL1 && !lineBlocked
+      if (isL1) console.debug('[route]', link.id.slice(0,8), 'direct:', directAllowed, 'blocked:', lineBlocked, 'astar:', allowAStar, 'intra:', isIntraArea, 'obs:', obstacles.length)
 
       const fromSide = fromAnchor.side || computeSide(fromView, toCenter)
       const toSide = toAnchor.side || computeSide(toView, fromCenter)
@@ -1517,6 +1519,7 @@ const buildVisibleLinks = (useCache: boolean) => {
 
       let routed = false
       if (allowAStar && !directAllowed) {
+        console.debug('[A*]', link.id.slice(0,8), 'obstacles:', obstacles.length, 'intra:', isIntraArea, 'grid:', grid?.cols, 'x', grid?.rows)
         const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
         const route = routeOrthogonalPath({
           start: fromExit,
@@ -1546,6 +1549,9 @@ const buildVisibleLinks = (useCache: boolean) => {
         }
       }
 
+      if (!routed && isL1) {
+        console.debug('[fallback]', link.id.slice(0,8), 'interArea:', fromAreaId !== toAreaId)
+      }
       if (!routed) {
         // Orthogonal routing for all links (fallback)
         if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {

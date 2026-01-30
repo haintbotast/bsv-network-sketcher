@@ -150,6 +150,22 @@
 | Link MGMT | Theo purpose | 1.5 | 6,3 |
 | Interface Tag | #333333 | 0.5 | None |
 
+### 5.2 Line Jump/Arc tại giao điểm
+
+Khi hai đường link cắt nhau, đường link có **index render cao hơn** sẽ hiển thị **semicircle arc (jump)** tại điểm giao để phân biệt với kết nối thực.
+
+| Thuộc tính | Giá trị |
+|------------|---------|
+| Arc radius | 5 px |
+| Hướng nhảy (đoạn ngang) | Lên trên (negative Y) |
+| Hướng nhảy (đoạn dọc) | Sang phải (positive X) |
+| Convention | Link index cao nhảy qua link index thấp |
+| Áp dụng | Tất cả links: inter-area, intra-area, bundled |
+| Epsilon loại trừ | 1px từ endpoint segment |
+| Khoảng cách tối thiểu giữa 2 arc | 2.5 × radius |
+
+Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), thay thế `v-line`.
+
 ---
 
 ## 6. Màu sắc

@@ -77,6 +77,7 @@
 - [ ] Export PPTX L1/L2/L3 với small/medium thành công.
 - [ ] UI flow tạo project → nhập dữ liệu → export chạy trơn tru.
 - [ ] Audit log hoạt động cho thao tác quản trị.
+- [ ] Line jump/arc hiển thị đúng tại giao điểm link (intra-area và inter-area).
 - [ ] Backup DB trước khi phát hành.
 
 ---

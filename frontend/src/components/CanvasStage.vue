@@ -43,10 +43,10 @@
       </v-layer>
 
       <v-layer ref="linkLayerRef" :config="layerTransform">
-        <v-line
+        <v-shape
           v-for="link in visibleLinks"
           :key="link.id"
-          :config="link.config"
+          :config="linkShapeConfig(link)"
         />
       </v-layer>
 
@@ -112,6 +112,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AreaModel, DeviceModel, LinkModel, Viewport, ViewMode, L2AssignmentRecord, L3AddressRecord } from '../models/types'
 import { getVisibleBounds, logicalRectToView } from '../utils/viewport'
 import { addOccupancy, buildGridSpec, connectOrthogonal, routeOrthogonalPath, simplifyOrthogonalPath } from '../utils/link_routing'
+import { computeCrossings, drawPolylineWithJumps } from '../utils/line_crossings'
+import type { Crossing } from '../utils/line_crossings'
 
 const props = defineProps<{
   areas: AreaModel[]
@@ -1484,15 +1486,19 @@ const buildVisibleLinks = (useCache: boolean) => {
         arr.push(x, y)
       }
 
+      const isIntraArea = fromAreaId && toAreaId && fromAreaId === toAreaId
       const obstacles: Array<{ x: number; y: number; width: number; height: number }> = []
       deviceRects.forEach(({ id, rect }) => {
         if (id === link.fromDeviceId || id === link.toDeviceId) return
         obstacles.push(rect)
       })
-      areaRects.forEach(({ id, rect }) => {
-        if (id === fromAreaId || id === toAreaId) return
-        obstacles.push(rect)
-      })
+      if (!isIntraArea) {
+        // Inter-area links né cả areas khác
+        areaRects.forEach(({ id, rect }) => {
+          if (id === fromAreaId || id === toAreaId) return
+          obstacles.push(rect)
+        })
+      }
 
       const lineBlocked = isL1 && obstacles.some(rect =>
         segmentIntersectsRect(
@@ -1739,6 +1745,43 @@ const visibleLinks = computed(() => {
   const result = buildVisibleLinks(isPanning.value)
   return result.links
 })
+
+const ARC_RADIUS = 5
+
+const linkCrossings = computed<Map<string, Crossing[]>>(() => {
+  if (isPanning.value) return new Map()
+  const links = visibleLinks.value
+  if (!links || links.length < 2) return new Map()
+  return computeCrossings(links.map(l => ({ id: l.id, points: l.points })))
+})
+
+function linkShapeConfig(link: { id: string; points: number[]; config: Record<string, unknown> }) {
+  const crossings = linkCrossings.value.get(link.id) || []
+  const pts = link.points
+  const cfg = link.config
+
+  return {
+    sceneFunc: (ctx: any, shape: any) => {
+      ctx.beginPath()
+      drawPolylineWithJumps(ctx, pts, crossings, ARC_RADIUS)
+      ctx.fillStrokeShape(shape)
+    },
+    hitFunc: (ctx: any, shape: any) => {
+      ctx.beginPath()
+      if (pts.length >= 2) ctx.moveTo(pts[0], pts[1])
+      for (let i = 2; i < pts.length; i += 2) {
+        ctx.lineTo(pts[i], pts[i + 1])
+      }
+      ctx.fillStrokeShape(shape)
+    },
+    stroke: cfg.stroke,
+    strokeWidth: cfg.strokeWidth,
+    lineCap: cfg.lineCap,
+    lineJoin: cfg.lineJoin,
+    dash: cfg.dash,
+    opacity: cfg.opacity,
+  }
+}
 
 const linkPortLabels = computed(() => {
   if (isPanning.value) return []

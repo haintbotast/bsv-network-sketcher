@@ -26,6 +26,7 @@ https://github.com/cisco-open/network-sketcher
 - **Bố cục phân tầng top‑to‑bottom:** Core/Distribution ở hàng trên, Access ở giữa, Endpoints ở dưới; quan hệ cha‑con phải theo chiều dọc.
 - **Grid theo hàng/cột** và dùng `_AIR_` làm ô trống để canh cột, giữ thẳng hàng.
 - **Liên kết khác Area bắt buộc qua Waypoint area** (tên kết thúc `_wp_`); không nối trực tiếp Area‑Area.
+- **Liên kết nội bộ Area (intra-area):** A* routing chỉ né devices (không né areas); khi đường cắt nhau hiển thị arc jump (semicircle 5px).
 - **Physical vs Logical:** Area = phân tách vật lý; VRF/VLAN = phân tách logic (không tạo Area riêng cho VRF).
 - **Ưu tiên bảo toàn layout gốc** khi đã có bố cục; auto‑layout chỉ là hỗ trợ.
 

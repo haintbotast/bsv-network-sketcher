@@ -278,108 +278,108 @@
           </div>
 
           <!-- Area Properties -->
-          <div v-if="selectedObjectType === 'Area'" class="inspector-form">
+          <div v-if="selectedObjectType === 'Area' && selectedDraft" class="inspector-form">
             <div class="form-group">
               <label>Tên</label>
-              <input type="text" v-model="selectedObject.name" @change="handleSelectedObjectChange" />
+              <input type="text" v-model="selectedDraft.name" @change="handleSelectedObjectChange" />
             </div>
             <div class="form-row">
               <div class="form-group">
                 <label>Hàng lưới</label>
-                <input type="number" v-model.number="selectedObject.grid_row" @change="handleSelectedObjectChange" />
+                <input type="number" v-model.number="selectedDraft.grid_row" @change="handleSelectedObjectChange" />
               </div>
               <div class="form-group">
                 <label>Cột lưới</label>
-                <input type="number" v-model.number="selectedObject.grid_col" @change="handleSelectedObjectChange" />
+                <input type="number" v-model.number="selectedDraft.grid_col" @change="handleSelectedObjectChange" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
                 <label>Tọa độ X (đv)</label>
-                <input type="number" step="0.1" v-model.number="selectedObject.position_x" @change="handleSelectedObjectChange" />
+                <input type="number" step="0.1" v-model.number="selectedDraft.position_x" @change="handleSelectedObjectChange" />
               </div>
               <div class="form-group">
                 <label>Tọa độ Y (đv)</label>
-                <input type="number" step="0.1" v-model.number="selectedObject.position_y" @change="handleSelectedObjectChange" />
+                <input type="number" step="0.1" v-model.number="selectedDraft.position_y" @change="handleSelectedObjectChange" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
                 <label>Rộng (đv)</label>
-                <input type="number" step="0.1" v-model.number="selectedObject.width" @change="handleSelectedObjectChange" />
+                <input type="number" step="0.1" v-model.number="selectedDraft.width" @change="handleSelectedObjectChange" />
               </div>
               <div class="form-group">
                 <label>Cao (đv)</label>
-                <input type="number" step="0.1" v-model.number="selectedObject.height" @change="handleSelectedObjectChange" />
+                <input type="number" step="0.1" v-model.number="selectedDraft.height" @change="handleSelectedObjectChange" />
               </div>
             </div>
           </div>
 
           <!-- Device Properties -->
-          <div v-else-if="selectedObjectType === 'Device'" class="inspector-form">
+          <div v-else-if="selectedObjectType === 'Device' && selectedDraft" class="inspector-form">
             <div class="form-group">
               <label>Tên thiết bị</label>
-              <input type="text" v-model="selectedObject.name" @change="handleSelectedObjectChange" />
+              <input type="text" v-model="selectedDraft.name" @change="handleSelectedObjectChange" />
             </div>
             <div class="form-group">
               <label>Area</label>
-              <select v-model="selectedObject.area_name" @change="handleSelectedObjectChange">
+              <select v-model="selectedDraft.area_name" @change="handleSelectedObjectChange">
                 <option v-for="area in areas" :key="area.id" :value="area.name">{{ area.name }}</option>
               </select>
             </div>
             <div class="form-group">
               <label>Loại thiết bị</label>
-              <select v-model="selectedObject.device_type" @change="handleSelectedObjectChange">
+              <select v-model="selectedDraft.device_type" @change="handleSelectedObjectChange">
                 <option v-for="type in deviceTypes" :key="type" :value="type">{{ type }}</option>
               </select>
             </div>
             <div class="form-row">
               <div class="form-group">
                 <label>X (đv)</label>
-                <input type="number" step="0.1" v-model.number="selectedObject.position_x" @change="handleSelectedObjectChange" />
+                <input type="number" step="0.1" v-model.number="selectedDraft.position_x" @change="handleSelectedObjectChange" />
               </div>
               <div class="form-group">
                 <label>Y (đv)</label>
-                <input type="number" step="0.1" v-model.number="selectedObject.position_y" @change="handleSelectedObjectChange" />
+                <input type="number" step="0.1" v-model.number="selectedDraft.position_y" @change="handleSelectedObjectChange" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-group">
                 <label>Width (đv)</label>
-                <input type="number" step="0.1" v-model.number="selectedObject.width" @change="handleSelectedObjectChange" />
+                <input type="number" step="0.1" v-model.number="selectedDraft.width" @change="handleSelectedObjectChange" />
               </div>
               <div class="form-group">
                 <label>Height (đv)</label>
-                <input type="number" step="0.1" v-model.number="selectedObject.height" @change="handleSelectedObjectChange" />
+                <input type="number" step="0.1" v-model.number="selectedDraft.height" @change="handleSelectedObjectChange" />
               </div>
             </div>
           </div>
 
           <!-- Link Properties -->
-          <div v-else-if="selectedObjectType === 'Link'" class="inspector-form">
+          <div v-else-if="selectedObjectType === 'Link' && selectedDraft" class="inspector-form">
             <div class="form-group">
               <label>Thiết bị nguồn</label>
-              <select v-model="selectedObject.from_device_name" @change="handleSelectedObjectChange">
+              <select v-model="selectedDraft.from_device_name" @change="handleSelectedObjectChange">
                 <option v-for="device in devices" :key="device.id" :value="device.name">{{ device.name }}</option>
               </select>
             </div>
             <div class="form-group">
               <label>Cổng nguồn</label>
-              <input type="text" v-model="selectedObject.from_port" @change="handleSelectedObjectChange" />
+              <input type="text" v-model="selectedDraft.from_port" @change="handleSelectedObjectChange" />
             </div>
             <div class="form-group">
               <label>Thiết bị đích</label>
-              <select v-model="selectedObject.to_device_name" @change="handleSelectedObjectChange">
+              <select v-model="selectedDraft.to_device_name" @change="handleSelectedObjectChange">
                 <option v-for="device in devices" :key="device.id" :value="device.name">{{ device.name }}</option>
               </select>
             </div>
             <div class="form-group">
               <label>Cổng đích</label>
-              <input type="text" v-model="selectedObject.to_port" @change="handleSelectedObjectChange" />
+              <input type="text" v-model="selectedDraft.to_port" @change="handleSelectedObjectChange" />
             </div>
             <div class="form-group">
               <label>Kiểu đường</label>
-              <select v-model="selectedObject.line_style" @change="handleSelectedObjectChange">
+              <select v-model="selectedDraft.line_style" @change="handleSelectedObjectChange">
                 <option value="solid">Solid</option>
                 <option value="dashed">Dashed</option>
                 <option value="dotted">Dotted</option>
@@ -387,13 +387,29 @@
             </div>
             <div class="form-group">
               <label>Mục đích</label>
-              <select v-model="selectedObject.purpose" @change="handleSelectedObjectChange">
+              <select v-model="selectedDraft.purpose" @change="handleSelectedObjectChange">
                 <option v-for="purpose in linkPurposes" :key="purpose" :value="purpose">{{ purpose }}</option>
               </select>
             </div>
           </div>
 
           <div class="inspector-actions">
+            <button
+              type="button"
+              class="secondary"
+              :disabled="!selectedDraftDirty || selectedSavePending"
+              @click="resetSelectedDraft"
+            >
+              Hủy thay đổi
+            </button>
+            <button
+              type="button"
+              class="primary"
+              :disabled="!selectedDraftDirty || selectedSavePending"
+              @click="saveSelectedObject"
+            >
+              {{ selectedSavePending ? 'Đang lưu...' : 'Lưu thay đổi' }}
+            </button>
             <button type="button" class="danger" @click="handleSelectedObjectDelete">Xóa</button>
           </div>
         </div>
@@ -481,6 +497,10 @@ const devices = ref<DeviceRow[]>([])
 const links = ref<LinkRow[]>([])
 
 const selectedId = ref<string | null>(null)
+const selectedDraft = ref<any>(null)
+const selectedDraftDirty = ref(false)
+const selectedSavePending = ref(false)
+let syncingDraft = false
 
 const viewport = reactive({
   scale: 1,
@@ -565,6 +585,48 @@ const selectedObjectType = computed(() => {
 
   return null
 })
+
+function cloneRow<T>(row: T): T {
+  return JSON.parse(JSON.stringify(row)) as T
+}
+
+function syncSelectedDraft() {
+  syncingDraft = true
+  if (!selectedObject.value) {
+    selectedDraft.value = null
+    selectedDraftDirty.value = false
+    syncingDraft = false
+    return
+  }
+  selectedDraft.value = cloneRow(selectedObject.value)
+  selectedDraftDirty.value = false
+  window.setTimeout(() => {
+    syncingDraft = false
+  }, 0)
+}
+
+watch(selectedId, () => {
+  syncSelectedDraft()
+})
+
+watch(selectedObject, () => {
+  if (!selectedDraftDirty.value) {
+    syncSelectedDraft()
+  }
+})
+
+watch(
+  selectedDraft,
+  () => {
+    if (syncingDraft || !selectedDraft.value) return
+    selectedDraftDirty.value = true
+  },
+  { deep: true }
+)
+
+function resetSelectedDraft() {
+  syncSelectedDraft()
+}
 
 const selectedAreaName = computed(() => {
   if (!selectedObject.value) return null
@@ -1114,15 +1176,77 @@ async function handleLinkRemove(row: LinkRow) {
 
 // Properties Inspector handlers
 function handleSelectedObjectChange() {
-  if (!selectedObject.value || !selectedId.value) return
+  if (!selectedDraft.value || !selectedId.value) return
+  selectedDraftDirty.value = true
+}
 
+async function saveSelectedObject() {
+  if (!selectedDraft.value || !selectedId.value || !selectedProjectId.value) return
+  if (selectedSavePending.value) return
+
+  const projectId = selectedProjectId.value
   const objectType = selectedObjectType.value
-  if (objectType === 'Area') {
-    handleAreaChange({ row: selectedObject.value as AreaRow })
-  } else if (objectType === 'Device') {
-    handleDeviceChange({ row: selectedObject.value as DeviceRow })
-  } else if (objectType === 'Link') {
-    handleLinkChange({ row: selectedObject.value as LinkRow })
+  if (!objectType) return
+
+  if (objectType === 'Device' && !selectedDraft.value.area_name) {
+    setNotice('Cần chọn area cho device.', 'error')
+    return
+  }
+  if (objectType === 'Link' && (!selectedDraft.value.from_device_name || !selectedDraft.value.to_device_name)) {
+    setNotice('Cần chọn thiết bị đầu/cuối cho link.', 'error')
+    return
+  }
+
+  selectedSavePending.value = true
+  try {
+    let updated: AreaRow | DeviceRow | LinkRow | null = null
+    if (objectType === 'Area') {
+      updated = await updateArea(projectId as string, selectedDraft.value.id, {
+        name: selectedDraft.value.name,
+        grid_row: selectedDraft.value.grid_row,
+        grid_col: selectedDraft.value.grid_col,
+        position_x: selectedDraft.value.position_x,
+        position_y: selectedDraft.value.position_y,
+        width: selectedDraft.value.width,
+        height: selectedDraft.value.height,
+        style: selectedDraft.value.style || undefined
+      })
+      const index = areas.value.findIndex(area => area.id === selectedDraft.value.id)
+      if (index >= 0 && updated) areas.value[index] = updated as AreaRow
+    } else if (objectType === 'Device') {
+      updated = await updateDevice(projectId as string, selectedDraft.value.id, {
+        name: selectedDraft.value.name,
+        area_name: selectedDraft.value.area_name || undefined,
+        device_type: selectedDraft.value.device_type,
+        position_x: selectedDraft.value.position_x,
+        position_y: selectedDraft.value.position_y,
+        width: selectedDraft.value.width,
+        height: selectedDraft.value.height,
+        color_rgb: selectedDraft.value.color_rgb || undefined
+      })
+      const index = devices.value.findIndex(device => device.id === selectedDraft.value.id)
+      if (index >= 0 && updated) devices.value[index] = updated as DeviceRow
+    } else if (objectType === 'Link') {
+      updated = await updateLink(projectId as string, selectedDraft.value.id, {
+        from_device: selectedDraft.value.from_device_name || undefined,
+        from_port: selectedDraft.value.from_port,
+        to_device: selectedDraft.value.to_device_name || undefined,
+        to_port: selectedDraft.value.to_port,
+        purpose: selectedDraft.value.purpose || undefined,
+        line_style: selectedDraft.value.line_style || undefined
+      })
+      const index = links.value.findIndex(link => link.id === selectedDraft.value.id)
+      if (index >= 0 && updated) links.value[index] = updated as LinkRow
+    }
+    if (updated) {
+      selectedDraft.value = cloneRow(updated)
+      selectedDraftDirty.value = false
+      setNotice('Đã lưu thay đổi.', 'success')
+    }
+  } catch (error: any) {
+    setNotice(error?.message || 'Lưu thay đổi thất bại.', 'error')
+  } finally {
+    selectedSavePending.value = false
   }
 }
 

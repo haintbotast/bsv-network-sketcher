@@ -57,11 +57,12 @@
 **Liên kết liên‑area:**
 - Bắt buộc đi qua **Waypoint area** (đuôi `_wp_`), không nối Area‑Area trực tiếp.
 - Link đi qua **anchor** trên biên Area để giảm cắt xuyên.
-- Ưu tiên tuyến **corridor** (ngoài biên Area) cho liên‑area để tránh đi xuyên vùng thiết bị.
+- Ưu tiên **corridor cục bộ** giữa 2 Area nếu có **gap sạch** (không bị Area khác chặn); fallback về corridor global ngoài biên Area khi không hợp lệ.
 - Routing link ưu tiên **tránh vật cản** (area/device/**interface tag**) và **giảm chồng lấn**; nếu không bị cản thì giữ đường thẳng ngắn nhất.
 - **Anchor port tối ưu 2‑pass:** pass 1 định tuyến để lấy hướng/điểm tham chiếu, pass 2 sắp xếp lại anchor theo side + thứ tự để giãn cách hợp lý và bám tuyến ngắn nhất.
 - **Pair alignment:** với nhiều link giữa 2 thiết bị kề nhau, anchor được **xếp đồng bộ theo thứ tự port phía đối diện** để giảm chéo.
 - Liên‑area **tách lane rộng hơn** so với bundle nội‑area để giảm chồng/đè.
+- Intra‑area: nếu đường thẳng cắt thiết bị khác thì bẻ góc (Manhattan) để tránh xuyên qua device.
 
 **Macro layout (Area):**
 - Kích thước Area được **tính lại từ bounding thiết bị** + padding + band nhãn khi auto‑layout toàn dự án (cho phép **co lại** nếu dư thừa).

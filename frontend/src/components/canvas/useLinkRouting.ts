@@ -1043,6 +1043,76 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       return overrides
     }
 
+    const computeLocalCorridor = (
+      fromArea: Rect,
+      toArea: Rect,
+      fromExit: { x: number; y: number },
+      toExit: { x: number; y: number },
+      fromAreaId: string | null,
+      toAreaId: string | null,
+      interBundleOffset: number,
+      clearanceValue: number
+    ) => {
+      const minGap = Math.max(6, clearanceValue + Math.abs(interBundleOffset))
+      const fromRight = fromArea.x + fromArea.width
+      const fromLeft = fromArea.x
+      const fromTop = fromArea.y
+      const fromBottom = fromArea.y + fromArea.height
+      const toRight = toArea.x + toArea.width
+      const toLeft = toArea.x
+      const toTop = toArea.y
+      const toBottom = toArea.y + toArea.height
+
+      const isLeftRight = fromRight <= toLeft || toRight <= fromLeft
+      const isTopBottom = fromBottom <= toTop || toBottom <= fromTop
+
+      if (isLeftRight) {
+        const leftRect = fromLeft < toLeft ? fromArea : toArea
+        const rightRect = fromLeft < toLeft ? toArea : fromArea
+        const gap = rightRect.x - (leftRect.x + leftRect.width)
+        if (gap < minGap) return null
+        const minCoord = leftRect.x + leftRect.width + clearanceValue
+        const maxCoord = rightRect.x - clearanceValue
+        if (minCoord >= maxCoord) return null
+        const baseCoord = leftRect.x + leftRect.width + gap / 2
+        const corridorX = clamp(baseCoord + interBundleOffset, minCoord, maxCoord)
+        const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, 0)
+        const toAreaAnchor = computeAreaAnchor(toArea, toExit, fromExit, interBundleOffset, 0)
+        const segStart = { x: corridorX, y: fromAreaAnchor.y }
+        const segEnd = { x: corridorX, y: toAreaAnchor.y }
+        const blocked = areaRects.some(({ id, rect }) => {
+          if (id === fromAreaId || id === toAreaId) return false
+          return segmentIntersectsRect(segStart, segEnd, rect, clearanceValue)
+        })
+        if (blocked) return null
+        return { axis: 'x' as const, coord: corridorX, fromAreaAnchor, toAreaAnchor }
+      }
+
+      if (isTopBottom) {
+        const topRect = fromTop < toTop ? fromArea : toArea
+        const bottomRect = fromTop < toTop ? toArea : fromArea
+        const gap = bottomRect.y - (topRect.y + topRect.height)
+        if (gap < minGap) return null
+        const minCoord = topRect.y + topRect.height + clearanceValue
+        const maxCoord = bottomRect.y - clearanceValue
+        if (minCoord >= maxCoord) return null
+        const baseCoord = topRect.y + topRect.height + gap / 2
+        const corridorY = clamp(baseCoord + interBundleOffset, minCoord, maxCoord)
+        const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, 0)
+        const toAreaAnchor = computeAreaAnchor(toArea, toExit, fromExit, interBundleOffset, 0)
+        const segStart = { x: fromAreaAnchor.x, y: corridorY }
+        const segEnd = { x: toAreaAnchor.x, y: corridorY }
+        const blocked = areaRects.some(({ id, rect }) => {
+          if (id === fromAreaId || id === toAreaId) return false
+          return segmentIntersectsRect(segStart, segEnd, rect, clearanceValue)
+        })
+        if (blocked) return null
+        return { axis: 'y' as const, coord: corridorY, fromAreaAnchor, toAreaAnchor }
+      }
+
+      return null
+    }
+
     const routeLinks = (
       linkMetas: Array<any>,
       laneIndex: Map<string, { index: number; total: number }>,
@@ -1192,8 +1262,35 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
                 pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
                 pushPoint(points, toExit.x, toExit.y)
                 pushPoint(points, toAnchor.x, toAnchor.y)
+            } else {
+              // Fallback: corridor routing
+              const localCorridor = computeLocalCorridor(
+                fromArea,
+                toArea,
+                fromExit,
+                toExit,
+                fromAreaId,
+                toAreaId,
+                interBundleOffset,
+                clearance
+              )
+              if (localCorridor) {
+                const { axis, coord, fromAreaAnchor, toAreaAnchor } = localCorridor
+                points = []
+                pushPoint(points, fromAnchor.x, fromAnchor.y)
+                pushPoint(points, fromExit.x, fromExit.y)
+                pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+                if (axis === 'x') {
+                  pushPoint(points, coord, fromAreaAnchor.y)
+                  pushPoint(points, coord, toAreaAnchor.y)
+                } else {
+                  pushPoint(points, fromAreaAnchor.x, coord)
+                  pushPoint(points, toAreaAnchor.x, coord)
+                }
+                pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+                pushPoint(points, toExit.x, toExit.y)
+                pushPoint(points, toAnchor.x, toAnchor.y)
               } else {
-                // Fallback: corridor routing
                 const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, anchorOffset)
                 const toAreaAnchor = computeAreaAnchor(toArea, toExit, fromExit, interBundleOffset, anchorOffset)
                 const bounds = areaBounds.value
@@ -1245,7 +1342,8 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
                   pushPoint(points, toAnchor.x, toAnchor.y)
                 }
               }
-            } else if (isL1) {
+            }
+          } else if (isL1) {
               // L1 intra-area: straight segment between ports, bundle if needed
               // For bundled links, use device centers for consistent perpendicular direction
               const useCenters = bundleOffset !== 0
@@ -1269,20 +1367,25 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
               }
 
               if (bundleOffset === 0) {
-                const blockedAreas: Rect[] = []
+                const blockedRects: Rect[] = []
                 areaViewMap.value.forEach((rect, areaId) => {
                   if (areaId === fromAreaId || areaId === toAreaId) return
                   if (segmentIntersectsRect({ x: fromAnchor.x, y: fromAnchor.y }, { x: toAnchor.x, y: toAnchor.y }, rect, renderTuning.value.area_clearance ?? 0)) {
-                    blockedAreas.push(rect)
+                    blockedRects.push(rect)
                   }
                 })
-                if (blockedAreas.length) {
+                deviceRects.forEach(({ id, rect }) => {
+                  if (id === link.fromDeviceId || id === link.toDeviceId) return
+                  if (segmentIntersectsRect({ x: fromAnchor.x, y: fromAnchor.y }, { x: toAnchor.x, y: toAnchor.y }, rect, renderTuning.value.area_clearance ?? 0)) {
+                    blockedRects.push(rect)
+                  }
+                })
+                if (blockedRects.length) {
                   const midA = { x: fromAnchor.x, y: toAnchor.y }
                   const midB = { x: toAnchor.x, y: fromAnchor.y }
                   const score = (a: { x: number; y: number }) => {
                     let hits = 0
-                    areaViewMap.value.forEach((rect, areaId) => {
-                      if (areaId === fromAreaId || areaId === toAreaId) return
+                    blockedRects.forEach(rect => {
                       if (segmentIntersectsRect(fromAnchor, a, rect, renderTuning.value.area_clearance ?? 0)) hits += 1
                       if (segmentIntersectsRect(a, toAnchor, rect, renderTuning.value.area_clearance ?? 0)) hits += 1
                     })

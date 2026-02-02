@@ -63,6 +63,33 @@ DEFAULT_DEVICE_WIDTH = 1.2
 DEFAULT_DEVICE_HEIGHT = 0.5
 
 
+def _safe_dim(value: float | None, fallback: float) -> float:
+    try:
+        return float(value) if value is not None else fallback
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _compute_max_device_size(devices: list, base_width: float, base_height: float) -> tuple[float, float]:
+    max_width = base_width
+    max_height = base_height
+    for device in devices:
+        max_width = max(max_width, _safe_dim(getattr(device, "width", None), base_width))
+        max_height = max(max_height, _safe_dim(getattr(device, "height", None), base_height))
+    return max_width, max_height
+
+
+def _effective_node_size(
+    devices: list,
+    base_width: float,
+    base_height: float,
+    extra_width: float = 0.0,
+    extra_height: float = 0.0,
+) -> tuple[float, float]:
+    max_width, max_height = _compute_max_device_size(devices, base_width, base_height)
+    return max_width + max(0.0, extra_width), max_height + max(0.0, extra_height)
+
+
 def _normalize(text: str | None) -> str:
     return (text or "").strip().lower()
 
@@ -624,6 +651,7 @@ async def compute_auto_layout(
     node_width = DEFAULT_DEVICE_WIDTH
     node_height = DEFAULT_DEVICE_HEIGHT
     port_label_band = 0.0
+    label_band = 0.0
     if view_mode == "L1":
         try:
             port_label_band = float(layout_tuning.get("port_label_band", 0.0))
@@ -631,6 +659,29 @@ async def compute_auto_layout(
             port_label_band = 0.0
         if port_label_band < 0:
             port_label_band = 0.0
+    if view_mode in ("L2", "L3"):
+        try:
+            label_band = float(layout_tuning.get("label_band", 0.45))
+        except (TypeError, ValueError):
+            label_band = 0.45
+        if label_band < 0:
+            label_band = 0.0
+
+    extra_width = 0.0
+    extra_height = 0.0
+    if view_mode == "L1" and port_label_band:
+        extra_width = port_label_band * 2
+        extra_height = port_label_band * 2
+    if view_mode in ("L2", "L3") and label_band:
+        extra_height += label_band
+
+    node_width, node_height = _effective_node_size(
+        devices,
+        DEFAULT_DEVICE_WIDTH,
+        DEFAULT_DEVICE_HEIGHT,
+        extra_width=extra_width,
+        extra_height=extra_height,
+    )
 
     # Check cache
     cache = get_cache()
@@ -699,11 +750,11 @@ async def compute_auto_layout(
                     "stats": LayoutStats(**layout_result.stats),
                 }
         elif view_mode == "L2":
-            response = compute_layout_l2(devices, links, l2_assignments, l2_segments, config)
+            response = compute_layout_l2(devices, links, l2_assignments, l2_segments, config, layout_tuning)
             response["areas"] = None
             response["subnet_groups"] = None
         elif view_mode == "L3":
-            response = compute_layout_l3(devices, links, l3_addresses, config)
+            response = compute_layout_l3(devices, links, l3_addresses, config, layout_tuning)
             response["areas"] = None
             response["vlan_groups"] = None
         else:
@@ -1106,11 +1157,15 @@ def compute_layout_l1(
     except (TypeError, ValueError):
         row_stagger = 0.5
 
+    base_node_width = config.node_width
+    base_node_height = config.node_height
+    label_extra = port_label_band * 2
+
     micro_config = LayoutConfig(
         layer_gap=layer_gap,
         node_spacing=node_spacing,
-        node_width=config.node_width,
-        node_height=config.node_height,
+        node_width=base_node_width,
+        node_height=base_node_height,
         max_nodes_per_row=max_nodes_per_row,
         row_gap=row_gap,
         row_stagger=row_stagger,
@@ -1134,17 +1189,34 @@ def compute_layout_l1(
             if l.from_device_id in device_ids and l.to_device_id in device_ids
         ]
 
-        layout_result = simple_layer_layout(area_devices, area_links, micro_config)
+        area_node_width, area_node_height = _effective_node_size(
+            area_devices,
+            DEFAULT_DEVICE_WIDTH,
+            DEFAULT_DEVICE_HEIGHT,
+            extra_width=label_extra,
+            extra_height=label_extra,
+        )
+        area_micro_config = LayoutConfig(
+            layer_gap=micro_config.layer_gap,
+            node_spacing=micro_config.node_spacing,
+            node_width=area_node_width,
+            node_height=area_node_height,
+            max_nodes_per_row=micro_config.max_nodes_per_row,
+            row_gap=micro_config.row_gap,
+            row_stagger=micro_config.row_stagger,
+        )
+
+        layout_result = simple_layer_layout(area_devices, area_links, area_micro_config)
 
         if layout_result.devices:
             min_x = min(d["x"] for d in layout_result.devices)
             min_y = min(d["y"] for d in layout_result.devices)
-            max_x = max(d["x"] for d in layout_result.devices) + micro_config.node_width
-            max_y = max(d["y"] for d in layout_result.devices) + micro_config.node_height
+            max_x = max(d["x"] for d in layout_result.devices) + area_micro_config.node_width
+            max_y = max(d["y"] for d in layout_result.devices) + area_micro_config.node_height
         else:
             min_x = min_y = 0.0
-            max_x = micro_config.node_width
-            max_y = micro_config.node_height
+            max_x = area_micro_config.node_width
+            max_y = area_micro_config.node_height
 
         external_links = area_external_links.get(area_id, 0)
         device_count = len(area_devices)
@@ -1168,6 +1240,8 @@ def compute_layout_l1(
             "layout": layout_result,
             "min_x": min_x,
             "min_y": min_y,
+            "node_width": area_micro_config.node_width,
+            "node_height": area_micro_config.node_height,
         }
 
     area_tiers: dict[int, list[str]] = {}
@@ -1355,26 +1429,28 @@ def compute_layout_l1(
         layout_result = result["layout"]
         min_x = result["min_x"]
         min_y = result["min_y"]
+        node_width = float(result.get("node_width", micro_config.node_width))
+        node_height = float(result.get("node_height", micro_config.node_height))
 
         padding = AREA_PADDING + area_meta[area_id].get("extra_padding", 0.0)
-        span_x = max(0.0, (area_width - padding * 2) - micro_config.node_width)
-        span_y = max(0.0, (area_height - LABEL_BAND - padding * 2) - micro_config.node_height)
+        span_x = max(0.0, (area_width - padding * 2) - node_width)
+        span_y = max(0.0, (area_height - LABEL_BAND - padding * 2) - node_height)
 
         layout_span_x = max(
-            micro_config.node_width,
-            max((d["x"] - min_x) for d in layout_result.devices) + micro_config.node_width
+            node_width,
+            max((d["x"] - min_x) for d in layout_result.devices) + node_width
         )
         layout_span_y = max(
-            micro_config.node_height,
-            max((d["y"] - min_y) for d in layout_result.devices) + micro_config.node_height
+            node_height,
+            max((d["y"] - min_y) for d in layout_result.devices) + node_height
         )
 
         scale_x = 1.0
-        if layout_span_x > micro_config.node_width and span_x > 0:
-            scale_x = min(1.0, span_x / (layout_span_x - micro_config.node_width))
+        if layout_span_x > node_width and span_x > 0:
+            scale_x = min(1.0, span_x / (layout_span_x - node_width))
         scale_y = 1.0
-        if layout_span_y > micro_config.node_height and span_y > 0:
-            scale_y = min(1.0, span_y / (layout_span_y - micro_config.node_height))
+        if layout_span_y > node_height and span_y > 0:
+            scale_y = min(1.0, span_y / (layout_span_y - node_height))
         scale = min(scale_x, scale_y, 1.0)
 
         for d in layout_result.devices:
@@ -1399,7 +1475,23 @@ def compute_layout_l1(
             l for l in links
             if l.from_device_id in no_area_device_ids and l.to_device_id in no_area_device_ids
         ]
-        layout_result = simple_layer_layout(no_area_devices, no_area_links, micro_config)
+        no_area_node_width, no_area_node_height = _effective_node_size(
+            no_area_devices,
+            DEFAULT_DEVICE_WIDTH,
+            DEFAULT_DEVICE_HEIGHT,
+            extra_width=label_extra,
+            extra_height=label_extra,
+        )
+        no_area_config = LayoutConfig(
+            layer_gap=micro_config.layer_gap,
+            node_spacing=micro_config.node_spacing,
+            node_width=no_area_node_width,
+            node_height=no_area_node_height,
+            max_nodes_per_row=micro_config.max_nodes_per_row,
+            row_gap=micro_config.row_gap,
+            row_stagger=micro_config.row_stagger,
+        )
+        layout_result = simple_layer_layout(no_area_devices, no_area_links, no_area_config)
         for d in layout_result.devices:
             device_layouts.append(DeviceLayout(
                 id=d["id"],
@@ -1432,13 +1524,20 @@ def compute_layout_l2(
     l2_assignments: list,
     l2_segments: list,
     config: LayoutConfig,
+    layout_tuning: dict | None = None,
 ) -> dict:
     """Compute L2 layout: VLAN grouping boxes (NS-like L2 view)."""
+    tuning = layout_tuning or {}
     GROUP_MIN_WIDTH = 3.0
     GROUP_MIN_HEIGHT = 1.5
     GROUP_GAP = 0.5
     GROUP_PADDING = 0.15
-    LABEL_BAND = 0.45
+    try:
+        LABEL_BAND = float(tuning.get("label_band", 0.45))
+    except (TypeError, ValueError):
+        LABEL_BAND = 0.45
+    if LABEL_BAND < 0:
+        LABEL_BAND = 0.0
 
     # Create VLAN mapping
     vlan_map = {seg.id: {"vlan_id": seg.vlan_id, "name": seg.name} for seg in l2_segments}
@@ -1478,19 +1577,36 @@ def compute_layout_l2(
             if l.from_device_id in device_id_set and l.to_device_id in device_id_set
         ]
 
+        group_node_width, group_node_height = _effective_node_size(
+            group_devices,
+            DEFAULT_DEVICE_WIDTH,
+            DEFAULT_DEVICE_HEIGHT,
+            extra_width=0.0,
+            extra_height=LABEL_BAND,
+        )
+        group_config = LayoutConfig(
+            layer_gap=config.layer_gap,
+            node_spacing=config.node_spacing,
+            node_width=group_node_width,
+            node_height=group_node_height,
+            max_nodes_per_row=config.max_nodes_per_row,
+            row_gap=config.row_gap,
+            row_stagger=config.row_stagger,
+        )
+
         # Layout devices using simple layer layout (NS gốc style)
-        layout_result = simple_layer_layout(group_devices, group_links, config)
+        layout_result = simple_layer_layout(group_devices, group_links, group_config)
 
         # Compute bounding box
         if layout_result.devices:
             min_x = min(d["x"] for d in layout_result.devices)
             min_y = min(d["y"] for d in layout_result.devices)
-            max_x = max(d["x"] for d in layout_result.devices) + config.node_width
-            max_y = max(d["y"] for d in layout_result.devices) + config.node_height
+            max_x = max(d["x"] for d in layout_result.devices) + group_config.node_width
+            max_y = max(d["y"] for d in layout_result.devices) + group_config.node_height
         else:
             min_x = min_y = 0.0
-            max_x = config.node_width
-            max_y = config.node_height
+            max_x = group_config.node_width
+            max_y = group_config.node_height
 
         group_width = max(GROUP_MIN_WIDTH, (max_x - min_x) + GROUP_PADDING * 2)
         group_height = max(GROUP_MIN_HEIGHT, (max_y - min_y) + GROUP_PADDING * 2 + LABEL_BAND)
@@ -1584,15 +1700,22 @@ def compute_layout_l3(
     links: list,
     l3_addresses: list,
     config: LayoutConfig,
+    layout_tuning: dict | None = None,
 ) -> dict:
     """Compute L3 layout: routers on top, subnet groups below (NS-like L3 view)."""
     import ipaddress
 
+    tuning = layout_tuning or {}
     GROUP_MIN_WIDTH = 3.0
     GROUP_MIN_HEIGHT = 1.5
     GROUP_GAP = 0.5
     GROUP_PADDING = 0.15
-    LABEL_BAND = 0.45
+    try:
+        LABEL_BAND = float(tuning.get("label_band", 0.45))
+    except (TypeError, ValueError):
+        LABEL_BAND = 0.45
+    if LABEL_BAND < 0:
+        LABEL_BAND = 0.0
     ROUTER_GAP = 1.0
 
     # Map device_id -> subnets
@@ -1618,6 +1741,14 @@ def compute_layout_l3(
     # Get router devices
     routers = [d for d in devices if d.id in router_ids]
 
+    router_node_width, router_node_height = _effective_node_size(
+        routers,
+        DEFAULT_DEVICE_WIDTH,
+        DEFAULT_DEVICE_HEIGHT,
+        extra_width=0.0,
+        extra_height=LABEL_BAND,
+    )
+
     # Layout routers horizontally at the top
     router_x = 0.0
     router_y = 0.0
@@ -1631,7 +1762,7 @@ def compute_layout_l3(
             y=router_y,
             layer=0,
         ))
-        router_x += config.node_width + ROUTER_GAP
+        router_x += router_node_width + ROUTER_GAP
 
     # Group endpoints by subnet (exclude routers from subnet groups)
     subnet_groups_data: list[dict] = []
@@ -1657,19 +1788,36 @@ def compute_layout_l3(
             if l.from_device_id in device_id_set and l.to_device_id in device_id_set
         ]
 
+        group_node_width, group_node_height = _effective_node_size(
+            group_devices,
+            DEFAULT_DEVICE_WIDTH,
+            DEFAULT_DEVICE_HEIGHT,
+            extra_width=0.0,
+            extra_height=LABEL_BAND,
+        )
+        group_config = LayoutConfig(
+            layer_gap=config.layer_gap,
+            node_spacing=config.node_spacing,
+            node_width=group_node_width,
+            node_height=group_node_height,
+            max_nodes_per_row=config.max_nodes_per_row,
+            row_gap=config.row_gap,
+            row_stagger=config.row_stagger,
+        )
+
         # Layout devices using simple layer layout (NS gốc style)
-        layout_result = simple_layer_layout(group_devices, group_links, config)
+        layout_result = simple_layer_layout(group_devices, group_links, group_config)
 
         # Compute bounding box
         if layout_result.devices:
             min_x = min(d["x"] for d in layout_result.devices)
             min_y = min(d["y"] for d in layout_result.devices)
-            max_x = max(d["x"] for d in layout_result.devices) + config.node_width
-            max_y = max(d["y"] for d in layout_result.devices) + config.node_height
+            max_x = max(d["x"] for d in layout_result.devices) + group_config.node_width
+            max_y = max(d["y"] for d in layout_result.devices) + group_config.node_height
         else:
             min_x = min_y = 0.0
-            max_x = config.node_width
-            max_y = config.node_height
+            max_x = group_config.node_width
+            max_y = group_config.node_height
 
         group_width = max(GROUP_MIN_WIDTH, (max_x - min_x) + GROUP_PADDING * 2)
         group_height = max(GROUP_MIN_HEIGHT, (max_y - min_y) + GROUP_PADDING * 2 + LABEL_BAND)
@@ -1701,7 +1849,7 @@ def compute_layout_l3(
     subnet_groups_data.sort(key=lambda g: g["subnet"])
 
     # Start below routers
-    router_row_height = config.node_height if routers else 0.0
+    router_row_height = router_node_height if routers else 0.0
     max_row_width = 15.0
     current_x = 0.0
     current_y = router_row_height + (GROUP_GAP * 2 if routers else 0.0)

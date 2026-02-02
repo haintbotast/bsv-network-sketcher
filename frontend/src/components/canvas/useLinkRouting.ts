@@ -754,6 +754,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       const portPairRank = new Map<string, Map<string, { rank: number; count: number; neighborId: string }>>()
       const portNeighborDevice = new Map<string, Map<string, string>>()
       const portForcedSide = new Map<string, Map<string, 'left' | 'right' | 'top' | 'bottom'>>()
+      const portAlignedCoord = new Map<string, Map<string, { axis: 'x' | 'y'; coord: number }>>()
 
       const registerPairRank = (deviceId: string, port: string, rank: number, count: number, neighborId: string) => {
         const deviceMap = portPairRank.get(deviceId) || new Map<string, { rank: number; count: number; neighborId: string }>()
@@ -771,6 +772,20 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         const deviceMap = portForcedSide.get(deviceId) || new Map<string, 'left' | 'right' | 'top' | 'bottom'>()
         deviceMap.set(port, side)
         portForcedSide.set(deviceId, deviceMap)
+      }
+
+      const registerForcedSideIfUnset = (deviceId: string, port: string, side: 'left' | 'right' | 'top' | 'bottom') => {
+        const deviceMap = portForcedSide.get(deviceId) || new Map<string, 'left' | 'right' | 'top' | 'bottom'>()
+        if (!deviceMap.has(port)) {
+          deviceMap.set(port, side)
+          portForcedSide.set(deviceId, deviceMap)
+        }
+      }
+
+      const registerAlignedCoord = (deviceId: string, port: string, axis: 'x' | 'y', coord: number) => {
+        const deviceMap = portAlignedCoord.get(deviceId) || new Map<string, { axis: 'x' | 'y'; coord: number }>()
+        deviceMap.set(port, { axis, coord })
+        portAlignedCoord.set(deviceId, deviceMap)
       }
 
       const ensureStats = (deviceId: string, port: string) => {
@@ -838,6 +853,89 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
           const coord = toSide === 'left' || toSide === 'right' ? toPrev.y : toPrev.x
           record(meta.link.toDeviceId, meta.link.toPort, toSide, coord)
           registerNeighborDevice(meta.link.toDeviceId, meta.link.toPort, meta.link.fromDeviceId)
+        }
+
+        if (isL1View && meta.link.fromPort && meta.link.toPort) {
+          const fromCenter = meta.fromCenter
+          const toCenter = meta.toCenter
+          const fromView = meta.fromView
+          const toView = meta.toView
+          const dxCenter = toCenter.x - fromCenter.x
+          const dyCenter = toCenter.y - fromCenter.y
+          const rowTolerance = Math.min(fromView.height, toView.height) * 0.35
+          const colTolerance = Math.min(fromView.width, toView.width) * 0.35
+          let axis: 'x' | 'y' | null = null
+          if (Math.abs(dyCenter) <= rowTolerance && Math.abs(dxCenter) >= Math.abs(dyCenter)) {
+            axis = 'y'
+          } else if (Math.abs(dxCenter) <= colTolerance && Math.abs(dyCenter) > Math.abs(dxCenter)) {
+            axis = 'x'
+          }
+
+          if (axis) {
+            const portEdgeInset = renderTuning.value.port_edge_inset ?? 0
+            const bundle = linkBundleIndex.value.get(meta.link.id)
+            const bundleGap = Math.max(6, (renderTuning.value.bundle_gap ?? 0) * scale * 0.6)
+            const bundleOffset = bundle && bundle.total > 1
+              ? (bundle.index - (bundle.total - 1) / 2) * bundleGap
+              : 0
+            const baseCoord = axis === 'y'
+              ? (fromCenter.y + toCenter.y) / 2
+              : (fromCenter.x + toCenter.x) / 2
+
+            const fromMin = axis === 'y'
+              ? fromView.y + portEdgeInset
+              : fromView.x + portEdgeInset
+            const fromMax = axis === 'y'
+              ? fromView.y + fromView.height - portEdgeInset
+              : fromView.x + fromView.width - portEdgeInset
+            const toMin = axis === 'y'
+              ? toView.y + portEdgeInset
+              : toView.x + portEdgeInset
+            const toMax = axis === 'y'
+              ? toView.y + toView.height - portEdgeInset
+              : toView.x + toView.width - portEdgeInset
+            const minCoord = Math.max(fromMin, toMin)
+            const maxCoord = Math.min(fromMax, toMax)
+            if (minCoord <= maxCoord) {
+              const coord = clamp(baseCoord + bundleOffset, minCoord, maxCoord)
+              const fromSide = axis === 'y'
+                ? (toCenter.x >= fromCenter.x ? 'right' : 'left')
+                : (toCenter.y >= fromCenter.y ? 'bottom' : 'top')
+              const toSide = axis === 'y'
+                ? (fromCenter.x >= toCenter.x ? 'right' : 'left')
+                : (fromCenter.y >= toCenter.y ? 'bottom' : 'top')
+
+              const fromAnchor = axis === 'y'
+                ? { x: fromSide === 'left' ? fromView.x : fromView.x + fromView.width, y: coord }
+                : { x: coord, y: fromSide === 'top' ? fromView.y : fromView.y + fromView.height }
+              const toAnchor = axis === 'y'
+                ? { x: toSide === 'left' ? toView.x : toView.x + toView.width, y: coord }
+                : { x: coord, y: toSide === 'top' ? toView.y : toView.y + toView.height }
+
+              const obstacles: Rect[] = []
+              deviceRects.forEach(({ id, rect }) => {
+                if (id === meta.link.fromDeviceId || id === meta.link.toDeviceId) return
+                obstacles.push(rect)
+              })
+              if (meta.fromAreaId && meta.toAreaId && meta.fromAreaId !== meta.toAreaId) {
+                areaRects.forEach(({ id, rect }) => {
+                  if (id === meta.fromAreaId || id === meta.toAreaId) return
+                  obstacles.push(rect)
+                })
+              }
+
+              const blocked = obstacles.some(rect =>
+                segmentIntersectsRect(fromAnchor, toAnchor, rect, clearance)
+              )
+
+              if (!blocked) {
+                registerAlignedCoord(meta.link.fromDeviceId, meta.link.fromPort, axis, coord)
+                registerAlignedCoord(meta.link.toDeviceId, meta.link.toPort, axis, coord)
+                registerForcedSideIfUnset(meta.link.fromDeviceId, meta.link.fromPort, fromSide)
+                registerForcedSideIfUnset(meta.link.toDeviceId, meta.link.toPort, toSide)
+              }
+            }
+          }
         }
 
         if (meta.link.fromPort && meta.link.toPort) {
@@ -935,6 +1033,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         const pairMap = portPairRank.get(deviceId) || new Map<string, { rank: number; count: number; neighborId: string }>()
         const neighborDeviceMap = portNeighborDevice.get(deviceId) || new Map<string, string>()
         const forcedSideMap = portForcedSide.get(deviceId) || new Map<string, 'left' | 'right' | 'top' | 'bottom'>()
+        const alignedCoordMap = portAlignedCoord.get(deviceId) || new Map<string, { axis: 'x' | 'y'; coord: number }>()
         const buckets: Record<'left' | 'right' | 'top' | 'bottom', Array<{
           port: string
           coord: number | null
@@ -942,6 +1041,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
           order: number
           pairRank: number | null
           pairKey: string | null
+          fixedCoord: number | null
         }>> = { left: [], right: [], top: [], bottom: [] }
 
         ports.forEach(port => {
@@ -969,6 +1069,14 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
             : null
           const pairInfo = pairMap.get(port)
           const pairKey = pairInfo?.neighborId || neighborDeviceMap.get(port) || null
+          const aligned = alignedCoordMap.get(port)
+          const fixedCoord = aligned
+            ? ((side === 'left' || side === 'right') && aligned.axis === 'y'
+              ? aligned.coord
+              : (side === 'top' || side === 'bottom') && aligned.axis === 'x'
+                ? aligned.coord
+                : null)
+            : null
 
           buckets[side].push({
             port,
@@ -976,62 +1084,105 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
             neighborCoord,
             order: orderMap.get(port) ?? 0,
             pairRank: pairInfo?.rank ?? null,
-            pairKey
+            pairKey,
+            fixedCoord
           })
         })
 
         const anchors = new Map<string, { x: number; y: number; side: string }>()
-        ;(['left', 'right'] as const).forEach(side => {
-          const list = buckets[side]
-          const count = list.length
-          if (!count) return
-          list.sort((a, b) => {
-            if (a.pairKey && b.pairKey && a.pairKey === b.pairKey) {
-              const ar = a.pairRank ?? 0
-              const br = b.pairRank ?? 0
-              if (ar !== br) return ar - br
-            }
-            if (a.coord != null && b.coord != null && a.coord !== b.coord) return a.coord - b.coord
-            if (a.coord != null && b.coord == null) return -1
-            if (a.coord == null && b.coord != null) return 1
-            if (a.neighborCoord != null && b.neighborCoord != null && a.neighborCoord !== b.neighborCoord) return a.neighborCoord - b.neighborCoord
-            if (a.neighborCoord != null && b.neighborCoord == null) return -1
-            if (a.neighborCoord == null && b.neighborCoord != null) return 1
-            return a.order - b.order
-          })
-          const spacing = (rect.height - portEdgeInset * 2) / (count + 1)
-          list.forEach((entry, index) => {
-            const y = rect.y + portEdgeInset + spacing * (index + 1)
-            const x = side === 'left' ? rect.x : rect.x + rect.width
-            anchors.set(entry.port, { x, y, side })
-          })
-        })
+        const sortEntries = (a: typeof buckets['left'][number], b: typeof buckets['left'][number]) => {
+          if (a.pairKey && b.pairKey && a.pairKey === b.pairKey) {
+            const ar = a.pairRank ?? 0
+            const br = b.pairRank ?? 0
+            if (ar !== br) return ar - br
+          }
+          if (a.fixedCoord != null && b.fixedCoord != null && a.fixedCoord !== b.fixedCoord) return a.fixedCoord - b.fixedCoord
+          if (a.fixedCoord != null && b.fixedCoord == null) return -1
+          if (a.fixedCoord == null && b.fixedCoord != null) return 1
+          if (a.coord != null && b.coord != null && a.coord !== b.coord) return a.coord - b.coord
+          if (a.coord != null && b.coord == null) return -1
+          if (a.coord == null && b.coord != null) return 1
+          if (a.neighborCoord != null && b.neighborCoord != null && a.neighborCoord !== b.neighborCoord) return a.neighborCoord - b.neighborCoord
+          if (a.neighborCoord != null && b.neighborCoord == null) return -1
+          if (a.neighborCoord == null && b.neighborCoord != null) return 1
+          return a.order - b.order
+        }
 
-        ;(['top', 'bottom'] as const).forEach(side => {
+        const assignAnchorsForSide = (side: 'left' | 'right' | 'top' | 'bottom') => {
           const list = buckets[side]
           const count = list.length
           if (!count) return
-          list.sort((a, b) => {
-            if (a.pairKey && b.pairKey && a.pairKey === b.pairKey) {
-              const ar = a.pairRank ?? 0
-              const br = b.pairRank ?? 0
-              if (ar !== br) return ar - br
+          const isVertical = side === 'left' || side === 'right'
+          const minCoord = isVertical ? rect.y + portEdgeInset : rect.x + portEdgeInset
+          const maxCoord = isVertical ? rect.y + rect.height - portEdgeInset : rect.x + rect.width - portEdgeInset
+          const span = Math.max(maxCoord - minCoord, 1)
+          const baseSpacing = span / (count + 1)
+          const minSpacing = Math.max(baseSpacing * 0.6, 4)
+
+          const sorted = [...list].sort(sortEntries)
+          const fixedCoords: number[] = []
+          const fixedEntries: typeof list = []
+          const groups: Array<typeof list> = []
+          let currentGroup: typeof list = []
+
+          sorted.forEach(entry => {
+            if (entry.fixedCoord != null) {
+              groups.push(currentGroup)
+              currentGroup = []
+              fixedEntries.push(entry)
+              fixedCoords.push(clamp(entry.fixedCoord, minCoord, maxCoord))
+            } else {
+              currentGroup.push(entry)
             }
-            if (a.coord != null && b.coord != null && a.coord !== b.coord) return a.coord - b.coord
-            if (a.coord != null && b.coord == null) return -1
-            if (a.coord == null && b.coord != null) return 1
-            if (a.neighborCoord != null && b.neighborCoord != null && a.neighborCoord !== b.neighborCoord) return a.neighborCoord - b.neighborCoord
-            if (a.neighborCoord != null && b.neighborCoord == null) return -1
-            if (a.neighborCoord == null && b.neighborCoord != null) return 1
-            return a.order - b.order
           })
-          const spacing = (rect.width - portEdgeInset * 2) / (count + 1)
-          list.forEach((entry, index) => {
-            const x = rect.x + portEdgeInset + spacing * (index + 1)
-            const y = side === 'top' ? rect.y : rect.y + rect.height
+          groups.push(currentGroup)
+
+          const segments: Array<{ min: number; max: number }> = []
+          let segStart = minCoord
+          fixedCoords.forEach(coord => {
+            segments.push({ min: segStart, max: coord - minSpacing })
+            segStart = coord + minSpacing
+          })
+          segments.push({ min: segStart, max: maxCoord })
+
+          const positions = new Map<string, number>()
+          groups.forEach((group, idx) => {
+            if (group.length === 0) return
+            const segment = segments[idx] ?? { min: minCoord, max: maxCoord }
+            const segMin = Math.min(segment.min, segment.max)
+            const segMax = Math.max(segment.min, segment.max)
+            const segSpan = Math.max(segMax - segMin, 0)
+            if (segSpan <= 0) {
+              const fallback = clamp(segMin, minCoord, maxCoord)
+              group.forEach(entry => {
+                positions.set(entry.port, fallback)
+              })
+              return
+            }
+            const spacing = segSpan / (group.length + 1)
+            group.forEach((entry, index) => {
+              positions.set(entry.port, segMin + spacing * (index + 1))
+            })
+          })
+
+          fixedEntries.forEach((entry, index) => {
+            positions.set(entry.port, fixedCoords[index])
+          })
+
+          sorted.forEach((entry, index) => {
+            const coord = positions.get(entry.port) ?? (minCoord + baseSpacing * (index + 1))
+            const x = isVertical
+              ? (side === 'left' ? rect.x : rect.x + rect.width)
+              : coord
+            const y = isVertical
+              ? coord
+              : (side === 'top' ? rect.y : rect.y + rect.height)
             anchors.set(entry.port, { x, y, side })
           })
-        })
+        }
+
+        ;(['left', 'right'] as const).forEach(assignAnchorsForSide)
+        ;(['top', 'bottom'] as const).forEach(assignAnchorsForSide)
 
         if (anchors.size) {
           overrides.set(deviceId, anchors)

@@ -61,6 +61,7 @@
 - Routing link ưu tiên **tránh vật cản** (area/device/**interface tag**) và **giảm chồng lấn**; nếu không bị cản thì giữ đường thẳng ngắn nhất.
 - **Anchor port tối ưu 2‑pass:** pass 1 định tuyến để lấy hướng/điểm tham chiếu, pass 2 sắp xếp lại anchor theo side + thứ tự để giãn cách hợp lý và bám tuyến ngắn nhất.
 - **Pair alignment:** với nhiều link giữa 2 thiết bị kề nhau, anchor được **xếp đồng bộ theo thứ tự port phía đối diện** để giảm chéo.
+- **Same-row alignment:** link giữa **2 thiết bị cùng hàng/cùng cột** sẽ ưu tiên **canh thẳng anchor + port label** (ngang hoặc dọc). Chỉ áp dụng khi **đường thẳng không bị vật cản**; nếu bị cản thì giữ routing tránh vật cản.
 - Liên‑area **tách lane rộng hơn** so với bundle nội‑area để giảm chồng/đè.
 - Intra‑area: nếu đường thẳng cắt thiết bị khác thì bẻ góc (Manhattan) để tránh xuyên qua device.
 
@@ -123,6 +124,10 @@
 | Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor**, có thể xoay theo hướng link; auto-scale theo zoom (0.6-1.15) và tự giãn để tránh chồng lấn |
 
 - Auto-layout cần **tính thêm vùng đệm Interface Tag** khi giãn khoảng cách giữa thiết bị để tránh chồng lấn.
+- Auto-layout cần **tính thêm băng nhãn** khi xác định kích thước node và khoảng cách:
+  - **L1:** cộng `port_label_band` vào kích thước node (rộng/cao) và vào `node_spacing`/`layer_gap`.
+  - **L2/L3:** cộng `label_band` vào chiều cao node để chừa chỗ nhãn L2/L3 dưới thiết bị; đồng thời chừa band nhãn cho group (VLAN/Subnet).
+- Micro layout sử dụng **kích thước thiết bị sau auto-resize** để tính bounding và sắp xếp trước khi tính macro layout.
 - **Quy tắc nhãn port:** định dạng **chữ cái + khoảng trắng + số hiệu**.  
   Ví dụ: `Gi 0/1`, `Gi 1/0/48`, `HA 1`, `Port 1`.
 

@@ -226,6 +226,7 @@ test.describe('Diagram Editor', () => {
 - [ ] RB-006: số lượng node/link trước & sau layout không đổi.
 - [ ] RB-101..RB-104: không chồng lấn; device nằm trong area; link không xuyên node.
 - [ ] L1 routing: khi đường thẳng bị cản bởi area/device, link phải bẻ hướng để tránh vật cản.
+- [ ] L1 routing: liên‑area/waypoint có thể đi ngoài đường bao sơ đồ; pan/viewport vẫn nhìn thấy đầy đủ đoạn link.
 - [ ] RB-121..RB-122: nhãn không đè lên node/link; interface tag hợp lệ.
 - [ ] RB-141..RB-143: cảnh báo khoảng cách hiển thị đúng khi vi phạm ngưỡng.
 - [ ] RB-201..RB-202: hướng layout đúng mode; custom thiếu tham số -> fallback ISO + cảnh báo.

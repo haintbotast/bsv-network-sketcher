@@ -10,6 +10,15 @@ from app.db.models import Area
 from app.schemas.area import AreaCreate, AreaStyle, AreaUpdate
 
 
+def _normalize_grid_value(value: Optional[int]) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return 1
+
+
 async def get_areas(db: AsyncSession, project_id: str) -> list[Area]:
     """Lấy danh sách areas của project."""
     result = await db.execute(
@@ -43,8 +52,8 @@ async def create_area(db: AsyncSession, project_id: str, data: AreaCreate) -> Ar
     area = Area(
         project_id=project_id,
         name=data.name,
-        grid_row=data.grid_row,
-        grid_col=data.grid_col,
+        grid_row=_normalize_grid_value(data.grid_row),
+        grid_col=_normalize_grid_value(data.grid_col),
         position_x=data.position_x,
         position_y=data.position_y,
         width=data.width,
@@ -65,6 +74,18 @@ async def update_area(db: AsyncSession, area: Area, data: AreaUpdate) -> Area:
         update_data["style_json"] = json.dumps(update_data.pop("style"))
     elif "style" in update_data:
         update_data.pop("style")
+
+    if "grid_row" in update_data:
+        if update_data["grid_row"] is None:
+            update_data.pop("grid_row")
+        else:
+            update_data["grid_row"] = _normalize_grid_value(update_data["grid_row"])
+
+    if "grid_col" in update_data:
+        if update_data["grid_col"] is None:
+            update_data.pop("grid_col")
+        else:
+            update_data["grid_col"] = _normalize_grid_value(update_data["grid_col"])
 
     for field, value in update_data.items():
         setattr(area, field, value)

@@ -685,8 +685,35 @@ const visibleDevices = computed(() => {
           ellipsis: true
         }
       }
-    })
+  })
 })
+
+const mergeBounds = (boundsList: Array<{ minX: number; minY: number; maxX: number; maxY: number } | null>) => {
+  let minX = 0
+  let minY = 0
+  let maxX = 0
+  let maxY = 0
+  let hasBounds = false
+
+  boundsList.forEach(bounds => {
+    if (!bounds) return
+    if (!hasBounds) {
+      minX = bounds.minX
+      minY = bounds.minY
+      maxX = bounds.maxX
+      maxY = bounds.maxY
+      hasBounds = true
+      return
+    }
+    minX = Math.min(minX, bounds.minX)
+    minY = Math.min(minY, bounds.minY)
+    maxX = Math.max(maxX, bounds.maxX)
+    maxY = Math.max(maxY, bounds.maxY)
+  })
+
+  if (!hasBounds) return null
+  return { minX, minY, maxX, maxY }
+}
 
 const areaBounds = computed(() => {
   // Loại trừ waypoint areas (_wp_) khỏi bounding box
@@ -698,6 +725,34 @@ const areaBounds = computed(() => {
   let hasBounds = false
   areaViewMap.value.forEach((rect, id) => {
     if (wpIds.has(id)) return
+    if (!hasBounds) {
+      minX = rect.x
+      minY = rect.y
+      maxX = rect.x + rect.width
+      maxY = rect.y + rect.height
+      hasBounds = true
+      return
+    }
+    minX = Math.min(minX, rect.x)
+    minY = Math.min(minY, rect.y)
+    maxX = Math.max(maxX, rect.x + rect.width)
+    maxY = Math.max(maxY, rect.y + rect.height)
+  })
+  if (!hasBounds) return null
+  return { minX, minY, maxX, maxY }
+})
+
+const waypointBounds = computed(() => {
+  const wpAreas = props.areas.filter(a => a.name.endsWith('_wp_'))
+  if (!wpAreas.length) return null
+  let minX = 0
+  let minY = 0
+  let maxX = 0
+  let maxY = 0
+  let hasBounds = false
+  wpAreas.forEach(area => {
+    const rect = areaViewMap.value.get(area.id)
+    if (!rect) return
     if (!hasBounds) {
       minX = rect.x
       minY = rect.y
@@ -739,7 +794,6 @@ const deviceBounds = computed(() => {
   return { minX, minY, maxX, maxY }
 })
 
-const diagramBounds = computed(() => areaBounds.value || deviceBounds.value)
 
 const zoomScale = computed(() => {
   const baseScale = layoutViewport.value.scale || 1
@@ -801,6 +855,45 @@ const { visibleLinks, visibleLinkShapes, linkPortLabels } = useLinkRouting({
   areaBounds,
   isPanning
 })
+
+const linkBounds = computed(() => {
+  if (!visibleLinks.value.length) return null
+  let minX = 0
+  let minY = 0
+  let maxX = 0
+  let maxY = 0
+  let hasBounds = false
+
+  visibleLinks.value.forEach(link => {
+    const points = link.points
+    for (let i = 0; i < points.length; i += 2) {
+      const x = points[i]
+      const y = points[i + 1]
+      if (!hasBounds) {
+        minX = x
+        minY = y
+        maxX = x
+        maxY = y
+        hasBounds = true
+        continue
+      }
+      minX = Math.min(minX, x)
+      minY = Math.min(minY, y)
+      maxX = Math.max(maxX, x)
+      maxY = Math.max(maxY, y)
+    }
+  })
+
+  if (!hasBounds) return null
+  return { minX, minY, maxX, maxY }
+})
+
+const diagramBounds = computed(() => mergeBounds([
+  areaBounds.value,
+  waypointBounds.value,
+  deviceBounds.value,
+  linkBounds.value
+]))
 
 // L2 Labels - VLAN info on devices
 const l2Labels = computed(() => {

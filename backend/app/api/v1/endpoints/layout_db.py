@@ -45,8 +45,8 @@ async def apply_layout_to_db(db: AsyncSession, device_layouts: list[dict]) -> No
                 area_devices[device.area_id].append({
                     "x": x,
                     "y": y,
-                    "width": 1.2,  # Default device width in inches
-                    "height": 0.8   # Default device height in inches
+                    "width": device.width or 1.2,  # Default device width in inches
+                    "height": device.height or 0.5  # Default device height in inches
                 })
 
     # Update area positions based on device bounds

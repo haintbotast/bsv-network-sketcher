@@ -26,9 +26,13 @@ export type RouteLinksParams = {
   areaBundleIndex: Map<string, { index: number; total: number }>
   waypointAreaMap: Map<string, { id: string; cx: number; cy: number; rect: Rect }>
   areaCenters: Map<string, { x: number; y: number }>
+  debugRouteMode?: boolean
 }
 
 const LABEL_STUB_PADDING = 4
+const DEFAULT_STROKE = '#2b2a28'
+const DEBUG_STROKE_L2 = '#c0392b'
+const DEBUG_STROKE_L1_DIAGONAL = '#d35400'
 
 function computeLocalCorridor(
   fromArea: Rect,
@@ -114,7 +118,9 @@ export function routeLinks(
     renderTuning, areaViewMap, deviceAreaMap, areaBounds,
     linkBundleIndex, areaBundleIndex, waypointAreaMap,
     areaCenters,
+    debugRouteMode,
   } = ctx
+  const debugOn = !!debugRouteMode
 
   const laneAxisByPair = new Map<string, 'x' | 'y'>()
   const getPairKey = (fromArea: string, toArea: string) =>
@@ -160,6 +166,18 @@ export function routeLinks(
       if (len1 <= 0 || len2 <= 0) continue
       const dot = (dx1 * dx2 + dy1 * dy2) / (len1 * len2)
       if (dot < 0.999) return true
+    }
+    return false
+  }
+
+  const hasSignificantDiagonal = (pts: number[], minDiagonal: number) => {
+    if (pts.length < 4) return false
+    for (let i = 2; i + 1 < pts.length; i += 2) {
+      const dx = Math.abs(pts[i] - pts[i - 2])
+      const dy = Math.abs(pts[i + 1] - pts[i - 1])
+      if (dx <= 0.5 || dy <= 0.5) continue
+      const len = Math.hypot(dx, dy)
+      if (len >= minDiagonal) return true
     }
     return false
   }
@@ -603,6 +621,14 @@ export function routeLinks(
         smoothed.forEach(point => pushPoint(points, point.x, point.y))
       }
 
+      const debugStroke = (() => {
+        if (!debugOn) return DEFAULT_STROKE
+        if (!isL1) return DEBUG_STROKE_L2
+        const minDiagonal = Math.max(8, minSegment * 1.2)
+        if (hasSignificantDiagonal(points, minDiagonal)) return DEBUG_STROKE_L1_DIAGONAL
+        return DEFAULT_STROKE
+      })()
+
       return {
         id: link.id,
         fromAnchor,
@@ -612,7 +638,7 @@ export function routeLinks(
         points,
         config: {
           points,
-          stroke: '#2b2a28',
+          stroke: debugStroke,
           strokeWidth: 1.5,
           lineCap: 'round',
           lineJoin: 'round',

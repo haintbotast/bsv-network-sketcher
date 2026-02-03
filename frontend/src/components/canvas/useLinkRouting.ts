@@ -103,6 +103,10 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     }
 
     const isL1View = (props.viewMode || 'L1') === 'L1'
+    const debugRouteMode = (() => {
+      if (typeof window === 'undefined') return false
+      return new URLSearchParams(window.location.search).get('debugRoute') === '1'
+    })()
     const clearance = (renderTuning.value.area_clearance ?? 0) * scale
     const gridBase = Math.max(6, Math.round((renderTuning.value.area_clearance ?? 0) * 0.5 * scale))
     const minSegment = Math.max(4, Math.round(6 * scale))
@@ -191,6 +195,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       areaBundleIndex: abIndex,
       waypointAreaMap: wpMap,
       areaCenters,
+      debugRouteMode,
     }
 
     const anchorCtx = {

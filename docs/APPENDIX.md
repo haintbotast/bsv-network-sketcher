@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-23  
+> **Cập nhật:** 2026-02-03  
 > **Mục tiêu:** Lưu các thông tin phụ trợ tách khỏi plan tổng.
 
 ---
@@ -57,3 +57,12 @@ network-sketcher-web/
 
 - `WEB_APP_DEVELOPMENT_PLAN.md`
 - `docs/NS_REFERENCE.md`
+
+---
+
+## E. Tham số debug UI
+
+- `?debugRoute=1`: Tô màu đường link để nhận biết chế độ routing.
+- Màu mặc định: L1 chuẩn, không có đoạn chéo đáng kể.
+- Màu cam: L1 nhưng có đoạn chéo dài (gợi ý smoothing/shortcut).
+- Màu đỏ: Non‑L1 (đang chạy routing any‑angle).

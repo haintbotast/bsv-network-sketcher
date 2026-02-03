@@ -45,6 +45,13 @@ export type LinkModel = {
   style: 'solid' | 'dashed' | 'dotted'
 }
 
+export type PortAnchorOverride = {
+  deviceId: string
+  portName: string
+  side: 'left' | 'right' | 'top' | 'bottom'
+  offsetRatio: number
+}
+
 // View modes for canvas
 export type ViewMode = 'L1' | 'L2' | 'L3'
 

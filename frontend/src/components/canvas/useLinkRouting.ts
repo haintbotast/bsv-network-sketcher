@@ -6,7 +6,7 @@ import type { Crossing } from '../../utils/line_crossings'
 
 // Re-export types for backward compatibility
 export type { Rect } from './linkRoutingTypes'
-import type { Rect, RenderLink, UseLinkRoutingParams } from './linkRoutingTypes'
+import type { Rect, RenderLink, UseLinkRoutingParams, PortAnchorOverrideMap } from './linkRoutingTypes'
 
 import { clamp, computeSide, computePortLabelPlacement } from './linkRoutingUtils'
 
@@ -39,13 +39,20 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
   const visibleLinkCache = ref<RenderLink[]>([])
 
   // Port anchors sub-composable
+  const userPortAnchorOverrides = computed<PortAnchorOverrideMap>(() => props.portAnchorOverrides || new Map())
+
   const {
     devicePortList,
     devicePortOrder,
     devicePortNeighbors,
     devicePortSideMap,
     resolvePortAnchorWithOverrides,
-  } = usePortAnchors({ props, renderTuning, deviceViewMap })
+  } = usePortAnchors({
+    props,
+    renderTuning,
+    deviceViewMap,
+    portAnchorOverrides: userPortAnchorOverrides
+  })
 
   // Link bundles sub-composable
   const {
@@ -199,6 +206,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       devicePortOrder: dpOrder,
       devicePortNeighbors: dpNeighbors,
       linkBundleIndex: lbIndex,
+      userAnchorOverrides: userPortAnchorOverrides.value,
     }
 
     // Two-pass: metadata → route → anchor overrides → re-route
@@ -207,7 +215,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     const overrides = buildAnchorOverrides(pass1.linkMetas, pass1Result.cache, anchorCtx)
 
     let finalResult = pass1Result
-    if (overrides.size > 0) {
+    if (overrides.size > 0 || userPortAnchorOverrides.value.size > 0) {
       const pass2 = buildLinkMetaData(metaParams, overrides)
       finalResult = routeLinks(pass2.linkMetas, pass2.laneIndex, pass2.labelObstacles, routeCtx)
     }
@@ -493,6 +501,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       () => props.devices,
       () => props.viewMode,
       () => props.l2Assignments,
+      () => props.portAnchorOverrides,
       () => layoutViewport.value.scale,
       () => layoutViewport.value.offsetX,
       () => layoutViewport.value.offsetY,

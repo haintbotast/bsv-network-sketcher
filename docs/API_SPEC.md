@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.1
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-01-29
+> **Cập nhật:** 2026-02-03
 > **Mục tiêu:** Đặc tả API phục vụ nhập liệu trực tiếp, quản lý dự án và xuất dữ liệu.
 
 ---
@@ -73,6 +73,7 @@ POST   /templates/{id}/apply
 /projects/{project_id}/l2/segments
 /projects/{project_id}/l2/assignments
 /projects/{project_id}/l3/addresses
+/projects/{project_id}/port-anchors
 ```
 
 **Bulk (grid nhập liệu):**
@@ -83,6 +84,31 @@ POST /projects/{project_id}/links/bulk
 POST /projects/{project_id}/port-channels/bulk
 POST /projects/{project_id}/virtual-ports/bulk
 ```
+
+**Port Anchor Overrides:**
+```
+GET    /projects/{project_id}/port-anchors
+PUT    /projects/{project_id}/port-anchors   # bulk upsert
+DELETE /projects/{project_id}/port-anchors?device_id=...&port_name=...
+```
+
+**Request (bulk upsert):**
+```json
+{
+  "overrides": [
+    {
+      "device_id": "dev-uuid",
+      "port_name": "Gi 0/1",
+      "side": "left",
+      "offset_ratio": 0.5
+    }
+  ]
+}
+```
+
+**Ghi chú:**
+- `side` ∈ `left|right|top|bottom`
+- `offset_ratio` ∈ `[0..1]`, tính theo chiều cạnh thiết bị.
 
 ---
 

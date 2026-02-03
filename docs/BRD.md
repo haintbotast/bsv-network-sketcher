@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-30  
+> **Cập nhật:** 2026-02-03  
 > **Phạm vi:** Ứng dụng web Network Sketcher (port từ repo gốc)  
 > **Nguyên tắc:** Tối giản, chính xác tuyệt đối, UX tiện dụng, **không triển khai CLI**.
 
@@ -53,6 +53,7 @@
 - Có **layout mode chọn** (Cisco/ISO/custom) + preset; **Flexible** có kiểm soát khi cần.
 - Validation logic L1→L2→L3 chặt chẽ hơn.
 - Ràng buộc kết nối L1 theo tầng (Access/Distribution/Server) để đảm bảo đúng logic vật lý.
+- Cho phép **chỉnh anchor port thủ công** để tinh chỉnh đường kết nối trong sơ đồ.
 - Bảo vệ dữ liệu dự án (phân quyền theo project, kiểm soát upload/download).
 - Cho phép quản trị preset/layout/validation qua trang cấu hình (không hardcode).
 

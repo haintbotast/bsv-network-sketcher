@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-23  
+> **Cập nhật:** 2026-02-03  
 > **Trạng thái:** Tài liệu kiến trúc vận hành  
 > **Nguyên tắc:** Dự án web tham chiếu Network Sketcher gốc (logic), **không triển khai CLI**; ưu tiên đúng logic và UX tối giản nhưng dùng được ngay.
 
@@ -122,6 +122,7 @@ UI đọc trạng thái → tải file
 - **Idempotency** cho job (không chạy trùng).
 - **Claim job nguyên tử** (status + locked_at + worker_id).
 - **Kiểm soát upload/download** (kích thước/đuôi file/đường dẫn).
+- **Anchor override:** lưu `port_anchor_overrides` để cố định vị trí anchor per-port (không bị auto-layout ghi đè).
 
 ---
 

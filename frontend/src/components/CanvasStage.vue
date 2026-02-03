@@ -103,6 +103,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AreaModel, DeviceModel, LinkModel, Viewport, ViewMode, L2AssignmentRecord, L3AddressRecord } from '../models/types'
+import type { PortAnchorOverrideMap } from './canvas/linkRoutingTypes'
 import { getVisibleBounds, logicalRectToView } from '../utils/viewport'
 import { useLinkRouting } from './canvas/useLinkRouting'
 
@@ -116,6 +117,7 @@ const props = defineProps<{
   viewMode?: ViewMode
   l2Assignments?: L2AssignmentRecord[]
   l3Addresses?: L3AddressRecord[]
+  portAnchorOverrides?: PortAnchorOverrideMap
   autoLayoutCoords?: Map<string, { x: number; y: number }> // Auto-layout coords (logical units/inches)
   renderTuning?: {
     port_edge_inset?: number

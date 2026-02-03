@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-23  
+> **Cập nhật:** 2026-02-03  
 > **Mục tiêu:** Theo dõi liên kết tối giản giữa BRD → PRD → SRS → API/Schema.
 
 ---
@@ -19,6 +19,7 @@
 | Versioning topology | FR-11 | 2.1, 2.5, 3.1 | `docs/API_SPEC.md` |
 | Cấu hình preset/layout | FR-12 | 2.8 | `docs/API_SPEC.md` |
 | Preview/Export có metadata phiên bản | FR-13 | 2.5 | `docs/API_SPEC.md` |
+| Chỉnh anchor port thủ công | FR-14 | 2.4 | `docs/DIAGRAM_STYLE_SPEC.md`, `docs/API_SPEC.md` |
 
 ---
 

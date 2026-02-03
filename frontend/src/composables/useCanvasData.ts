@@ -1,9 +1,10 @@
 import { computed, ref } from 'vue'
 import type { AreaModel, DeviceModel, LinkModel } from '../models/types'
-import type { AreaRecord, DeviceRecord, LinkRecord } from '../models/api'
+import type { AreaRecord, DeviceRecord, LinkRecord, PortAnchorOverrideRecord } from '../models/api'
 import { listAreas, createArea, updateArea, deleteArea } from '../services/areas'
 import { listDevices, createDevice, updateDevice, deleteDevice } from '../services/devices'
 import { listLinks, createLink, updateLink, deleteLink } from '../services/links'
+import { listPortAnchorOverrides, upsertPortAnchorOverrides, deletePortAnchorOverride } from '../services/portAnchors'
 import {
   UNIT_PX,
   GRID_FALLBACK_X,
@@ -24,6 +25,20 @@ export function useCanvasData(
   const areas = ref<AreaRow[]>([])
   const devices = ref<DeviceRow[]>([])
   const links = ref<LinkRow[]>([])
+  const portAnchorOverrides = ref<PortAnchorOverrideRecord[]>([])
+
+  const portAnchorOverrideMap = computed(() => {
+    const map = new Map<string, Map<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number }>>()
+    portAnchorOverrides.value.forEach(override => {
+      const deviceMap = map.get(override.device_id) || new Map()
+      deviceMap.set(override.port_name, {
+        side: override.side,
+        offsetRatio: override.offset_ratio
+      })
+      map.set(override.device_id, deviceMap)
+    })
+    return map
+  })
 
   const canvasAreas = computed<AreaModel[]>(() => {
     return areas.value.map(area => {
@@ -84,14 +99,16 @@ export function useCanvasData(
 
   async function loadProjectData(projectId: string) {
     try {
-      const [areasData, devicesData, linksData] = await Promise.all([
+      const [areasData, devicesData, linksData, overridesData] = await Promise.all([
         listAreas(projectId),
         listDevices(projectId),
-        listLinks(projectId)
+        listLinks(projectId),
+        listPortAnchorOverrides(projectId)
       ])
       areas.value = areasData
       devices.value = devicesData
       links.value = linksData
+      portAnchorOverrides.value = overridesData
     } catch (error: any) {
       setNotice(error?.message || 'Không tải được dữ liệu project.', 'error')
     }
@@ -299,6 +316,29 @@ export function useCanvasData(
     }
   }
 
+  async function upsertAnchorOverride(
+    projectId: string,
+    payload: { device_id: string; port_name: string; side: 'left' | 'right' | 'top' | 'bottom'; offset_ratio: number }
+  ) {
+    const [saved] = await upsertPortAnchorOverrides(projectId, [payload])
+    if (!saved) return
+    const index = portAnchorOverrides.value.findIndex(
+      item => item.device_id === saved.device_id && item.port_name === saved.port_name
+    )
+    if (index >= 0) {
+      portAnchorOverrides.value[index] = saved
+    } else {
+      portAnchorOverrides.value.push(saved)
+    }
+  }
+
+  async function removeAnchorOverride(projectId: string, deviceId: string, portName: string) {
+    await deletePortAnchorOverride(projectId, deviceId, portName)
+    portAnchorOverrides.value = portAnchorOverrides.value.filter(
+      item => !(item.device_id === deviceId && item.port_name === portName)
+    )
+  }
+
   function assignDeviceArea(device: DeviceRow, areaId: string) {
     const area = areas.value.find(item => item.id === areaId)
     if (!area) return
@@ -311,6 +351,8 @@ export function useCanvasData(
     areas,
     devices,
     links,
+    portAnchorOverrides,
+    portAnchorOverrideMap,
     canvasAreas,
     canvasDevices,
     canvasLinks,
@@ -324,6 +366,8 @@ export function useCanvasData(
     handleLinkAdd,
     handleLinkChange,
     handleLinkRemove,
+    upsertAnchorOverride,
+    removeAnchorOverride,
     assignDeviceArea,
   }
 }

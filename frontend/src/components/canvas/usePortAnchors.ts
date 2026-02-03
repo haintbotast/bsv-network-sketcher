@@ -1,7 +1,7 @@
 import { computed, type ComputedRef } from 'vue'
 import type { LinkModel, L2AssignmentRecord, ViewMode } from '../../models/types'
-import type { Rect, AnchorOverrideMap, RenderTuning } from './linkRoutingTypes'
-import { comparePorts, computePortAnchorFallback, computeSide } from './linkRoutingUtils'
+import type { Rect, AnchorOverrideMap, RenderTuning, PortAnchorOverrideMap } from './linkRoutingTypes'
+import { clamp, comparePorts, computePortAnchorFallback, computeSide } from './linkRoutingUtils'
 
 export function usePortAnchors(deps: {
   props: {
@@ -11,8 +11,9 @@ export function usePortAnchors(deps: {
   }
   renderTuning: ComputedRef<RenderTuning>
   deviceViewMap: ComputedRef<Map<string, Rect>>
+  portAnchorOverrides?: ComputedRef<PortAnchorOverrideMap>
 }) {
-  const { props, renderTuning, deviceViewMap } = deps
+  const { props, renderTuning, deviceViewMap, portAnchorOverrides } = deps
 
   const devicePortList = computed(() => {
     const map = new Map<string, string[]>()
@@ -201,6 +202,24 @@ export function usePortAnchors(deps: {
     portName: string | undefined,
     overrides?: AnchorOverrideMap
   ) {
+    if (portName && portAnchorOverrides?.value) {
+      const deviceOverrides = portAnchorOverrides.value.get(deviceId)
+      const override = deviceOverrides?.get(portName)
+      if (override) {
+        const inset = renderTuning.value.port_edge_inset ?? 0
+        const usableWidth = Math.max(rect.width - inset * 2, 1)
+        const usableHeight = Math.max(rect.height - inset * 2, 1)
+        const ratio = clamp(override.offsetRatio, 0, 1)
+        if (override.side === 'left' || override.side === 'right') {
+          const y = rect.y + inset + usableHeight * ratio
+          const x = override.side === 'left' ? rect.x : rect.x + rect.width
+          return { x, y, side: override.side }
+        }
+        const x = rect.x + inset + usableWidth * ratio
+        const y = override.side === 'top' ? rect.y : rect.y + rect.height
+        return { x, y, side: override.side }
+      }
+    }
     if (portName && overrides) {
       const deviceOverrides = overrides.get(deviceId)
       const anchor = deviceOverrides?.get(portName)

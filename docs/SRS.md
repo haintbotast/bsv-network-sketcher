@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-30  
+> **Cập nhật:** 2026-02-03  
 > **Mục tiêu:** Đặc tả yêu cầu kỹ thuật để triển khai web app theo chuẩn layout network phổ biến.
 
 ---
@@ -37,6 +37,7 @@
 - Auto-layout theo **2 tầng** (macro Area + micro Device), ưu tiên bố cục top‑to‑bottom.
 - Auto-layout tự động **chỉ chạy khi project chưa có tọa độ layout** (device/area position trống hoặc 0); nếu đã có layout thì **không tự chạy lại**. Cho phép chạy lại khi đổi layout mode hoặc người dùng chủ động.
 - Khoảng cách giữa thiết bị trong auto-layout **tính cả vùng nhãn port (Interface Tag)** để tránh chồng lấn.
+- Cho phép người dùng **override anchor per-port** bằng `side + offset_ratio`; override **được lưu DB** và **không bị auto-layout ghi đè**.
 - Overview (nếu bật) chỉ L1/flow; L2/L3 chỉ hiển thị ở view riêng.  
   **Lưu ý:** UI hiện không hiển thị Overview; dùng L1 thay thế.
 - Liên kết khác Area bắt buộc qua **Waypoint area** (đuôi `_wp_`).

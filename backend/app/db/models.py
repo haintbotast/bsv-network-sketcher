@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -77,6 +78,9 @@ class Project(Base):
     )
     l3_addresses: Mapped[list["L3Address"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     export_jobs: Mapped[list["ExportJob"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    port_anchor_overrides: Mapped[list["PortAnchorOverride"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 # ============================================================================
@@ -133,6 +137,9 @@ class Device(Base):
     area: Mapped["Area"] = relationship(back_populates="devices")
     port_channels: Mapped[list["PortChannel"]] = relationship(back_populates="device")
     virtual_ports: Mapped[list["VirtualPort"]] = relationship(back_populates="device")
+    port_anchor_overrides: Mapped[list["PortAnchorOverride"]] = relationship(
+        back_populates="device", cascade="all, delete-orphan"
+    )
 
 
 # ============================================================================
@@ -161,6 +168,34 @@ class L1Link(Base):
     project: Mapped["Project"] = relationship(back_populates="l1_links")
     from_device: Mapped["Device"] = relationship(foreign_keys=[from_device_id])
     to_device: Mapped["Device"] = relationship(foreign_keys=[to_device_id])
+
+
+# ============================================================================
+# Port Anchor Override
+# ============================================================================
+
+
+ANCHOR_SIDES = ["left", "right", "top", "bottom"]
+
+
+class PortAnchorOverride(Base):
+    __tablename__ = "port_anchor_overrides"
+    __table_args__ = (
+        UniqueConstraint("project_id", "device_id", "port_name", name="uq_port_anchor_override"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), nullable=False)
+    device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id"), nullable=False)
+    port_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    side: Mapped[str] = mapped_column(String(10), nullable=False, default="right")
+    offset_ratio: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project: Mapped["Project"] = relationship(back_populates="port_anchor_overrides")
+    device: Mapped["Device"] = relationship(back_populates="port_anchor_overrides")
 
 
 # ============================================================================

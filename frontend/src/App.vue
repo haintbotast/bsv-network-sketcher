@@ -99,6 +99,7 @@
           :view-mode="viewMode"
           :l2-assignments="l2Assignments"
           :l3-addresses="l3Addresses"
+          :port-anchor-overrides="portAnchorOverrideMap"
           :render-tuning="renderTuning"
           @select="handleSelect"
           @update:viewport="updateViewport"
@@ -353,6 +354,41 @@
                 <input type="number" step="0.1" v-model.number="selectedDraft.height" @change="handleSelectedObjectChange" />
               </div>
             </div>
+            <div class="form-group">
+              <label>Anchor port (override)</label>
+              <div v-if="selectedDevicePorts.length === 0" class="hint small">
+                Chưa có port để chỉnh.
+              </div>
+              <div v-else class="anchor-override-list">
+                <div v-for="port in selectedDevicePorts" :key="port" class="anchor-override-row">
+                  <div class="anchor-port-name">
+                    <span>{{ port }}</span>
+                    <span v-if="hasAnchorOverride(port)" class="badge">override</span>
+                  </div>
+                  <div v-if="anchorDrafts[port]" class="anchor-controls">
+                    <select v-model="anchorDrafts[port].side">
+                      <option value="left">left</option>
+                      <option value="right">right</option>
+                      <option value="top">top</option>
+                      <option value="bottom">bottom</option>
+                    </select>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      v-model.number="anchorDrafts[port].offsetRatio"
+                    />
+                    <button type="button" class="secondary" @click="saveAnchorOverride(port)">
+                      Lưu
+                    </button>
+                    <button type="button" class="ghost" @click="clearAnchorOverride(port)">
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Link Properties -->
@@ -429,6 +465,7 @@ import { updateArea } from './services/areas'
 import { updateDevice } from './services/devices'
 import { updateLink } from './services/links'
 import { deviceTypes, linkPurposes } from './composables/canvasConstants'
+import { comparePorts } from './components/canvas/linkRoutingUtils'
 import { useViewport } from './composables/useViewport'
 import { useAuth } from './composables/useAuth'
 import { useProjects } from './composables/useProjects'
@@ -493,11 +530,13 @@ const canvasData = useCanvasData(
 )
 const {
   areas, devices, links,
+  portAnchorOverrides, portAnchorOverrideMap,
   canvasAreas, canvasDevices, canvasLinks,
   loadProjectData,
   handleAreaAdd, handleAreaChange, handleAreaRemove,
   handleDeviceAdd, handleDeviceChange, handleDeviceRemove,
   handleLinkAdd, handleLinkChange, handleLinkRemove,
+  upsertAnchorOverride, removeAnchorOverride,
   assignDeviceArea,
 } = canvasData
 
@@ -506,6 +545,9 @@ const selectedDraft = ref<any>(null)
 const selectedDraftDirty = ref(false)
 const selectedSavePending = ref(false)
 let syncingDraft = false
+
+const anchorDrafts = ref<Record<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number }>>({})
+
 
 // Viewport state (from composable)
 const {
@@ -578,6 +620,78 @@ const selectedObjectType = computed(() => {
 
   return null
 })
+
+const selectedDevicePorts = computed(() => {
+  if (selectedObjectType.value !== 'Device' || !selectedObject.value) return []
+  const deviceId = (selectedObject.value as DeviceRow).id
+  const ports = new Set<string>()
+  links.value.forEach(link => {
+    if (link.from_device_id === deviceId && link.from_port) ports.add(link.from_port)
+    if (link.to_device_id === deviceId && link.to_port) ports.add(link.to_port)
+  })
+  return Array.from(ports).sort(comparePorts)
+})
+
+const selectedDeviceOverrideMap = computed(() => {
+  if (selectedObjectType.value !== 'Device' || !selectedObject.value) {
+    return new Map<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number }>()
+  }
+  const deviceId = (selectedObject.value as DeviceRow).id
+  const map = new Map<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number }>()
+  portAnchorOverrides.value
+    .filter(item => item.device_id === deviceId)
+    .forEach(item => {
+      map.set(item.port_name, { side: item.side, offsetRatio: item.offset_ratio })
+    })
+  return map
+})
+
+watch([selectedDevicePorts, selectedDeviceOverrideMap], () => {
+  if (selectedDevicePorts.value.length === 0) {
+    anchorDrafts.value = {}
+    return
+  }
+  const next: Record<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number }> = {}
+  selectedDevicePorts.value.forEach(port => {
+    const existing = selectedDeviceOverrideMap.value.get(port)
+    next[port] = existing
+      ? { side: existing.side, offsetRatio: existing.offsetRatio }
+      : { side: 'right', offsetRatio: 0.5 }
+  })
+  anchorDrafts.value = next
+})
+
+const hasAnchorOverride = (port: string) => selectedDeviceOverrideMap.value.has(port)
+
+async function saveAnchorOverride(port: string) {
+  if (!selectedProjectId.value || selectedObjectType.value !== 'Device' || !selectedObject.value) return
+  const deviceId = (selectedObject.value as DeviceRow).id
+  const draft = anchorDrafts.value[port]
+  if (!draft) return
+  try {
+    await upsertAnchorOverride(selectedProjectId.value, {
+      device_id: deviceId,
+      port_name: port,
+      side: draft.side,
+      offset_ratio: draft.offsetRatio
+    })
+    setNotice('Đã lưu override anchor.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Lưu override anchor thất bại.', 'error')
+  }
+}
+
+async function clearAnchorOverride(port: string) {
+  if (!selectedProjectId.value || selectedObjectType.value !== 'Device' || !selectedObject.value) return
+  const deviceId = (selectedObject.value as DeviceRow).id
+  try {
+    await removeAnchorOverride(selectedProjectId.value, deviceId, port)
+    anchorDrafts.value[port] = { side: 'right', offsetRatio: 0.5 }
+    setNotice('Đã xóa override anchor.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Xóa override anchor thất bại.', 'error')
+  }
+}
 
 function cloneRow<T>(row: T): T {
   return JSON.parse(JSON.stringify(row)) as T
@@ -1184,6 +1298,12 @@ onMounted(() => {
   font-size: 13px;
 }
 
+.hint.small {
+  margin-top: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
 .panel-hint {
   padding: 16px 12px;
   background: #f8f5f2;
@@ -1218,6 +1338,43 @@ onMounted(() => {
   margin: 0;
   font-size: 12px;
   color: var(--muted);
+}
+
+.anchor-override-list {
+  display: grid;
+  gap: 8px;
+}
+
+.anchor-override-row {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f6f2ef;
+}
+
+.anchor-port-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.anchor-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.badge {
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: #f3d7b8;
+  color: #5a3b1d;
+  font-size: 10px;
+  text-transform: uppercase;
 }
 
 @media (max-width: 1024px) {

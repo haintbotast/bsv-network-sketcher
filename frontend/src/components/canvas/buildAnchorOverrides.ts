@@ -1,4 +1,4 @@
-import type { Rect, RenderTuning, AnchorOverrideMap, LinkMeta, AreaRectEntry, DeviceRectEntry } from './linkRoutingTypes'
+import type { Rect, RenderTuning, AnchorOverrideMap, LinkMeta, AreaRectEntry, DeviceRectEntry, PortAnchorOverrideMap } from './linkRoutingTypes'
 import { clamp, computeSide, computeSideFromVector, segmentIntersectsRect } from './linkRoutingUtils'
 
 export type BuildAnchorOverridesParams = {
@@ -14,6 +14,7 @@ export type BuildAnchorOverridesParams = {
   devicePortOrder: Map<string, Map<string, number>>
   devicePortNeighbors: Map<string, Map<string, { xSum: number; ySum: number; count: number }>>
   linkBundleIndex: Map<string, { index: number; total: number }>
+  userAnchorOverrides?: PortAnchorOverrideMap
 }
 
 export function buildAnchorOverrides(
@@ -26,7 +27,14 @@ export function buildAnchorOverrides(
     renderTuning, deviceViewMap,
     devicePortList, devicePortSideMap, devicePortOrder, devicePortNeighbors,
     linkBundleIndex,
+    userAnchorOverrides,
   } = ctx
+
+  const hasUserOverride = (deviceId: string, port: string | undefined) => {
+    if (!port) return false
+    if (!userAnchorOverrides || userAnchorOverrides.size === 0) return false
+    return !!userAnchorOverrides.get(deviceId)?.get(port)
+  }
 
   const portStats = new Map<string, Map<string, {
     votes: Record<'left' | 'right' | 'top' | 'bottom', number>
@@ -131,18 +139,24 @@ export function buildAnchorOverrides(
       ? computeSideFromVector(toVector.x, toVector.y)
       : (entry.toAnchor.side || computeSide(meta.toView, meta.fromCenter))) as 'left' | 'right' | 'top' | 'bottom'
 
-    if (meta.link.fromPort) {
+    if (meta.link.fromPort && !hasUserOverride(meta.link.fromDeviceId, meta.link.fromPort)) {
       const coord = fromSide === 'left' || fromSide === 'right' ? fromNext.y : fromNext.x
       record(meta.link.fromDeviceId, meta.link.fromPort, fromSide, coord)
       registerNeighborDevice(meta.link.fromDeviceId, meta.link.fromPort, meta.link.toDeviceId)
     }
-    if (meta.link.toPort) {
+    if (meta.link.toPort && !hasUserOverride(meta.link.toDeviceId, meta.link.toPort)) {
       const coord = toSide === 'left' || toSide === 'right' ? toPrev.y : toPrev.x
       record(meta.link.toDeviceId, meta.link.toPort, toSide, coord)
       registerNeighborDevice(meta.link.toDeviceId, meta.link.toPort, meta.link.fromDeviceId)
     }
 
-    if (isL1View && meta.link.fromPort && meta.link.toPort) {
+    if (
+      isL1View
+      && meta.link.fromPort
+      && meta.link.toPort
+      && !hasUserOverride(meta.link.fromDeviceId, meta.link.fromPort)
+      && !hasUserOverride(meta.link.toDeviceId, meta.link.toPort)
+    ) {
       const fromCenter = meta.fromCenter
       const toCenter = meta.toCenter
       const fromView = meta.fromView
@@ -225,7 +239,12 @@ export function buildAnchorOverrides(
       }
     }
 
-    if (meta.link.fromPort && meta.link.toPort) {
+    if (
+      meta.link.fromPort
+      && meta.link.toPort
+      && !hasUserOverride(meta.link.fromDeviceId, meta.link.fromPort)
+      && !hasUserOverride(meta.link.toDeviceId, meta.link.toPort)
+    ) {
       const a = meta.link.fromDeviceId
       const b = meta.link.toDeviceId
       const pairKey = a < b ? `${a}|${b}` : `${b}|${a}`
@@ -270,6 +289,7 @@ export function buildAnchorOverrides(
 
     list.forEach(entry => {
       if (!entry.fromPort || !entry.toPort) return
+      if (hasUserOverride(entry.fromDeviceId, entry.fromPort) || hasUserOverride(entry.toDeviceId, entry.toPort)) return
       const fromOrder = devicePortOrder.get(entry.fromDeviceId)?.get(entry.fromPort) ?? 0
       const toOrder = devicePortOrder.get(entry.toDeviceId)?.get(entry.toPort) ?? 0
       registerPairRank(entry.fromDeviceId, entry.fromPort, toOrder, list.length, entry.toDeviceId)
@@ -289,6 +309,7 @@ export function buildAnchorOverrides(
 
     list.forEach(entry => {
       if (!entry.fromPort || !entry.toPort) return
+      if (hasUserOverride(entry.fromDeviceId, entry.fromPort) || hasUserOverride(entry.toDeviceId, entry.toPort)) return
       const fromRect = deviceViewMap.get(entry.fromDeviceId)
       const toRect = deviceViewMap.get(entry.toDeviceId)
       if (!fromRect || !toRect) return
@@ -332,6 +353,7 @@ export function buildAnchorOverrides(
     }>> = { left: [], right: [], top: [], bottom: [] }
 
     ports.forEach(port => {
+      if (hasUserOverride(deviceId, port)) return
       const stats = deviceStats.get(port)
       let side = (sideMap.get(port) || 'right') as 'left' | 'right' | 'top' | 'bottom'
       const forcedSide = forcedSideMap.get(port)

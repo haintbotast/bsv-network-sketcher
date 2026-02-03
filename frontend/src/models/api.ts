@@ -67,6 +67,15 @@ export type LinkRecord = {
   color_rgb?: [number, number, number] | null
 }
 
+export type PortAnchorOverrideRecord = {
+  id: string
+  project_id: string
+  device_id: string
+  port_name: string
+  side: 'left' | 'right' | 'top' | 'bottom'
+  offset_ratio: number
+}
+
 export type TokenResponse = {
   access_token: string
   refresh_token?: string | null

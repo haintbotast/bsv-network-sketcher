@@ -456,12 +456,11 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         width: label.width,
         height: label.height,
         fill: '#ffffff',
+        stroke: '#b0b0b0',
+        strokeWidth: Math.max(1, Math.round(1 * labelScale)),
         cornerRadius: 4 * labelScale,
         opacity: 0.92,
-        shadowColor: 'rgba(0, 0, 0, 0.2)',
-        shadowBlur: 4 * labelScale,
-        shadowOffset: { x: 0, y: 2 },
-        shadowOpacity: 0.2
+        shadowEnabled: false
       },
       text: {
         x: label.textPadX,

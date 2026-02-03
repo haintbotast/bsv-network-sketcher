@@ -126,7 +126,7 @@
 | Device | Rectangle bo góc | Màu theo loại thiết bị, **không viền**, có **đổ bóng nhẹ** |
 | Waypoint | Diamond hoặc Circle | Không hiện label khi zoom out |
 | Link | Line | L1 ưu tiên **đường thẳng ngắn nhất** giữa port; nếu bị cản thì dùng **any‑angle (Theta\*)** tránh vật cản và **bo góc nhẹ**; L2/L3 dùng Manhattan; màu theo purpose; nét liền/đứt; **bo góc mềm** (lineJoin/lineCap round) |
-| Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor**, có thể xoay theo hướng link; auto-scale theo zoom (0.6-1.15) và tự giãn để tránh chồng lấn |
+| Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor**, có thể xoay theo hướng link; auto-scale theo zoom (0.6-1.15) và tự giãn để tránh chồng lấn; **viền xám mảnh, không đổ bóng** |
 
 - Auto-layout cần **tính thêm vùng đệm Interface Tag** khi giãn khoảng cách giữa thiết bị để tránh chồng lấn.
 - Auto-layout cần **tính thêm băng nhãn** khi xác định kích thước node và khoảng cách:

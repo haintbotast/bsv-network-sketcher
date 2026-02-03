@@ -20,8 +20,16 @@ BASE_HEIGHT = 0.5
 WIDTH_PER_PORT = 0.15  # Each port adds 0.15 inch to width
 MIN_WIDTH = 1.2  # Minimum width
 MAX_WIDTH = 3.6  # Maximum width to prevent overly wide devices
-HEIGHT_THRESHOLD = 24  # If more than 24 ports, increase height slightly
-TALL_HEIGHT = 0.6  # Height for high-density devices (>24 ports)
+MAX_HEIGHT = 1.2  # Upper bound to keep layout stable
+
+# Text sizing (approx, based on UI defaults)
+LABEL_CHAR_WIDTH_IN = 6.0 / 120.0
+LABEL_PADDING_IN = 8.0 / 120.0
+LABEL_MIN_WIDTH_IN = 24.0 / 120.0
+
+# Port label sizing heuristic (based on default render tuning)
+PORT_EDGE_INSET_IN = 6.0 / 120.0
+PORT_LABEL_HEIGHT_IN = 16.0 / 120.0
 
 
 async def compute_device_port_counts(db: AsyncSession, project_id: str) -> dict[str, int]:
@@ -80,7 +88,7 @@ async def compute_device_port_counts(db: AsyncSession, project_id: str) -> dict[
     return {device_id: len(ports) for device_id, ports in port_counts.items()}
 
 
-def compute_device_size(port_count: int) -> tuple[float, float]:
+def compute_device_size(port_count: int, name: str | None = None) -> tuple[float, float]:
     """
     Compute device width and height based on port count.
 
@@ -95,15 +103,24 @@ def compute_device_size(port_count: int) -> tuple[float, float]:
     Returns:
         tuple[width, height] in inches
     """
-    if port_count == 0:
-        return (BASE_WIDTH, BASE_HEIGHT)
-
-    # Compute width: base + increment per port, clamped to [MIN_WIDTH, MAX_WIDTH]
+    # Width from ports
     computed_width = BASE_WIDTH + (port_count * WIDTH_PER_PORT)
-    width = max(MIN_WIDTH, min(MAX_WIDTH, computed_width))
+    width_from_ports = max(MIN_WIDTH, min(MAX_WIDTH, computed_width))
 
-    # Compute height: increase only for high-density devices
-    height = TALL_HEIGHT if port_count > HEIGHT_THRESHOLD else BASE_HEIGHT
+    # Width from label text
+    label = (name or "").strip()
+    if label:
+        text_width = max(len(label) * LABEL_CHAR_WIDTH_IN + LABEL_PADDING_IN * 2, LABEL_MIN_WIDTH_IN)
+    else:
+        text_width = LABEL_MIN_WIDTH_IN
+    width = max(width_from_ports, text_width, MIN_WIDTH)
+    width = min(width, MAX_WIDTH)
+
+    # Height from port density (approx by side)
+    side_count = max(1, (port_count + 1) // 2)
+    required_height = (PORT_LABEL_HEIGHT_IN * (side_count + 1)) + PORT_EDGE_INSET_IN * 2
+    height = max(BASE_HEIGHT, required_height)
+    height = min(height, MAX_HEIGHT)
 
     return (width, height)
 
@@ -128,8 +145,8 @@ async def auto_resize_devices_by_ports(
         Updates device.width and device.height in database
     """
     for device_id, port_count in port_counts.items():
-        # Compute new size
-        width, height = compute_device_size(port_count)
+        # Compute new size (ports + name)
+        width, height = compute_device_size(port_count, getattr(device, "name", None))
 
         # Update device
         result = await db.execute(

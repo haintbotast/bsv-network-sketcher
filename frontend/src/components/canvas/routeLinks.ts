@@ -7,7 +7,7 @@ import {
   segmentIntersectsRect,
   computeAreaAnchor,
 } from './linkRoutingUtils'
-import { addOccupancy, routeAnyAnglePath, smoothAnyAnglePath } from '../../utils/link_routing'
+import { addOccupancy, connectOrthogonal, routeAnyAnglePath, routeOrthogonalPath, smoothAnyAnglePath } from '../../utils/link_routing'
 
 export type RouteLinksParams = {
   isL1View: boolean
@@ -289,7 +289,8 @@ export function routeLinks(
           clearance
         )
       )
-      const directAllowed = isL1 && !lineBlocked
+      const directOrthogonal = Math.abs(fromAnchor.x - toAnchor.x) < 1 || Math.abs(fromAnchor.y - toAnchor.y) < 1
+      const directAllowed = isL1 && !lineBlocked && directOrthogonal
 
       const fromSide = fromAnchor.side || computeSide(fromView, toCenter)
       const toSide = toAnchor.side || computeSide(toView, fromCenter)
@@ -312,17 +313,16 @@ export function routeLinks(
       // Use direct any-angle routing for all links (waypoint logic disabled)
       if (allowAStar && !directAllowed && grid) {
         const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
-
-        // Apply bundle offset perpendicular to link direction to separate parallel links
-        const dir = normalizeVector(toCenter.x - fromCenter.x, toCenter.y - fromCenter.y)
-        const perp = { x: -dir.y, y: dir.x }
+        const bundleShift = preferAxis === 'x'
+          ? { x: 0, y: bundleOffset }
+          : { x: bundleOffset, y: 0 }
         const offsetFromExit = {
-          x: fromExit.x + perp.x * bundleOffset,
-          y: fromExit.y + perp.y * bundleOffset
+          x: fromExit.x + bundleShift.x,
+          y: fromExit.y + bundleShift.y
         }
         const offsetToExit = {
-          x: toExit.x + perp.x * bundleOffset,
-          y: toExit.y + perp.y * bundleOffset
+          x: toExit.x + bundleShift.x,
+          y: toExit.y + bundleShift.y
         }
 
         // Convert grid format to GridSpec
@@ -334,27 +334,88 @@ export function routeLinks(
           rows: grid.rows
         }
 
-        const route = routeAnyAnglePath({
-          start: offsetFromExit,
-          end: offsetToExit,
-          obstacles,
-          clearance,
-          grid: gridSpec,
-          occupancy,
-          preferAxis
-        })
+        const routeOrthogonal = (start: { x: number; y: number }, end: { x: number; y: number }) => {
+          return routeOrthogonalPath({
+            start,
+            end,
+            obstacles,
+            clearance,
+            grid: gridSpec,
+            occupancy,
+            preferAxis,
+            turnPenalty: gridSpec.size * 1.2,
+            congestionPenalty: gridSpec.size * 25
+          })
+        }
 
-        if (route && route.points.length) {
-          const assembled: Array<{ x: number; y: number }> = []
-          appendPoints(assembled, [fromAnchor, fromBase, fromExit])
-          appendPoints(assembled, route.points)
-          appendPoints(assembled, [toExit, toBase, toAnchor])
+        if (isL1) {
+          const waypointKey = fromAreaId && toAreaId ? getPairKey(fromAreaId, toAreaId) : null
+          const waypoint = waypointKey ? waypointAreaMap.get(waypointKey) : null
+          let routeSegments: Array<{ points: Array<{ x: number; y: number }>; gridPath: Array<{ gx: number; gy: number }> }> = []
 
-          const cornerRadius = Math.max(2, Math.min(minSegment * 0.8, 12 * scale))
-          const smoothed = smoothAnyAnglePath(assembled, obstacles, clearance, cornerRadius, minSegment)
-          smoothed.forEach(point => pushPoint(points, point.x, point.y))
-          addOccupancy(occupancy, route.gridPath)
-          routed = true
+          if (waypoint && waypoint.rect) {
+            const wpShift = areaBundleOffset
+            const wpEntry = computeAreaAnchor(waypoint.rect, offsetFromExit, offsetToExit, wpShift, 0)
+            const wpExit = computeAreaAnchor(waypoint.rect, offsetToExit, offsetFromExit, wpShift, 0)
+
+            const routeA = routeOrthogonal(offsetFromExit, wpEntry)
+            const routeB = routeOrthogonal(wpExit, offsetToExit)
+            if (routeA && routeB) {
+              const waypointPoints = (wpEntry.x === wpExit.x || wpEntry.y === wpExit.y)
+                ? [wpEntry, wpExit]
+                : [wpEntry, { x: wpEntry.x, y: wpExit.y }, wpExit]
+              routeSegments = [
+                { points: routeA.points, gridPath: routeA.gridPath },
+                { points: waypointPoints, gridPath: [] },
+                { points: routeB.points, gridPath: routeB.gridPath }
+              ]
+            }
+          }
+
+          if (routeSegments.length === 0) {
+            const route = routeOrthogonal(offsetFromExit, offsetToExit)
+            if (route && route.points.length) {
+              routeSegments = [{ points: route.points, gridPath: route.gridPath }]
+            }
+          }
+
+          if (routeSegments.length) {
+            const assembled: Array<{ x: number; y: number }> = []
+            appendPoints(assembled, [fromAnchor, fromBase, fromExit])
+            routeSegments.forEach(segment => {
+              appendPoints(assembled, segment.points)
+              if (segment.gridPath.length) addOccupancy(occupancy, segment.gridPath)
+            })
+            appendPoints(assembled, [toExit, toBase, toAnchor])
+
+            const cornerRadius = Math.max(2, Math.min(minSegment * 0.6, 10 * scale))
+            const smoothed = smoothAnyAnglePath(assembled, obstacles, clearance, cornerRadius, minSegment)
+            smoothed.forEach(point => pushPoint(points, point.x, point.y))
+            routed = true
+          }
+        } else {
+          const route = routeAnyAnglePath({
+            start: offsetFromExit,
+            end: offsetToExit,
+            obstacles,
+            clearance,
+            grid: gridSpec,
+            occupancy,
+            preferAxis
+          })
+
+          if (route && route.points.length) {
+            const assembled: Array<{ x: number; y: number }> = []
+            appendPoints(assembled, [fromAnchor, fromBase, fromExit])
+            appendPoints(assembled, route.points)
+            appendPoints(assembled, [toExit, toBase, toAnchor])
+
+            const cornerRadius = Math.max(2, Math.min(minSegment * 0.8, 12 * scale))
+            const smoothed = smoothAnyAnglePath(assembled, obstacles, clearance, cornerRadius, minSegment)
+            smoothed.forEach(point => pushPoint(points, point.x, point.y))
+            addOccupancy(occupancy, route.gridPath)
+            routed = true
+          }
         }
       }
 
@@ -448,38 +509,24 @@ export function routeLinks(
             }
           }
         } else if (isL1) {
-          const useCenters = bundleOffset !== 0
-          const fromStart = fromExit
-          const toStart = toExit
-          const dx = useCenters ? (toCenter.x - fromCenter.x) : (toStart.x - fromStart.x)
-          const dy = useCenters ? (toCenter.y - fromCenter.y) : (toStart.y - fromStart.y)
-          const dir = normalizeVector(dx, dy)
-          const perp = normalizeVector(-dir.y, dir.x)
-          if (bundleOffset !== 0 && (dir.x !== 0 || dir.y !== 0)) {
-            const fromStub = { x: fromStart.x + dir.x * bundleStub, y: fromStart.y + dir.y * bundleStub }
-            const toStub = { x: toStart.x - dir.x * bundleStub, y: toStart.y - dir.y * bundleStub }
-            const fromShift = { x: fromStub.x + perp.x * bundleOffset, y: fromStub.y + perp.y * bundleOffset }
-            const toShift = { x: toStub.x + perp.x * bundleOffset, y: toStub.y + perp.y * bundleOffset }
+          const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
+          const bundleShift = preferAxis === 'x'
+            ? { x: 0, y: bundleOffset }
+            : { x: bundleOffset, y: 0 }
+          const fromStart = { x: fromExit.x + bundleShift.x, y: fromExit.y + bundleShift.y }
+          const toStart = { x: toExit.x + bundleShift.x, y: toExit.y + bundleShift.y }
+
+          const orth = connectOrthogonal(fromStart, toStart, obstacles, clearance, preferAxis)
+          if (orth && orth.length) {
             points = []
             pushPoint(points, fromAnchor.x, fromAnchor.y)
             pushPoint(points, fromBase.x, fromBase.y)
-            pushPoint(points, fromStart.x, fromStart.y)
-            pushPoint(points, fromShift.x, fromShift.y)
-            pushPoint(points, toShift.x, toShift.y)
-            pushPoint(points, toStart.x, toStart.y)
+            pushPoint(points, fromExit.x, fromExit.y)
+            orth.forEach(p => pushPoint(points, p.x, p.y))
+            pushPoint(points, toExit.x, toExit.y)
             pushPoint(points, toBase.x, toBase.y)
             pushPoint(points, toAnchor.x, toAnchor.y)
           } else {
-            points = []
-            pushPoint(points, fromAnchor.x, fromAnchor.y)
-            pushPoint(points, fromBase.x, fromBase.y)
-            pushPoint(points, fromStart.x, fromStart.y)
-            pushPoint(points, toStart.x, toStart.y)
-            pushPoint(points, toBase.x, toBase.y)
-            pushPoint(points, toAnchor.x, toAnchor.y)
-          }
-
-          if (bundleOffset === 0) {
             const blockedRects: Rect[] = []
             areaViewMap.forEach((rect, areaId) => {
               if (areaId === fromAreaId || areaId === toAreaId) return
@@ -493,30 +540,31 @@ export function routeLinks(
                 blockedRects.push(rect)
               }
             })
-            if (blockedRects.length) {
-              const midA = { x: fromStart.x, y: toStart.y }
-              const midB = { x: toStart.x, y: fromStart.y }
-              const score = (a: { x: number; y: number }) => {
-                let hits = 0
-                blockedRects.forEach(rect => {
-                  if (segmentIntersectsRect(fromStart, a, rect, renderTuning.area_clearance ?? 0)) hits += 1
-                  if (segmentIntersectsRect(a, toStart, rect, renderTuning.area_clearance ?? 0)) hits += 1
-                })
-                const length = Math.hypot(a.x - fromStart.x, a.y - fromStart.y) + Math.hypot(toStart.x - a.x, toStart.y - a.y)
-                return hits * 10000 + length
-              }
-              const scoreA = score(midA)
-              const scoreB = score(midB)
-              const mid = scoreA <= scoreB ? midA : midB
-              points = []
-              pushPoint(points, fromAnchor.x, fromAnchor.y)
-              pushPoint(points, fromBase.x, fromBase.y)
-              pushPoint(points, fromStart.x, fromStart.y)
-              pushPoint(points, mid.x, mid.y)
-              pushPoint(points, toStart.x, toStart.y)
-              pushPoint(points, toBase.x, toBase.y)
-              pushPoint(points, toAnchor.x, toAnchor.y)
+
+            const midA = { x: fromStart.x, y: toStart.y }
+            const midB = { x: toStart.x, y: fromStart.y }
+            const score = (a: { x: number; y: number }) => {
+              let hits = 0
+              blockedRects.forEach(rect => {
+                if (segmentIntersectsRect(fromStart, a, rect, renderTuning.area_clearance ?? 0)) hits += 1
+                if (segmentIntersectsRect(a, toStart, rect, renderTuning.area_clearance ?? 0)) hits += 1
+              })
+              const length = Math.hypot(a.x - fromStart.x, a.y - fromStart.y) + Math.hypot(toStart.x - a.x, toStart.y - a.y)
+              return hits * 10000 + length
             }
+            const scoreA = score(midA)
+            const scoreB = score(midB)
+            const mid = scoreA <= scoreB ? midA : midB
+            points = []
+            pushPoint(points, fromAnchor.x, fromAnchor.y)
+            pushPoint(points, fromBase.x, fromBase.y)
+            pushPoint(points, fromExit.x, fromExit.y)
+            pushPoint(points, fromStart.x, fromStart.y)
+            pushPoint(points, mid.x, mid.y)
+            pushPoint(points, toStart.x, toStart.y)
+            pushPoint(points, toExit.x, toExit.y)
+            pushPoint(points, toBase.x, toBase.y)
+            pushPoint(points, toAnchor.x, toAnchor.y)
           }
         } else {
           const dx = toAnchor.x - fromAnchor.x

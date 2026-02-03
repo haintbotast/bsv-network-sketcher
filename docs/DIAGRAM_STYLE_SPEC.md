@@ -66,6 +66,7 @@
 - **Same-row alignment:** link giữa **2 thiết bị cùng hàng/cùng cột** sẽ ưu tiên **canh thẳng anchor + port label** (ngang hoặc dọc). Chỉ áp dụng khi **đường thẳng không bị vật cản**; nếu bị cản thì giữ routing tránh vật cản.
 - **Stub theo nhãn port (L1):** đoạn link đi ra khỏi thiết bị **tối thiểu bằng bề ngang nhãn port** để nhãn không đè lên biên thiết bị và đường link.
 - **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng.
+- **Waypoint (L1):** khi có waypoint giữa 2 Area, link đi qua **nhiều tọa độ neo** trên waypoint (theo lane index) để **không chồng lên nhau**.
 - **Override thủ công (per-port):** người dùng có thể **cố định side + offset_ratio** cho từng port; `offset_ratio` có thể để `null` để **giữ auto offset** theo side đã chọn. Override này **ưu tiên cao nhất** và **không bị auto-layout ghi đè**.
 - Liên‑area **tách lane rộng hơn** so với bundle nội‑area để giảm chồng/đè.
 - Intra‑area: nếu đường thẳng cắt thiết bị khác thì bẻ góc (Manhattan) để tránh xuyên qua device.
@@ -125,7 +126,7 @@
 | Area | Rectangle bo góc | Nền nhạt xám nhẹ, label góc trên trái, **không viền**, có **đổ bóng nhẹ** |
 | Device | Rectangle bo góc | Màu theo loại thiết bị, **không viền**, có **đổ bóng nhẹ** |
 | Waypoint | Diamond hoặc Circle | Không hiện label khi zoom out |
-| Link | Line | L1 ưu tiên **đường thẳng ngắn nhất** giữa port; nếu bị cản thì dùng **any‑angle (Theta\*)** tránh vật cản và **bo góc nhẹ**; L2/L3 dùng Manhattan; màu theo purpose; nét liền/đứt; **bo góc mềm** (lineJoin/lineCap round) |
+| Link | Line | **L1 ưu tiên Manhattan (ngang/dọc)** theo tuyến tối ưu tránh vật cản, **không dùng đường chéo dài**; **bo góc nhẹ** ở các điểm rẽ; L2/L3 dùng Manhattan; màu theo purpose; nét liền/đứt; **bo góc mềm** (lineJoin/lineCap round) |
 | Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor**, có thể xoay theo hướng link; auto-scale theo zoom (0.6-1.15) và tự giãn để tránh chồng lấn; **viền xám mảnh, không đổ bóng** |
 
 - Auto-layout cần **tính thêm vùng đệm Interface Tag** khi giãn khoảng cách giữa thiết bị để tránh chồng lấn.
@@ -133,6 +134,7 @@
   - **L1:** cộng `port_label_band` vào kích thước node (rộng/cao) và vào `node_spacing`/`layer_gap`.
   - **L1 (thực tế):** ước lượng **bề ngang nhãn port** theo độ dài port + `render_tuning` để tăng `node_spacing`/`row_gap` (tránh nhãn bị kẹp giữa thiết bị).
   - **L2/L3:** cộng `label_band` vào chiều cao node để chừa chỗ nhãn L2/L3 dưới thiết bị; đồng thời chừa band nhãn cho group (VLAN/Subnet).
+- **Kích thước thiết bị (Device):** tự động **nới rộng theo độ dài tên** và **tăng chiều cao theo mật độ port** để tránh chồng nhãn.
 - Micro layout sử dụng **kích thước thiết bị sau auto-resize** để tính bounding và sắp xếp trước khi tính macro layout.
 - **Quy tắc nhãn port:** định dạng **chữ cái + khoảng trắng + số hiệu**.  
   Ví dụ: `Gi 0/1`, `Gi 1/0/48`, `HA 1`, `Port 1`.

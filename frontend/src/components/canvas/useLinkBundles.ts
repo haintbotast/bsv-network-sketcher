@@ -66,7 +66,7 @@ export function useLinkBundles(deps: {
   })
 
   const waypointAreaMap = computed(() => {
-    const map = new Map<string, { cx: number; cy: number; rect: Rect }>()
+    const map = new Map<string, { id: string; cx: number; cy: number; rect: Rect }>()
     const wpAreas = props.areas.filter(a => a.name.endsWith('_wp_'))
     if (wpAreas.length === 0) return map
 
@@ -81,6 +81,7 @@ export function useLinkBundles(deps: {
           const names = [nonWpAreas[i].name, nonWpAreas[j].name].sort()
           if (wp.name === `${names[0]}_${names[1]}_wp_`) {
             map.set(areaKey(nonWpAreas[i].id, nonWpAreas[j].id), {
+              id: wp.id,
               cx: rect.x + rect.width / 2,
               cy: rect.y + rect.height / 2,
               rect

@@ -59,6 +59,7 @@
 - Link đi qua **anchor** trên biên Area để giảm cắt xuyên.
 - Ưu tiên **corridor cục bộ** giữa 2 Area nếu có **gap sạch** (không bị Area khác chặn); fallback về corridor global ngoài biên Area khi không hợp lệ.
 - **Cho phép tuyến liên‑area/waypoint đi ra ngoài đường bao sơ đồ** khi cần để giảm cắt chéo; viewport/pan phải **tính cả waypoint + link extents** để tránh bị cắt mất đoạn.
+- **Liên‑area qua waypoint:** tuyến **anchor → waypoint → anchor** ưu tiên **any‑angle (Theta\*) + bo góc nhẹ** để giảm gãy góc; nếu không tìm được đường thì fallback hành lang.
 - Routing link ưu tiên **tránh vật cản** (area/device/**interface tag**) và **giảm chồng lấn**; nếu không bị cản thì giữ đường thẳng ngắn nhất, nếu bị cản thì dùng **any‑angle (Theta\*)** để vẫn ưu tiên đường chéo và **bo góc nhẹ**.
 - **Anchor port tối ưu 2‑pass:** pass 1 định tuyến để lấy hướng/điểm tham chiếu, pass 2 sắp xếp lại anchor theo side + thứ tự để giãn cách hợp lý và bám tuyến ngắn nhất.
 - **Pair alignment:** với nhiều link giữa 2 thiết bị kề nhau, anchor được **xếp đồng bộ theo thứ tự port phía đối diện** để giảm chéo.

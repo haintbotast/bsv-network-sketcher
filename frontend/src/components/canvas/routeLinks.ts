@@ -24,7 +24,7 @@ export type RouteLinksParams = {
   areaBounds: { minX: number; minY: number; maxX: number; maxY: number } | null
   linkBundleIndex: Map<string, { index: number; total: number }>
   areaBundleIndex: Map<string, { index: number; total: number }>
-  waypointAreaMap: Map<string, { cx: number; cy: number; rect: Rect }>
+  waypointAreaMap: Map<string, { id: string; cx: number; cy: number; rect: Rect }>
   areaCenters: Map<string, { x: number; y: number }>
 }
 
@@ -274,18 +274,57 @@ export function routeLinks(
             const wpOffsetY = axis === 'y' ? clamp(interBundleOffset, -maxOffsetY, maxOffsetY) : 0
             const wpTarget = { x: wp.cx + wpOffsetX, y: wp.cy + wpOffsetY }
 
-            const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, wpTarget, interBundleOffset, anchorOffset)
-            const toAreaAnchor = computeAreaAnchor(toArea, toExit, wpTarget, interBundleOffset, anchorOffset)
-            points = []
-            pushPoint(points, fromAnchor.x, fromAnchor.y)
-            pushPoint(points, fromExit.x, fromExit.y)
-            pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-            pushPoint(points, wpTarget.x, fromAreaAnchor.y)
-            pushPoint(points, wpTarget.x, wpTarget.y)
-            pushPoint(points, wpTarget.x, toAreaAnchor.y)
-            pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-            pushPoint(points, toExit.x, toExit.y)
-            pushPoint(points, toAnchor.x, toAnchor.y)
+            const waypointObstacles = obstacles.filter(rect => rect !== wp.rect)
+            const routeToWp = routeAnyAnglePath({
+              start: fromExit,
+              end: wpTarget,
+              obstacles: waypointObstacles,
+              clearance,
+              grid,
+              occupancy,
+              preferAxis: axis === 'x' ? 'y' : 'x'
+            })
+            const routeFromWp = routeAnyAnglePath({
+              start: wpTarget,
+              end: toExit,
+              obstacles: waypointObstacles,
+              clearance,
+              grid,
+              occupancy,
+              preferAxis: axis === 'x' ? 'y' : 'x'
+            })
+
+            if (routeToWp && routeFromWp) {
+              const cornerRadius = Math.max(2, Math.min(minSegment * 0.8, 12 * scale))
+              const segment1 = smoothAnyAnglePath(routeToWp.points, waypointObstacles, clearance, cornerRadius, minSegment)
+              const segment2 = smoothAnyAnglePath(routeFromWp.points, waypointObstacles, clearance, cornerRadius, minSegment)
+
+              points = []
+              pushPoint(points, fromAnchor.x, fromAnchor.y)
+              segment1.forEach(point => pushPoint(points, point.x, point.y))
+              segment2.forEach((point, idx) => {
+                if (idx === 0) return
+                pushPoint(points, point.x, point.y)
+              })
+              pushPoint(points, toAnchor.x, toAnchor.y)
+
+              addOccupancy(occupancy, routeToWp.gridPath)
+              addOccupancy(occupancy, routeFromWp.gridPath)
+              routed = true
+            } else {
+              const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, wpTarget, interBundleOffset, anchorOffset)
+              const toAreaAnchor = computeAreaAnchor(toArea, toExit, wpTarget, interBundleOffset, anchorOffset)
+              points = []
+              pushPoint(points, fromAnchor.x, fromAnchor.y)
+              pushPoint(points, fromExit.x, fromExit.y)
+              pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+              pushPoint(points, wpTarget.x, fromAreaAnchor.y)
+              pushPoint(points, wpTarget.x, wpTarget.y)
+              pushPoint(points, wpTarget.x, toAreaAnchor.y)
+              pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+              pushPoint(points, toExit.x, toExit.y)
+              pushPoint(points, toAnchor.x, toAnchor.y)
+            }
           } else {
             const localCorridor = computeLocalCorridor(
               fromArea,

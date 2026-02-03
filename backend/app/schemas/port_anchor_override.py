@@ -14,7 +14,7 @@ class PortAnchorOverrideCreate(BaseModel):
     device_id: str = Field(..., min_length=1)
     port_name: str = Field(..., min_length=1)
     side: AnchorSide = "right"
-    offset_ratio: float = Field(default=0.5, ge=0.0, le=1.0)
+    offset_ratio: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
 
 class PortAnchorOverrideUpdate(BaseModel):
@@ -32,7 +32,7 @@ class PortAnchorOverrideResponse(BaseModel):
     device_id: str
     port_name: str
     side: AnchorSide
-    offset_ratio: float
+    offset_ratio: Optional[float]
     created_at: datetime
     updated_at: datetime
 

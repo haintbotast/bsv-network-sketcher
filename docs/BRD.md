@@ -53,7 +53,8 @@
 - Có **layout mode chọn** (Cisco/ISO/custom) + preset; **Flexible** có kiểm soát khi cần.
 - Validation logic L1→L2→L3 chặt chẽ hơn.
 - Ràng buộc kết nối L1 theo tầng (Access/Distribution/Server) để đảm bảo đúng logic vật lý.
-- Cho phép **chỉnh anchor port thủ công** để tinh chỉnh đường kết nối trong sơ đồ.
+- Cho phép **chỉnh anchor port thủ công** (side + offset_ratio) để tinh chỉnh đường kết nối; `offset_ratio` có thể để `null` để giữ **auto offset**.
+- Cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port** ngay trong bảng thuộc tính thiết bị, có kiểm tra trùng và port đã dùng.
 - Bảo vệ dữ liệu dự án (phân quyền theo project, kiểm soát upload/download).
 - Cho phép quản trị preset/layout/validation qua trang cấu hình (không hardcode).
 

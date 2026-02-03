@@ -14,7 +14,7 @@ export type RenderLink = {
 }
 
 export type AnchorOverrideMap = Map<string, Map<string, { x: number; y: number; side: string }>>
-export type PortAnchorOverride = { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number }
+export type PortAnchorOverride = { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number | null }
 export type PortAnchorOverrideMap = Map<string, Map<string, PortAnchorOverride>>
 
 export type RenderTuning = {

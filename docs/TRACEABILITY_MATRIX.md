@@ -20,6 +20,7 @@
 | Cấu hình preset/layout | FR-12 | 2.8 | `docs/API_SPEC.md` |
 | Preview/Export có metadata phiên bản | FR-13 | 2.5 | `docs/API_SPEC.md` |
 | Chỉnh anchor port thủ công | FR-14 | 2.4 | `docs/DIAGRAM_STYLE_SPEC.md`, `docs/API_SPEC.md` |
+| Quản lý kết nối L1 theo port | FR-15 | 2.4 | `docs/API_SPEC.md`, `docs/DIAGRAM_STYLE_SPEC.md` |
 
 ---
 

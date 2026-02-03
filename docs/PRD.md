@@ -36,7 +36,8 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-11:** Quản lý phiên bản topology (snapshot, xem, khôi phục).
 - **FR-12:** Trang cấu hình quản trị preset/layout/validation (không hardcode).
 - **FR-13:** Export/preview gắn metadata phiên bản (version label, time, user).
-- **FR-14:** Cho phép người dùng **chỉnh thủ công anchor của port** (side + offset_ratio) và **giữ override khi chạy lại auto-layout**.
+- **FR-14:** Cho phép người dùng **chỉnh thủ công anchor của port** (side + offset_ratio, cho phép `offset_ratio = null` để giữ auto offset) và **giữ override khi chạy lại auto-layout**.
+- **FR-15:** Cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port** ngay trong bảng thuộc tính thiết bị, có kiểm tra trùng và port đã dùng.
 
 ## 5. Yêu cầu phi chức năng (NFR)
 

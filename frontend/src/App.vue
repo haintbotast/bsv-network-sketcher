@@ -372,12 +372,17 @@
                       <option value="top">top</option>
                       <option value="bottom">bottom</option>
                     </select>
+                    <label class="anchor-auto">
+                      <input type="checkbox" v-model="anchorDrafts[port].autoOffset" />
+                      Auto offset
+                    </label>
                     <input
                       type="number"
                       min="0"
                       max="1"
                       step="0.05"
                       v-model.number="anchorDrafts[port].offsetRatio"
+                      :disabled="anchorDrafts[port].autoOffset"
                     />
                     <button type="button" class="secondary" @click="saveAnchorOverride(port)">
                       Lưu
@@ -387,6 +392,83 @@
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Kết nối theo port (L1)</label>
+              <div v-if="selectedDeviceLinkEntries.length === 0" class="hint small">
+                Chưa có kết nối L1 cho thiết bị này.
+              </div>
+              <div v-else class="port-link-list">
+                <div v-for="entry in selectedDeviceLinkEntries" :key="entry.port" class="port-link-group">
+                  <div class="port-link-header">
+                    <span>{{ entry.port }}</span>
+                    <span class="muted">{{ entry.links.length }} link</span>
+                  </div>
+                  <div
+                    v-for="conn in entry.links"
+                    :key="conn.linkId"
+                    class="port-link-row"
+                  >
+                    <div v-if="linkDrafts[conn.linkId]" class="port-link-controls">
+                      <select v-model="linkDrafts[conn.linkId].targetDeviceId">
+                        <option :value="null">-- Chọn thiết bị đích --</option>
+                        <option v-for="device in targetDeviceOptions" :key="device.id" :value="device.id">
+                          {{ device.name }}
+                        </option>
+                      </select>
+                      <input
+                        type="text"
+                        v-model="linkDrafts[conn.linkId].targetPort"
+                        placeholder="Port đích (vd: Gi 0/24)"
+                      />
+                      <select v-model="linkDrafts[conn.linkId].purpose">
+                        <option v-for="purpose in linkPurposes" :key="purpose" :value="purpose">{{ purpose }}</option>
+                      </select>
+                      <select v-model="linkDrafts[conn.linkId].lineStyle">
+                        <option v-for="style in linkLineStyles" :key="style" :value="style">{{ style }}</option>
+                      </select>
+                    </div>
+                    <div class="port-link-actions">
+                      <button type="button" class="secondary" @click="savePortLink(conn)">
+                        Lưu
+                      </button>
+                      <button type="button" class="ghost" @click="removePortLink(conn)">
+                        Xóa
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Thêm kết nối L1</label>
+              <div class="new-link-controls">
+                <input
+                  type="text"
+                  v-model="newLinkDraft.port"
+                  placeholder="Port nguồn (vd: Gi 0/1)"
+                />
+                <select v-model="newLinkDraft.targetDeviceId">
+                  <option :value="null">-- Chọn thiết bị đích --</option>
+                  <option v-for="device in targetDeviceOptions" :key="device.id" :value="device.id">
+                    {{ device.name }}
+                  </option>
+                </select>
+                <input
+                  type="text"
+                  v-model="newLinkDraft.targetPort"
+                  placeholder="Port đích (vd: Gi 0/24)"
+                />
+                <select v-model="newLinkDraft.purpose">
+                  <option v-for="purpose in linkPurposes" :key="purpose" :value="purpose">{{ purpose }}</option>
+                </select>
+                <select v-model="newLinkDraft.lineStyle">
+                  <option v-for="style in linkLineStyles" :key="style" :value="style">{{ style }}</option>
+                </select>
+                <button type="button" class="primary" @click="createPortLink">
+                  Tạo link
+                </button>
               </div>
             </div>
           </div>
@@ -463,7 +545,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import CanvasStage from './components/CanvasStage.vue'
 import { updateArea } from './services/areas'
 import { updateDevice } from './services/devices'
-import { updateLink } from './services/links'
+import { createLink, deleteLink, updateLink } from './services/links'
 import { deviceTypes, linkPurposes } from './composables/canvasConstants'
 import { comparePorts } from './components/canvas/linkRoutingUtils'
 import { useViewport } from './composables/useViewport'
@@ -546,7 +628,7 @@ const selectedDraftDirty = ref(false)
 const selectedSavePending = ref(false)
 let syncingDraft = false
 
-const anchorDrafts = ref<Record<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number }>>({})
+const anchorDrafts = ref<Record<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number; autoOffset: boolean }>>({})
 
 
 // Viewport state (from composable)
@@ -634,10 +716,10 @@ const selectedDevicePorts = computed(() => {
 
 const selectedDeviceOverrideMap = computed(() => {
   if (selectedObjectType.value !== 'Device' || !selectedObject.value) {
-    return new Map<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number }>()
+    return new Map<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number | null }>()
   }
   const deviceId = (selectedObject.value as DeviceRow).id
-  const map = new Map<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number }>()
+  const map = new Map<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number | null }>()
   portAnchorOverrides.value
     .filter(item => item.device_id === deviceId)
     .forEach(item => {
@@ -651,12 +733,18 @@ watch([selectedDevicePorts, selectedDeviceOverrideMap], () => {
     anchorDrafts.value = {}
     return
   }
-  const next: Record<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number }> = {}
+  const next: Record<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number; autoOffset: boolean }> = {}
   selectedDevicePorts.value.forEach(port => {
     const existing = selectedDeviceOverrideMap.value.get(port)
-    next[port] = existing
-      ? { side: existing.side, offsetRatio: existing.offsetRatio }
-      : { side: 'right', offsetRatio: 0.5 }
+    if (existing) {
+      next[port] = {
+        side: existing.side,
+        offsetRatio: existing.offsetRatio ?? 0.5,
+        autoOffset: existing.offsetRatio == null
+      }
+    } else {
+      next[port] = { side: 'right', offsetRatio: 0.5, autoOffset: true }
+    }
   })
   anchorDrafts.value = next
 })
@@ -673,7 +761,7 @@ async function saveAnchorOverride(port: string) {
       device_id: deviceId,
       port_name: port,
       side: draft.side,
-      offset_ratio: draft.offsetRatio
+      offset_ratio: draft.autoOffset ? null : draft.offsetRatio
     })
     setNotice('Đã lưu override anchor.', 'success')
   } catch (error: any) {
@@ -686,10 +774,283 @@ async function clearAnchorOverride(port: string) {
   const deviceId = (selectedObject.value as DeviceRow).id
   try {
     await removeAnchorOverride(selectedProjectId.value, deviceId, port)
-    anchorDrafts.value[port] = { side: 'right', offsetRatio: 0.5 }
+    anchorDrafts.value[port] = { side: 'right', offsetRatio: 0.5, autoOffset: true }
     setNotice('Đã xóa override anchor.', 'success')
   } catch (error: any) {
     setNotice(error?.message || 'Xóa override anchor thất bại.', 'error')
+  }
+}
+
+type PortLinkDirection = 'from' | 'to'
+type PortLinkEntry = {
+  port: string
+  links: Array<{
+    linkId: string
+    direction: PortLinkDirection
+    otherDeviceId: string
+    otherPort: string
+    purpose: string
+    lineStyle: 'solid' | 'dashed' | 'dotted'
+  }>
+}
+
+const linkLineStyles: Array<'solid' | 'dashed' | 'dotted'> = ['solid', 'dashed', 'dotted']
+
+const selectedDeviceId = computed(() => {
+  if (selectedObjectType.value !== 'Device' || !selectedObject.value) return null
+  return (selectedObject.value as DeviceRow).id
+})
+
+const selectedDeviceName = computed(() => {
+  if (selectedObjectType.value !== 'Device' || !selectedObject.value) return null
+  return (selectedObject.value as DeviceRow).name
+})
+
+const deviceNameById = computed(() => {
+  return new Map(devices.value.map(device => [device.id, device.name]))
+})
+
+const targetDeviceOptions = computed(() => {
+  if (!selectedDeviceId.value) return devices.value
+  return devices.value.filter(device => device.id !== selectedDeviceId.value)
+})
+
+const selectedDeviceLinkEntries = computed<PortLinkEntry[]>(() => {
+  if (!selectedDeviceId.value) return []
+  const map = new Map<string, PortLinkEntry>()
+  links.value.forEach(link => {
+    if (link.from_device_id === selectedDeviceId.value) {
+      const entry = map.get(link.from_port) || { port: link.from_port, links: [] }
+      entry.links.push({
+        linkId: link.id,
+        direction: 'from',
+        otherDeviceId: link.to_device_id,
+        otherPort: link.to_port,
+        purpose: link.purpose || 'DEFAULT',
+        lineStyle: (link.line_style || 'solid') as 'solid' | 'dashed' | 'dotted'
+      })
+      map.set(link.from_port, entry)
+      return
+    }
+    if (link.to_device_id === selectedDeviceId.value) {
+      const entry = map.get(link.to_port) || { port: link.to_port, links: [] }
+      entry.links.push({
+        linkId: link.id,
+        direction: 'to',
+        otherDeviceId: link.from_device_id,
+        otherPort: link.from_port,
+        purpose: link.purpose || 'DEFAULT',
+        lineStyle: (link.line_style || 'solid') as 'solid' | 'dashed' | 'dotted'
+      })
+      map.set(link.to_port, entry)
+    }
+  })
+  return Array.from(map.values()).sort((a, b) => comparePorts(a.port, b.port))
+})
+
+const linkDrafts = ref<Record<string, {
+  targetDeviceId: string | null
+  targetPort: string
+  purpose: string
+  lineStyle: 'solid' | 'dashed' | 'dotted'
+}>>({})
+
+const newLinkDraft = ref({
+  port: '',
+  targetDeviceId: null as string | null,
+  targetPort: '',
+  purpose: 'DEFAULT',
+  lineStyle: 'solid' as 'solid' | 'dashed' | 'dotted'
+})
+
+watch(selectedDeviceLinkEntries, () => {
+  const next: Record<string, { targetDeviceId: string | null; targetPort: string; purpose: string; lineStyle: 'solid' | 'dashed' | 'dotted' }> = {}
+  selectedDeviceLinkEntries.value.forEach(entry => {
+    entry.links.forEach(link => {
+      next[link.linkId] = {
+        targetDeviceId: link.otherDeviceId,
+        targetPort: link.otherPort,
+        purpose: link.purpose || 'DEFAULT',
+        lineStyle: link.lineStyle || 'solid'
+      }
+    })
+  })
+  linkDrafts.value = next
+})
+
+watch(selectedDeviceId, () => {
+  newLinkDraft.value = {
+    port: '',
+    targetDeviceId: null,
+    targetPort: '',
+    purpose: 'DEFAULT',
+    lineStyle: 'solid'
+  }
+})
+
+function isPortInUse(deviceId: string, port: string, excludeLinkId?: string) {
+  const normalized = port.trim()
+  return links.value.some(link => {
+    if (excludeLinkId && link.id === excludeLinkId) return false
+    if (link.from_device_id === deviceId && link.from_port === normalized) return true
+    return link.to_device_id === deviceId && link.to_port === normalized
+  })
+}
+
+function isDuplicateLink(
+  fromDeviceId: string,
+  fromPort: string,
+  toDeviceId: string,
+  toPort: string,
+  excludeLinkId?: string
+) {
+  const fromPortNorm = fromPort.trim()
+  const toPortNorm = toPort.trim()
+  return links.value.some(link => {
+    if (excludeLinkId && link.id === excludeLinkId) return false
+    const direct = link.from_device_id === fromDeviceId
+      && link.from_port === fromPortNorm
+      && link.to_device_id === toDeviceId
+      && link.to_port === toPortNorm
+    const reverse = link.from_device_id === toDeviceId
+      && link.from_port === toPortNorm
+      && link.to_device_id === fromDeviceId
+      && link.to_port === fromPortNorm
+    return direct || reverse
+  })
+}
+
+function validatePortFormat(port: string) {
+  return /^[A-Za-z\\-]+\\s+.+$/.test(port.trim())
+}
+
+function validateLinkDraft(params: {
+  fromDeviceId: string
+  fromPort: string
+  toDeviceId: string | null
+  toPort: string
+  excludeLinkId?: string
+}) {
+  const { fromDeviceId, fromPort, toDeviceId, toPort, excludeLinkId } = params
+  if (!toDeviceId) return 'Cần chọn thiết bị đích.'
+  if (!fromPort.trim()) return 'Cần nhập port nguồn.'
+  if (!toPort.trim()) return 'Cần nhập port đích.'
+  if (!validatePortFormat(fromPort)) return 'Port nguồn không hợp lệ (vd: Gi 0/1).'
+  if (!validatePortFormat(toPort)) return 'Port đích không hợp lệ (vd: Gi 0/24).'
+  if (fromDeviceId === toDeviceId && fromPort.trim() === toPort.trim()) {
+    return 'Không thể nối cùng một port.'
+  }
+  if (isDuplicateLink(fromDeviceId, fromPort, toDeviceId, toPort, excludeLinkId)) {
+    return 'Link đã tồn tại.'
+  }
+  if (isPortInUse(fromDeviceId, fromPort, excludeLinkId)) {
+    return `Port '${fromPort.trim()}' trên thiết bị nguồn đã được sử dụng.`
+  }
+  if (isPortInUse(toDeviceId, toPort, excludeLinkId)) {
+    return `Port '${toPort.trim()}' trên thiết bị đích đã được sử dụng.`
+  }
+  return null
+}
+
+async function savePortLink(entry: { linkId: string; direction: PortLinkDirection; port: string }) {
+  if (!selectedProjectId.value || !selectedDeviceId.value || !selectedDeviceName.value) return
+  const draft = linkDrafts.value[entry.linkId]
+  if (!draft) return
+  const error = validateLinkDraft({
+    fromDeviceId: selectedDeviceId.value,
+    fromPort: entry.port,
+    toDeviceId: draft.targetDeviceId,
+    toPort: draft.targetPort,
+    excludeLinkId: entry.linkId
+  })
+  if (error) {
+    setNotice(error, 'error')
+    return
+  }
+
+  const targetName = draft.targetDeviceId ? deviceNameById.value.get(draft.targetDeviceId) : null
+  if (!targetName) {
+    setNotice('Không tìm thấy thiết bị đích.', 'error')
+    return
+  }
+
+  const payload: Record<string, any> = {
+    purpose: draft.purpose || 'DEFAULT',
+    line_style: draft.lineStyle || 'solid'
+  }
+  if (entry.direction === 'from') {
+    payload.to_device = targetName
+    payload.to_port = draft.targetPort.trim()
+  } else {
+    payload.from_device = targetName
+    payload.from_port = draft.targetPort.trim()
+  }
+
+  try {
+    const updated = await updateLink(selectedProjectId.value, entry.linkId, payload)
+    const index = links.value.findIndex(link => link.id === updated.id)
+    if (index >= 0) links.value[index] = updated
+    scheduleAutoLayout(selectedProjectId.value, true)
+    setNotice('Đã cập nhật link.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Cập nhật link thất bại.', 'error')
+  }
+}
+
+async function removePortLink(entry: { linkId: string }) {
+  if (!selectedProjectId.value) return
+  if (!confirm('Bạn có chắc muốn xóa link này?')) return
+  try {
+    await deleteLink(selectedProjectId.value, entry.linkId)
+    links.value = links.value.filter(link => link.id !== entry.linkId)
+    scheduleAutoLayout(selectedProjectId.value, true)
+    setNotice('Đã xóa link.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Xóa link thất bại.', 'error')
+  }
+}
+
+async function createPortLink() {
+  if (!selectedProjectId.value || !selectedDeviceId.value || !selectedDeviceName.value) return
+  const draft = newLinkDraft.value
+  const error = validateLinkDraft({
+    fromDeviceId: selectedDeviceId.value,
+    fromPort: draft.port,
+    toDeviceId: draft.targetDeviceId,
+    toPort: draft.targetPort,
+  })
+  if (error) {
+    setNotice(error, 'error')
+    return
+  }
+
+  const targetName = draft.targetDeviceId ? deviceNameById.value.get(draft.targetDeviceId) : null
+  if (!targetName) {
+    setNotice('Không tìm thấy thiết bị đích.', 'error')
+    return
+  }
+
+  try {
+    const created = await createLink(selectedProjectId.value, {
+      from_device: selectedDeviceName.value,
+      from_port: draft.port.trim(),
+      to_device: targetName,
+      to_port: draft.targetPort.trim(),
+      purpose: draft.purpose || 'DEFAULT',
+      line_style: draft.lineStyle || 'solid'
+    })
+    links.value.push(created)
+    scheduleAutoLayout(selectedProjectId.value, true)
+    newLinkDraft.value = {
+      port: '',
+      targetDeviceId: null,
+      targetPort: '',
+      purpose: 'DEFAULT',
+      lineStyle: 'solid'
+    }
+    setNotice('Đã tạo link.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Tạo link thất bại.', 'error')
   }
 }
 
@@ -1363,7 +1724,61 @@ onMounted(() => {
 
 .anchor-controls {
   display: grid;
-  grid-template-columns: 1fr 1fr auto auto;
+  grid-template-columns: 1fr auto 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.anchor-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.port-link-list {
+  display: grid;
+  gap: 10px;
+}
+
+.port-link-group {
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f6f2ef;
+}
+
+.port-link-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.port-link-row {
+  display: grid;
+  gap: 6px;
+}
+
+.port-link-controls {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.9fr 0.8fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.port-link-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.new-link-controls {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr 0.9fr 0.8fr auto;
   gap: 8px;
   align-items: center;
 }

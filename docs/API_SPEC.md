@@ -100,7 +100,7 @@ DELETE /projects/{project_id}/port-anchors?device_id=...&port_name=...
       "device_id": "dev-uuid",
       "port_name": "Gi 0/1",
       "side": "left",
-      "offset_ratio": 0.5
+      "offset_ratio": null
     }
   ]
 }
@@ -108,7 +108,8 @@ DELETE /projects/{project_id}/port-anchors?device_id=...&port_name=...
 
 **Ghi chú:**
 - `side` ∈ `left|right|top|bottom`
-- `offset_ratio` ∈ `[0..1]`, tính theo chiều cạnh thiết bị.
+- `offset_ratio` ∈ `[0..1]` (hoặc `null`), tính theo chiều cạnh thiết bị.  
+  Nếu `null` thì **giữ auto offset** theo side đã chọn.
 
 ---
 
@@ -563,6 +564,8 @@ Response (400 Bad Request - server uplink sai tầng):
   ]
 }
 ```
+
+**Ghi chú:** `PUT /api/v1/projects/{project_id}/links/{link_id}` áp dụng cùng validation như tạo mới (trùng link, port đã dùng, ràng buộc tầng).
 
 Response (400 Bad Request - vi phạm quy tắc Access/Area/Server Switch):
 ```json

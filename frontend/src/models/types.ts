@@ -49,7 +49,7 @@ export type PortAnchorOverride = {
   deviceId: string
   portName: string
   side: 'left' | 'right' | 'top' | 'bottom'
-  offsetRatio: number
+  offsetRatio: number | null
 }
 
 // View modes for canvas

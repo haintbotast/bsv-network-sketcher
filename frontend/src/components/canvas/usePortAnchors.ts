@@ -36,6 +36,14 @@ export function usePortAnchors(deps: {
       })
     }
 
+    if (portAnchorOverrides?.value) {
+      portAnchorOverrides.value.forEach((ports, deviceId) => {
+        ports.forEach((_override, port) => {
+          addPort(deviceId, port)
+        })
+      })
+    }
+
     map.forEach((ports, deviceId) => {
       ports.sort(comparePorts)
       map.set(deviceId, ports)
@@ -112,6 +120,17 @@ export function usePortAnchors(deps: {
       })
       resolved.set(deviceId, portSide)
     })
+
+    if (portAnchorOverrides?.value) {
+      portAnchorOverrides.value.forEach((ports, deviceId) => {
+        const portSide = resolved.get(deviceId) || new Map<string, string>()
+        ports.forEach((override, port) => {
+          portSide.set(port, override.side)
+        })
+        resolved.set(deviceId, portSide)
+      })
+    }
+
     return resolved
   })
 
@@ -209,6 +228,21 @@ export function usePortAnchors(deps: {
         const inset = renderTuning.value.port_edge_inset ?? 0
         const usableWidth = Math.max(rect.width - inset * 2, 1)
         const usableHeight = Math.max(rect.height - inset * 2, 1)
+        if (override.offsetRatio == null) {
+          const anchors = devicePortAnchors.value.get(deviceId)
+          const autoAnchor = anchors?.get(portName)
+          if (autoAnchor) return autoAnchor
+          if (override.side === 'left' || override.side === 'right') {
+            const ratio = clamp((target.y - rect.y - inset) / usableHeight, 0.1, 0.9)
+            const y = rect.y + inset + usableHeight * ratio
+            const x = override.side === 'left' ? rect.x : rect.x + rect.width
+            return { x, y, side: override.side }
+          }
+          const ratio = clamp((target.x - rect.x - inset) / usableWidth, 0.1, 0.9)
+          const x = rect.x + inset + usableWidth * ratio
+          const y = override.side === 'top' ? rect.y : rect.y + rect.height
+          return { x, y, side: override.side }
+        }
         const ratio = clamp(override.offsetRatio, 0, 1)
         if (override.side === 'left' || override.side === 'right') {
           const y = rect.y + inset + usableHeight * ratio

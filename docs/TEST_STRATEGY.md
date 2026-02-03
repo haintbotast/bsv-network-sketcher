@@ -13,7 +13,8 @@
 - **_AIR_ spacing:** giữ thẳng cột, không chồng lấn.
 - **same_type_row:** thiết bị cùng loại ưu tiên ở cùng hàng khi `max_nodes_per_row` cho phép.
 - **port_label_band:** giãn khoảng cách thiết bị có tính đến kích thước nhãn cổng.
-- **port_anchor_override:** override anchor per-port **được ưu tiên** và **không bị auto-layout ghi đè**.
+- **port_anchor_override:** override anchor per-port **được ưu tiên** và **không bị auto-layout ghi đè**; kiểm tra thêm trường hợp `offset_ratio = null` để giữ auto offset.
+- **link_update_validation:** cập nhật link phải chặn **trùng link** và **port đã dùng** (kể cả khi chỉ đổi đầu còn lại).
 - **inter‑area:** link khác Area bắt buộc qua Waypoint area (`_wp_`).
 
 ### 1.2 Kiểm thử overview/L2/L3

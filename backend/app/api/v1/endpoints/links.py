@@ -358,6 +358,8 @@ async def update_existing_link(
 
     effective_from = from_device or link.from_device
     effective_to = to_device or link.to_device
+    effective_from_port = data.from_port if data.from_port is not None else link.from_port
+    effective_to_port = data.to_port if data.to_port is not None else link.to_port
     existing_links = await get_links(db, project_id)
     if effective_from and effective_to and _endpoint_uplink_violation(effective_from, effective_to):
         raise HTTPException(
@@ -392,6 +394,45 @@ async def update_existing_link(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Server chỉ được kết nối lên Server Distribution Switch.",
         )
+
+    if effective_from and effective_to:
+        if await check_link_exists(
+            db,
+            project_id,
+            effective_from.id,
+            effective_from_port,
+            effective_to.id,
+            effective_to_port,
+            exclude_link_id=link.id,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Link đã tồn tại",
+            )
+
+        if await check_port_in_use(
+            db,
+            project_id,
+            effective_from.id,
+            effective_from_port,
+            exclude_link_id=link.id,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Port '{effective_from_port}' trên device '{effective_from.name}' đã được sử dụng",
+            )
+
+        if await check_port_in_use(
+            db,
+            project_id,
+            effective_to.id,
+            effective_to_port,
+            exclude_link_id=link.id,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Port '{effective_to_port}' trên device '{effective_to.name}' đã được sử dụng",
+            )
 
     link = await update_link(db, link, data, from_device, to_device)
     link = await get_link_by_id(db, link.id)

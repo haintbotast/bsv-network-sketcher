@@ -38,31 +38,34 @@ async def check_link_exists(
     from_port: str,
     to_device_id: str,
     to_port: str,
+    exclude_link_id: Optional[str] = None,
 ) -> bool:
     """Kiểm tra link đã tồn tại chưa (cả 2 chiều)."""
     # Check chiều 1
-    result = await db.execute(
-        select(L1Link).where(
-            L1Link.project_id == project_id,
-            L1Link.from_device_id == from_device_id,
-            L1Link.from_port == from_port,
-            L1Link.to_device_id == to_device_id,
-            L1Link.to_port == to_port,
-        )
+    query = select(L1Link).where(
+        L1Link.project_id == project_id,
+        L1Link.from_device_id == from_device_id,
+        L1Link.from_port == from_port,
+        L1Link.to_device_id == to_device_id,
+        L1Link.to_port == to_port,
     )
+    if exclude_link_id:
+        query = query.where(L1Link.id != exclude_link_id)
+    result = await db.execute(query)
     if result.scalar_one_or_none():
         return True
 
     # Check chiều ngược
-    result = await db.execute(
-        select(L1Link).where(
-            L1Link.project_id == project_id,
-            L1Link.from_device_id == to_device_id,
-            L1Link.from_port == to_port,
-            L1Link.to_device_id == from_device_id,
-            L1Link.to_port == from_port,
-        )
+    query = select(L1Link).where(
+        L1Link.project_id == project_id,
+        L1Link.from_device_id == to_device_id,
+        L1Link.from_port == to_port,
+        L1Link.to_device_id == from_device_id,
+        L1Link.to_port == from_port,
     )
+    if exclude_link_id:
+        query = query.where(L1Link.id != exclude_link_id)
+    result = await db.execute(query)
     return result.scalar_one_or_none() is not None
 
 

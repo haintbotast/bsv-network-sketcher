@@ -189,7 +189,7 @@ class PortAnchorOverride(Base):
     device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id"), nullable=False)
     port_name: Mapped[str] = mapped_column(String(50), nullable=False)
     side: Mapped[str] = mapped_column(String(10), nullable=False, default="right")
-    offset_ratio: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
+    offset_ratio: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

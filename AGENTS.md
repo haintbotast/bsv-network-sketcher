@@ -60,6 +60,7 @@ Các hướng dẫn này áp dụng cho mọi công cụ AI lập trình (Codex,
 - Nếu yêu cầu mới xung đột với file này hoặc kế hoạch, hỏi người dùng và cập nhật cả hai.
 - Khi người dùng cung cấp chỉ thị mới, cập nhật file này và các file hướng dẫn theo công cụ
   (CLAUDE.md, .cursor/rules/project.md) để đồng bộ.
+- Sau mỗi lần hoàn thành yêu cầu, **tự động commit/push** nếu không bị chặn; nếu không thể thì báo rõ lý do.
 - Mọi thay đổi về topology/triển khai/luồng dữ liệu phải cập nhật PROJECT_TOPOLOGY.md.
 - Mọi thay đổi về yêu cầu nghiệp vụ/sản phẩm/kỹ thuật phải cập nhật BRD/PRD/SRS tương ứng.
 - Mọi thay đổi về hình khối/màu/nét/chữ phải cập nhật DIAGRAM_STYLE_SPEC.md.

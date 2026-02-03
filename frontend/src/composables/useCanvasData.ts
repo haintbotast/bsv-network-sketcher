@@ -28,7 +28,7 @@ export function useCanvasData(
   const portAnchorOverrides = ref<PortAnchorOverrideRecord[]>([])
 
   const portAnchorOverrideMap = computed(() => {
-    const map = new Map<string, Map<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number }>>()
+    const map = new Map<string, Map<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number | null }>>()
     portAnchorOverrides.value.forEach(override => {
       const deviceMap = map.get(override.device_id) || new Map()
       deviceMap.set(override.port_name, {
@@ -318,7 +318,7 @@ export function useCanvasData(
 
   async function upsertAnchorOverride(
     projectId: string,
-    payload: { device_id: string; port_name: string; side: 'left' | 'right' | 'top' | 'bottom'; offset_ratio: number }
+    payload: { device_id: string; port_name: string; side: 'left' | 'right' | 'top' | 'bottom'; offset_ratio: number | null }
   ) {
     const [saved] = await upsertPortAnchorOverrides(projectId, [payload])
     if (!saved) return

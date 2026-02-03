@@ -37,7 +37,8 @@
 - Auto-layout theo **2 tầng** (macro Area + micro Device), ưu tiên bố cục top‑to‑bottom.
 - Auto-layout tự động **chỉ chạy khi project chưa có tọa độ layout** (device/area position trống hoặc 0); nếu đã có layout thì **không tự chạy lại**. Cho phép chạy lại khi đổi layout mode hoặc người dùng chủ động.
 - Khoảng cách giữa thiết bị trong auto-layout **tính cả vùng nhãn port (Interface Tag)** để tránh chồng lấn.
-- Cho phép người dùng **override anchor per-port** bằng `side + offset_ratio`; override **được lưu DB** và **không bị auto-layout ghi đè**.
+- Cho phép người dùng **override anchor per-port** bằng `side + offset_ratio` (cho phép `offset_ratio = null` để giữ auto offset); override **được lưu DB** và **không bị auto-layout ghi đè**.
+- Bảng thuộc tính thiết bị cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port**, áp dụng kiểm tra **trùng link** và **port đã dùng** trước khi lưu.
 - Overview (nếu bật) chỉ L1/flow; L2/L3 chỉ hiển thị ở view riêng.  
   **Lưu ý:** UI hiện không hiển thị Overview; dùng L1 thay thế.
 - Liên kết khác Area bắt buộc qua **Waypoint area** (đuôi `_wp_`).

@@ -80,6 +80,20 @@ async def test_port_anchor_override_crud() -> None:
         assert created.side == "left"
         assert created.offset_ratio == 0.25
 
+        auto_created = await upsert_override(
+            session,
+            project.id,
+            PortAnchorOverrideCreate(
+                device_id=device.id,
+                port_name="Gi 0/2",
+                side="top",
+                offset_ratio=None,
+            ),
+        )
+        assert auto_created.port_name == "Gi 0/2"
+        assert auto_created.side == "top"
+        assert auto_created.offset_ratio is None
+
         updated = await upsert_override(
             session,
             project.id,

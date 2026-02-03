@@ -5,7 +5,7 @@ export type PortAnchorOverrideUpsert = {
   device_id: string
   port_name: string
   side: 'left' | 'right' | 'top' | 'bottom'
-  offset_ratio: number
+  offset_ratio: number | null
 }
 
 export async function listPortAnchorOverrides(projectId: string) {

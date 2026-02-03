@@ -73,7 +73,7 @@ export type PortAnchorOverrideRecord = {
   device_id: string
   port_name: string
   side: 'left' | 'right' | 'top' | 'bottom'
-  offset_ratio: number
+  offset_ratio: number | null
 }
 
 export type TokenResponse = {

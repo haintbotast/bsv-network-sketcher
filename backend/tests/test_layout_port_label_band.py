@@ -45,6 +45,14 @@ class DummyL3Address:
         self.prefix_length = prefix
 
 
+class DummyLink:
+    def __init__(self, from_device_id: str, to_device_id: str, from_port: str, to_port: str) -> None:
+        self.from_device_id = from_device_id
+        self.to_device_id = to_device_id
+        self.from_port = from_port
+        self.to_port = to_port
+
+
 def _compute_row_gap(port_label_band: float) -> float:
     area = DummyArea("A1", "Office")
     devices = [
@@ -134,3 +142,45 @@ def test_label_band_offsets_l3_device_positions() -> None:
     base_y = _compute_l3_device_y(0.0)
     band_y = _compute_l3_device_y(0.4)
     assert math.isclose(band_y - base_y, 0.4, abs_tol=1e-6)
+
+
+def _compute_x_gap_for_ports(port_name: str) -> float:
+    area = DummyArea("A1", "Office")
+    area.width = 100.0
+    area.height = 30.0
+    devices = [
+        DummyDevice("D1", area.id, "HN-SW-1", "Switch"),
+        DummyDevice("D2", area.id, "HN-SW-2", "Switch"),
+    ]
+    links = [
+        DummyLink("D1", "D2", port_name, port_name),
+    ]
+    config = LayoutConfig(
+        layer_gap=1.0,
+        node_spacing=0.4,
+        node_width=1.0,
+        node_height=1.0,
+    )
+    layout_tuning = {
+        "max_nodes_per_row": 2,
+        "row_gap": 0.2,
+        "row_stagger": 0.0,
+        "port_label_band": 0.0,
+    }
+
+    result = compute_layout_l1(
+        devices,
+        links,
+        [area],
+        config,
+        layout_scope="area",
+        layout_tuning=layout_tuning,
+    )
+    positions = sorted([d for d in result["devices"] if d.area_id == area.id], key=lambda d: d.x)
+    return positions[1].x - positions[0].x
+
+
+def test_port_label_width_increases_spacing() -> None:
+    short_gap = _compute_x_gap_for_ports("Gi 0/1")
+    long_gap = _compute_x_gap_for_ports("GigabitEthernet 1/0/48")
+    assert long_gap > short_gap

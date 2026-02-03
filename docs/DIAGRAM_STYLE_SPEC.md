@@ -127,6 +127,7 @@
 - Auto-layout cần **tính thêm vùng đệm Interface Tag** khi giãn khoảng cách giữa thiết bị để tránh chồng lấn.
 - Auto-layout cần **tính thêm băng nhãn** khi xác định kích thước node và khoảng cách:
   - **L1:** cộng `port_label_band` vào kích thước node (rộng/cao) và vào `node_spacing`/`layer_gap`.
+  - **L1 (thực tế):** ước lượng **bề ngang nhãn port** theo độ dài port + `render_tuning` để tăng `node_spacing`/`row_gap` (tránh nhãn bị kẹp giữa thiết bị).
   - **L2/L3:** cộng `label_band` vào chiều cao node để chừa chỗ nhãn L2/L3 dưới thiết bị; đồng thời chừa band nhãn cho group (VLAN/Subnet).
 - Micro layout sử dụng **kích thước thiết bị sau auto-resize** để tính bounding và sắp xếp trước khi tính macro layout.
 - **Quy tắc nhãn port:** định dạng **chữ cái + khoảng trắng + số hiệu**.  

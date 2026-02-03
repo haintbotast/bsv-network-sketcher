@@ -7,7 +7,7 @@ from app.services.simple_layer_layout import simple_layer_layout
 from app.schemas.layout import DeviceLayout, AreaLayout, LayoutStats
 
 from .layout_constants import DEFAULT_DEVICE_WIDTH, DEFAULT_DEVICE_HEIGHT, normalize_text
-from .layout_geometry import effective_node_size
+from .layout_geometry import effective_node_size, collect_device_ports, estimate_label_clearance
 from .device_classifier import is_distribution_switch
 
 
@@ -18,9 +18,11 @@ def compute_layout_l1(
     config: LayoutConfig,
     layout_scope: str,
     layout_tuning: dict | None = None,
+    render_tuning: dict | None = None,
 ) -> dict:
     """Compute L1 layout: area-based with minimized area visuals (compact spacing)."""
     tuning = layout_tuning or {}
+    render_cfg = render_tuning or {}
     port_label_band = 0.0
     try:
         port_label_band = float(tuning.get("port_label_band", 0.0))
@@ -294,6 +296,13 @@ def compute_layout_l1(
             l for l in links
             if l.from_device_id in device_ids and l.to_device_id in device_ids
         ]
+        area_port_links = [
+            l for l in links
+            if l.from_device_id in device_ids or l.to_device_id in device_ids
+        ]
+
+        ports_by_device = collect_device_ports(area_port_links)
+        label_clearance_x, label_clearance_y = estimate_label_clearance(ports_by_device, render_cfg)
 
         area_node_width, area_node_height = effective_node_size(
             area_devices,
@@ -303,12 +312,12 @@ def compute_layout_l1(
             extra_height=label_extra,
         )
         area_micro_config = LayoutConfig(
-            layer_gap=micro_config.layer_gap,
-            node_spacing=micro_config.node_spacing,
+            layer_gap=micro_config.layer_gap + label_clearance_y,
+            node_spacing=micro_config.node_spacing + label_clearance_x,
             node_width=area_node_width,
             node_height=area_node_height,
             max_nodes_per_row=micro_config.max_nodes_per_row,
-            row_gap=micro_config.row_gap,
+            row_gap=micro_config.row_gap + label_clearance_y,
             row_stagger=micro_config.row_stagger,
         )
 
@@ -578,6 +587,13 @@ def compute_layout_l1(
             l for l in links
             if l.from_device_id in no_area_device_ids and l.to_device_id in no_area_device_ids
         ]
+        no_area_port_links = [
+            l for l in links
+            if l.from_device_id in no_area_device_ids or l.to_device_id in no_area_device_ids
+        ]
+        ports_by_device = collect_device_ports(no_area_port_links)
+        label_clearance_x, label_clearance_y = estimate_label_clearance(ports_by_device, render_cfg)
+
         no_area_node_width, no_area_node_height = effective_node_size(
             no_area_devices,
             DEFAULT_DEVICE_WIDTH,
@@ -586,12 +602,12 @@ def compute_layout_l1(
             extra_height=label_extra,
         )
         no_area_config = LayoutConfig(
-            layer_gap=micro_config.layer_gap,
-            node_spacing=micro_config.node_spacing,
+            layer_gap=micro_config.layer_gap + label_clearance_y,
+            node_spacing=micro_config.node_spacing + label_clearance_x,
             node_width=no_area_node_width,
             node_height=no_area_node_height,
             max_nodes_per_row=micro_config.max_nodes_per_row,
-            row_gap=micro_config.row_gap,
+            row_gap=micro_config.row_gap + label_clearance_y,
             row_stagger=micro_config.row_stagger,
         )
         layout_result = simple_layer_layout(no_area_devices, no_area_links, no_area_config)

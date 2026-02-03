@@ -25,7 +25,7 @@ from app.schemas.layout import (
 )
 
 from .layout_constants import DEFAULT_DEVICE_WIDTH, DEFAULT_DEVICE_HEIGHT
-from .layout_geometry import effective_node_size
+from .layout_geometry import effective_node_size, collect_device_ports, estimate_label_clearance
 from .topology_normalizer import normalize_topology
 from .waypoint_manager import create_or_update_waypoint_areas
 from .layout_db import apply_layout_to_db, apply_grouped_layout_to_db
@@ -67,6 +67,7 @@ async def compute_auto_layout(
 
     admin_config = await get_admin_config(db)
     layout_tuning = admin_config.get("layout_tuning", {}) if isinstance(admin_config, dict) else {}
+    render_tuning = admin_config.get("render_tuning", {}) if isinstance(admin_config, dict) else {}
 
     # Load data based on view_mode
     view_mode = options.view_mode
@@ -188,8 +189,33 @@ async def compute_auto_layout(
         if view_mode == "L1":
             if options.group_by_area:
                 non_wp_areas = [a for a in areas if not a.name.endswith("_wp_")]
-                response = compute_layout_l1(devices, links, non_wp_areas, config, options.layout_scope, layout_tuning)
+                response = compute_layout_l1(
+                    devices,
+                    links,
+                    non_wp_areas,
+                    config,
+                    options.layout_scope,
+                    layout_tuning,
+                    render_tuning,
+                )
             else:
+                label_clearance_x, label_clearance_y = estimate_label_clearance(
+                    collect_device_ports(links),
+                    render_tuning,
+                )
+                try:
+                    row_stagger = float(layout_tuning.get("row_stagger", 0.5))
+                except (TypeError, ValueError):
+                    row_stagger = 0.5
+                row_stagger = max(0.0, min(row_stagger, 1.0))
+                config = LayoutConfig(
+                    layer_gap=config.layer_gap + label_clearance_y,
+                    node_spacing=config.node_spacing + label_clearance_x,
+                    node_width=node_width,
+                    node_height=node_height,
+                    row_gap=max(0.2, (config.node_spacing + label_clearance_x) * 0.6) + label_clearance_y,
+                    row_stagger=row_stagger,
+                )
                 layout_result = simple_layer_layout(devices, links, config)
                 response = {
                     "devices": [

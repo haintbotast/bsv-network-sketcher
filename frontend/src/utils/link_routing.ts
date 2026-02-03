@@ -95,6 +95,17 @@ const DIRS = [
   { dx: 1, dy: 0 }
 ]
 
+const DIRS_8 = [
+  { dx: 0, dy: -1 },
+  { dx: 0, dy: 1 },
+  { dx: -1, dy: 0 },
+  { dx: 1, dy: 0 },
+  { dx: -1, dy: -1 },
+  { dx: -1, dy: 1 },
+  { dx: 1, dy: -1 },
+  { dx: 1, dy: 1 }
+]
+
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
 const pointInRect = (point: Point, rect: Rect, margin = 0) =>
@@ -228,6 +239,92 @@ export const simplifyOrthogonalPath = (points: Point[], minSegment = 0) => {
   return finalPath
 }
 
+const expandRect = (rect: Rect, clearance: number): Rect => ({
+  x: rect.x - clearance,
+  y: rect.y - clearance,
+  width: rect.width + clearance * 2,
+  height: rect.height + clearance * 2
+})
+
+const hasLineOfSight = (a: Point, b: Point, expanded: Rect[]) =>
+  !expanded.some(rect => segmentIntersectsRect(a, b, rect, 0))
+
+const shortcutPath = (points: Point[], expanded: Rect[]) => {
+  if (points.length <= 2) return points
+  const simplified: Point[] = []
+  let index = 0
+  simplified.push(points[0])
+  while (index < points.length - 1) {
+    let next = points.length - 1
+    for (let j = points.length - 1; j > index + 1; j -= 1) {
+      if (hasLineOfSight(points[index], points[j], expanded)) {
+        next = j
+        break
+      }
+    }
+    simplified.push(points[next])
+    index = next
+  }
+  return simplified
+}
+
+const roundCorners = (points: Point[], radius: number, minSegment = 0) => {
+  if (points.length <= 2 || radius <= 0) return points
+  const output: Point[] = [points[0]]
+  const maxCos = 0.999
+
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const prev = points[i - 1]
+    const curr = points[i]
+    const next = points[i + 1]
+
+    const v1x = prev.x - curr.x
+    const v1y = prev.y - curr.y
+    const v2x = next.x - curr.x
+    const v2y = next.y - curr.y
+
+    const len1 = Math.hypot(v1x, v1y)
+    const len2 = Math.hypot(v2x, v2y)
+    if (len1 < 1e-3 || len2 < 1e-3) {
+      output.push(curr)
+      continue
+    }
+
+    const cos = (v1x * v2x + v1y * v2y) / (len1 * len2)
+    if (Math.abs(cos) >= maxCos) {
+      output.push(curr)
+      continue
+    }
+
+    const offset = Math.min(radius, len1 * 0.5, len2 * 0.5)
+    if (offset < minSegment * 0.3) {
+      output.push(curr)
+      continue
+    }
+
+    const p1 = { x: curr.x + (v1x / len1) * offset, y: curr.y + (v1y / len1) * offset }
+    const p2 = { x: curr.x + (v2x / len2) * offset, y: curr.y + (v2y / len2) * offset }
+
+    output.push(p1, p2)
+  }
+
+  output.push(points[points.length - 1])
+  return output
+}
+
+export const smoothAnyAnglePath = (
+  points: Point[],
+  obstacles: Rect[],
+  clearance: number,
+  cornerRadius: number,
+  minSegment = 0
+): Point[] => {
+  if (points.length <= 2) return points
+  const expanded = obstacles.map(rect => expandRect(rect, clearance))
+  const shortened = shortcutPath(points, expanded)
+  return roundCorners(shortened, cornerRadius, minSegment)
+}
+
 export const routeOrthogonalPath = (options: RouteOptions): RouteResult | null => {
   const {
     start,
@@ -348,7 +445,155 @@ export const routeOrthogonalPath = (options: RouteOptions): RouteResult | null =
   return { points, gridPath }
 }
 
-const heuristic = (a: GridPoint, b: GridPoint) => (Math.abs(a.gx - b.gx) + Math.abs(a.gy - b.gy))
+export const routeAnyAnglePath = (options: RouteOptions): RouteResult | null => {
+  const {
+    start,
+    end,
+    obstacles,
+    clearance,
+    grid,
+    occupancy,
+    preferAxis,
+    congestionPenalty = grid.size * 3,
+    maxIterations = grid.cols * grid.rows * 6
+  } = options
+
+  if (grid.cols <= 1 || grid.rows <= 1) return null
+
+  const expanded = obstacles.map(rect => expandRect(rect, clearance))
+
+  const toGrid = (point: Point) => ({
+    gx: clamp(Math.round((point.x - grid.originX) / grid.size), 0, grid.cols - 1),
+    gy: clamp(Math.round((point.y - grid.originY) / grid.size), 0, grid.rows - 1)
+  })
+
+  const toWorld = (gp: GridPoint) => ({
+    x: grid.originX + gp.gx * grid.size,
+    y: grid.originY + gp.gy * grid.size
+  })
+
+  const isBlocked = (gp: GridPoint, allow: GridPoint) => {
+    if (gp.gx === allow.gx && gp.gy === allow.gy) return false
+    const point = toWorld(gp)
+    return expanded.some(rect => pointInRect(point, rect, 0))
+  }
+
+  const lineOfSight = (a: GridPoint, b: GridPoint) =>
+    hasLineOfSight(toWorld(a), toWorld(b), expanded)
+
+  const startNode = toGrid(start)
+  const endNode = toGrid(end)
+  const startIdx = nodeIndex(startNode.gx, startNode.gy, grid.cols)
+  const endIdx = nodeIndex(endNode.gx, endNode.gy, grid.cols)
+
+  const totalNodes = grid.cols * grid.rows
+  const gScore = new Float64Array(totalNodes)
+  const fScore = new Float64Array(totalNodes)
+  const parent = new Int32Array(totalNodes)
+  const closed = new Uint8Array(totalNodes)
+
+  gScore.fill(Number.POSITIVE_INFINITY)
+  fScore.fill(Number.POSITIVE_INFINITY)
+  parent.fill(-1)
+
+  gScore[startIdx] = 0
+  fScore[startIdx] = heuristic(startNode, endNode)
+  parent[startIdx] = startIdx
+
+  const open = new MinHeap()
+  open.push({ id: startIdx, priority: fScore[startIdx] })
+
+  let iterations = 0
+  let found = false
+
+  while (open.size && iterations < maxIterations) {
+    iterations += 1
+    const current = open.pop()
+    if (!current) break
+    const currentIdx = current.id
+    if (closed[currentIdx]) continue
+    closed[currentIdx] = 1
+
+    if (currentIdx === endIdx) {
+      found = true
+      break
+    }
+
+    const currentNode = decodeNode(currentIdx, grid.cols)
+    for (const dir of DIRS_8) {
+      const nx = currentNode.gx + dir.dx
+      const ny = currentNode.gy + dir.dy
+      if (nx < 0 || ny < 0 || nx >= grid.cols || ny >= grid.rows) continue
+      const nextNode = { gx: nx, gy: ny }
+      const nextIdx = nodeIndex(nx, ny, grid.cols)
+      if (closed[nextIdx]) continue
+      if (isBlocked(nextNode, endNode)) continue
+
+      const parentIdx = parent[currentIdx] >= 0 ? parent[currentIdx] : currentIdx
+      const parentNode = decodeNode(parentIdx, grid.cols)
+      const useParent = lineOfSight(parentNode, nextNode)
+      const baseNode = useParent ? parentNode : currentNode
+      const baseIdx = useParent ? parentIdx : currentIdx
+
+      const dx = nextNode.gx - baseNode.gx
+      const dy = nextNode.gy - baseNode.gy
+      const stepCost = grid.size * Math.hypot(dx, dy)
+
+      let axisPenalty = 0
+      if (preferAxis === 'x' && Math.abs(dy) > Math.abs(dx)) axisPenalty = grid.size * 0.1
+      if (preferAxis === 'y' && Math.abs(dx) > Math.abs(dy)) axisPenalty = grid.size * 0.1
+
+      const edgePenalty = occupancy
+        ? (occupancy.get(edgeKey(currentNode.gx, currentNode.gy, nextNode.gx, nextNode.gy)) || 0) * congestionPenalty
+        : 0
+
+      const tentative = gScore[baseIdx] + stepCost + axisPenalty + edgePenalty
+
+      if (tentative < gScore[nextIdx]) {
+        gScore[nextIdx] = tentative
+        parent[nextIdx] = baseIdx
+        fScore[nextIdx] = tentative + heuristic(nextNode, endNode)
+        open.push({ id: nextIdx, priority: fScore[nextIdx] })
+      }
+    }
+  }
+
+  if (!found) return null
+
+  const pathNodes: GridPoint[] = []
+  let currentIdx = endIdx
+  const guard = totalNodes + 5
+  let steps = 0
+  while (steps < guard) {
+    steps += 1
+    const node = decodeNode(currentIdx, grid.cols)
+    pathNodes.unshift(node)
+    const parentIdx = parent[currentIdx]
+    if (parentIdx < 0 || parentIdx === currentIdx) break
+    currentIdx = parentIdx
+  }
+
+  if (!pathNodes.length) return null
+
+  const gridPath: GridPoint[] = []
+  for (let i = 0; i < pathNodes.length - 1; i += 1) {
+    const segment = gridLine(pathNodes[i], pathNodes[i + 1])
+    segment.forEach(node => {
+      const last = gridPath[gridPath.length - 1]
+      if (!last || last.gx !== node.gx || last.gy !== node.gy) {
+        gridPath.push(node)
+      }
+    })
+  }
+
+  const points = pathNodes.map(toWorld)
+  points[0] = start
+  points[points.length - 1] = end
+
+  return { points, gridPath }
+}
+
+const heuristic = (a: GridPoint, b: GridPoint) => Math.hypot(a.gx - b.gx, a.gy - b.gy)
 
 const stateIndex = (gx: number, gy: number, dir: number, cols: number) => ((gy * cols + gx) << 2) | dir
 
@@ -364,4 +609,41 @@ const edgeKey = (x1: number, y1: number, x2: number, y2: number) => {
   const a = `${x1},${y1}`
   const b = `${x2},${y2}`
   return a < b ? `${a}|${b}` : `${b}|${a}`
+}
+
+const nodeIndex = (gx: number, gy: number, cols: number) => gy * cols + gx
+
+const decodeNode = (id: number, cols: number) => {
+  const gx = id % cols
+  const gy = Math.floor(id / cols)
+  return { gx, gy }
+}
+
+const gridLine = (a: GridPoint, b: GridPoint): GridPoint[] => {
+  const points: GridPoint[] = []
+  let x0 = a.gx
+  let y0 = a.gy
+  const x1 = b.gx
+  const y1 = b.gy
+  const dx = Math.abs(x1 - x0)
+  const dy = Math.abs(y1 - y0)
+  const sx = x0 < x1 ? 1 : -1
+  const sy = y0 < y1 ? 1 : -1
+  let err = dx - dy
+
+  while (true) {
+    points.push({ gx: x0, gy: y0 })
+    if (x0 === x1 && y0 === y1) break
+    const e2 = 2 * err
+    if (e2 > -dy) {
+      err -= dy
+      x0 += sx
+    }
+    if (e2 < dx) {
+      err += dx
+      y0 += sy
+    }
+  }
+
+  return points
 }

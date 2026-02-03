@@ -7,7 +7,7 @@ import {
   segmentIntersectsRect,
   computeAreaAnchor,
 } from './linkRoutingUtils'
-import { addOccupancy, connectOrthogonal, routeOrthogonalPath, simplifyOrthogonalPath } from '../../utils/link_routing'
+import { addOccupancy, routeAnyAnglePath, smoothAnyAnglePath } from '../../utils/link_routing'
 
 export type RouteLinksParams = {
   isL1View: boolean
@@ -236,7 +236,7 @@ export function routeLinks(
       let routed = false
       if (allowAStar && !directAllowed) {
         const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
-        const route = routeOrthogonalPath({
+        const route = routeAnyAnglePath({
           start: fromExit,
           end: toExit,
           obstacles,
@@ -247,18 +247,14 @@ export function routeLinks(
         })
 
         if (route && route.points.length) {
-          const startAxis = fromSide === 'left' || fromSide === 'right' ? 'x' : 'y'
-          const endAxis = toSide === 'left' || toSide === 'right' ? 'x' : 'y'
-          const startConnector = connectOrthogonal(fromAnchor, route.points[0], obstacles, clearance, startAxis)
-          const endConnector = connectOrthogonal(route.points[route.points.length - 1], toAnchor, obstacles, clearance, endAxis)
-
           const assembled: Array<{ x: number; y: number }> = []
-          appendPoints(assembled, startConnector || [fromAnchor, route.points[0]])
+          appendPoints(assembled, [fromAnchor, fromExit])
           appendPoints(assembled, route.points)
-          appendPoints(assembled, endConnector || [route.points[route.points.length - 1], toAnchor])
+          appendPoints(assembled, [toExit, toAnchor])
 
-          const simplified = simplifyOrthogonalPath(assembled, minSegment)
-          simplified.forEach(point => pushPoint(points, point.x, point.y))
+          const cornerRadius = Math.max(2, Math.min(minSegment * 0.8, 12 * scale))
+          const smoothed = smoothAnyAnglePath(assembled, obstacles, clearance, cornerRadius, minSegment)
+          smoothed.forEach(point => pushPoint(points, point.x, point.y))
           addOccupancy(occupancy, route.gridPath)
           routed = true
         }

@@ -234,7 +234,9 @@ export function routeLinks(
       )
 
       let routed = false
-      if (allowAStar && !directAllowed) {
+      // Only use direct any-angle routing for intra-area links
+      // Inter-area links should go through waypoint first
+      if (allowAStar && !directAllowed && isIntraArea) {
         const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
         const route = routeAnyAnglePath({
           start: fromExit,

@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, onBeforeUnmount } from 'vue'
 import type { AreaModel, DeviceModel, LinkModel } from '../models/types'
 import type { AreaRecord, DeviceRecord, LinkRecord, PortAnchorOverrideRecord } from '../models/api'
 import { listAreas, createArea, updateArea, deleteArea } from '../services/areas'
@@ -128,6 +128,13 @@ export function useCanvasData(
     }, 600)
     map.set(key, timer)
   }
+
+  // Cleanup all pending timers when component unmounts
+  onBeforeUnmount(() => {
+    areaUpdateTimers.forEach(t => window.clearTimeout(t))
+    deviceUpdateTimers.forEach(t => window.clearTimeout(t))
+    linkUpdateTimers.forEach(t => window.clearTimeout(t))
+  })
 
   async function handleAreaAdd(row: AreaRow) {
     if (!selectedProjectId.value) {

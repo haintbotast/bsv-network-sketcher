@@ -141,8 +141,9 @@ export function segmentIntersectsRect(
     [{ x: left, y: bottom }, { x: left, y: top }]
   ]
 
-  const ccw = (a: any, b: any, c: any) => (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x)
-  const intersects = (a: any, b: any, c: any, d: any) => ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d)
+  type Point = { x: number; y: number }
+  const ccw = (a: Point, b: Point, c: Point) => (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x)
+  const intersects = (a: Point, b: Point, c: Point, d: Point) => ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d)
 
   return edges.some(([a, b]) => intersects(p1, p2, a, b))
 }

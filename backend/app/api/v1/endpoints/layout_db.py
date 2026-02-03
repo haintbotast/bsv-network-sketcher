@@ -5,6 +5,7 @@ Database application functions for layout results.
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.layout import DeviceLayout, AreaLayout
+from .layout_constants import DEFAULT_DEVICE_WIDTH, DEFAULT_DEVICE_HEIGHT
 
 
 async def apply_layout_to_db(db: AsyncSession, device_layouts: list[dict]) -> None:
@@ -45,8 +46,8 @@ async def apply_layout_to_db(db: AsyncSession, device_layouts: list[dict]) -> No
                 area_devices[device.area_id].append({
                     "x": x,
                     "y": y,
-                    "width": device.width or 1.2,  # Default device width in inches
-                    "height": device.height or 0.5  # Default device height in inches
+                    "width": device.width or DEFAULT_DEVICE_WIDTH,
+                    "height": device.height or DEFAULT_DEVICE_HEIGHT
                 })
 
     # Update area positions based on device bounds

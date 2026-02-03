@@ -142,6 +142,55 @@ export function routeLinks(
     })
   }
 
+  type ExitSide = 'left' | 'right' | 'top' | 'bottom'
+  const exitBundleIndex = (() => {
+    const index = new Map<string, { index: number; total: number; side: ExitSide }>()
+    if (!isL1View) return index
+    const grouped = new Map<string, Array<{ key: string; coord: number; side: ExitSide; linkId: string }>>()
+
+    const add = (deviceId: string, side: ExitSide, coord: number, key: string, linkId: string) => {
+      const groupKey = `${deviceId}|${side}`
+      const list = grouped.get(groupKey) || []
+      list.push({ key, coord, side, linkId })
+      grouped.set(groupKey, list)
+    }
+
+    linkMetas.forEach(meta => {
+      if (!meta) return
+      const fromSide = (meta.fromAnchor.side || computeSide(meta.fromView, meta.toCenter)) as ExitSide
+      const toSide = (meta.toAnchor.side || computeSide(meta.toView, meta.fromCenter)) as ExitSide
+      const fromCoord = (fromSide === 'left' || fromSide === 'right') ? meta.fromAnchor.y : meta.fromAnchor.x
+      const toCoord = (toSide === 'left' || toSide === 'right') ? meta.toAnchor.y : meta.toAnchor.x
+      add(meta.link.fromDeviceId, fromSide, fromCoord, `${meta.link.id}|from`, meta.link.id)
+      add(meta.link.toDeviceId, toSide, toCoord, `${meta.link.id}|to`, meta.link.id)
+    })
+
+    grouped.forEach(list => {
+      list.sort((a, b) => {
+        const primary = a.coord - b.coord
+        if (primary !== 0) return primary
+        return a.linkId.localeCompare(b.linkId)
+      })
+      list.forEach((entry, idx) => {
+        index.set(entry.key, { index: idx, total: list.length, side: entry.side })
+      })
+    })
+
+    return index
+  })()
+
+  const exitBundleGapBase = (renderTuning.bundle_gap ?? 0) * scale
+  const exitBundleGap = exitBundleGapBase > 0 ? Math.max(4, exitBundleGapBase * 0.6) : 0
+  const resolveExitShift = (key: string) => {
+    const entry = exitBundleIndex.get(key)
+    if (!entry || entry.total <= 1 || exitBundleGap <= 0) return { dx: 0, dy: 0 }
+    const offset = (entry.index - (entry.total - 1) / 2) * exitBundleGap
+    if (entry.side === 'left' || entry.side === 'right') {
+      return { dx: 0, dy: offset }
+    }
+    return { dx: offset, dy: 0 }
+  }
+
   const occupancy = new Map<string, number>()
   const cache = new Map<string, {
     points: number[]
@@ -224,14 +273,18 @@ export function routeLinks(
       const toSide = toAnchor.side || computeSide(toView, fromCenter)
       const fromLabelStub = isL1View && meta.fromLabelWidth ? meta.fromLabelWidth + LABEL_STUB_PADDING : 0
       const toLabelStub = isL1View && meta.toLabelWidth ? meta.toLabelWidth + LABEL_STUB_PADDING : 0
-      const fromExit = offsetFromAnchor(
+      const fromBase = offsetFromAnchor(
         { ...fromAnchor, side: fromSide },
         Math.max(baseExitStub, fromLabelStub)
       )
-      const toExit = offsetFromAnchor(
+      const toBase = offsetFromAnchor(
         { ...toAnchor, side: toSide },
         Math.max(baseExitStub, toLabelStub)
       )
+      const fromExitShift = resolveExitShift(`${link.id}|from`)
+      const toExitShift = resolveExitShift(`${link.id}|to`)
+      const fromExit = { x: fromBase.x + fromExitShift.dx, y: fromBase.y + fromExitShift.dy }
+      const toExit = { x: toBase.x + toExitShift.dx, y: toBase.y + toExitShift.dy }
 
       let routed = false
       // Use direct any-angle routing for all links (waypoint logic disabled)
@@ -271,9 +324,9 @@ export function routeLinks(
 
         if (route && route.points.length) {
           const assembled: Array<{ x: number; y: number }> = []
-          appendPoints(assembled, [fromAnchor, fromExit])
+          appendPoints(assembled, [fromAnchor, fromBase, fromExit])
           appendPoints(assembled, route.points)
-          appendPoints(assembled, [toExit, toAnchor])
+          appendPoints(assembled, [toExit, toBase, toAnchor])
 
           const cornerRadius = Math.max(2, Math.min(minSegment * 0.8, 12 * scale))
           const smoothed = smoothAnyAnglePath(assembled, obstacles, clearance, cornerRadius, minSegment)
@@ -301,6 +354,7 @@ export function routeLinks(
             const { axis, coord, fromAreaAnchor, toAreaAnchor } = localCorridor
             points = []
             pushPoint(points, fromAnchor.x, fromAnchor.y)
+            pushPoint(points, fromBase.x, fromBase.y)
             pushPoint(points, fromExit.x, fromExit.y)
             pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
             if (axis === 'x') {
@@ -312,6 +366,7 @@ export function routeLinks(
             }
             pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
             pushPoint(points, toExit.x, toExit.y)
+            pushPoint(points, toBase.x, toBase.y)
             pushPoint(points, toAnchor.x, toAnchor.y)
           } else {
             const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, anchorOffset)
@@ -328,12 +383,14 @@ export function routeLinks(
                 const corridorY = corridorBaseY + interBundleOffset
                 points = []
                 pushPoint(points, fromAnchor.x, fromAnchor.y)
+                pushPoint(points, fromBase.x, fromBase.y)
                 pushPoint(points, fromExit.x, fromExit.y)
                 pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
                 pushPoint(points, fromAreaAnchor.x, corridorY)
                 pushPoint(points, toAreaAnchor.x, corridorY)
                 pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
                 pushPoint(points, toExit.x, toExit.y)
+                pushPoint(points, toBase.x, toBase.y)
                 pushPoint(points, toAnchor.x, toAnchor.y)
               } else {
                 const leftX = areaBounds.minX - corridorGap
@@ -343,51 +400,59 @@ export function routeLinks(
                 const corridorX = corridorBaseX + interBundleOffset
                 points = []
                 pushPoint(points, fromAnchor.x, fromAnchor.y)
+                pushPoint(points, fromBase.x, fromBase.y)
                 pushPoint(points, fromExit.x, fromExit.y)
                 pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
                 pushPoint(points, corridorX, fromAreaAnchor.y)
                 pushPoint(points, corridorX, toAreaAnchor.y)
                 pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
                 pushPoint(points, toExit.x, toExit.y)
+                pushPoint(points, toBase.x, toBase.y)
                 pushPoint(points, toAnchor.x, toAnchor.y)
               }
             } else {
               const midX = (fromAnchor.x + toAnchor.x) / 2 + interBundleOffset
               points = []
               pushPoint(points, fromAnchor.x, fromAnchor.y)
+              pushPoint(points, fromBase.x, fromBase.y)
               pushPoint(points, fromExit.x, fromExit.y)
               pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
               pushPoint(points, midX, fromAreaAnchor.y)
               pushPoint(points, midX, toAreaAnchor.y)
               pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
               pushPoint(points, toExit.x, toExit.y)
+              pushPoint(points, toBase.x, toBase.y)
               pushPoint(points, toAnchor.x, toAnchor.y)
             }
           }
         } else if (isL1) {
           const useCenters = bundleOffset !== 0
-          const fromBase = fromExit
-          const toBase = toExit
-          const dx = useCenters ? (toCenter.x - fromCenter.x) : (toBase.x - fromBase.x)
-          const dy = useCenters ? (toCenter.y - fromCenter.y) : (toBase.y - fromBase.y)
+          const fromStart = fromExit
+          const toStart = toExit
+          const dx = useCenters ? (toCenter.x - fromCenter.x) : (toStart.x - fromStart.x)
+          const dy = useCenters ? (toCenter.y - fromCenter.y) : (toStart.y - fromStart.y)
           const dir = normalizeVector(dx, dy)
           const perp = normalizeVector(-dir.y, dir.x)
           if (bundleOffset !== 0 && (dir.x !== 0 || dir.y !== 0)) {
-            const fromStub = { x: fromBase.x + dir.x * bundleStub, y: fromBase.y + dir.y * bundleStub }
-            const toStub = { x: toBase.x - dir.x * bundleStub, y: toBase.y - dir.y * bundleStub }
+            const fromStub = { x: fromStart.x + dir.x * bundleStub, y: fromStart.y + dir.y * bundleStub }
+            const toStub = { x: toStart.x - dir.x * bundleStub, y: toStart.y - dir.y * bundleStub }
             const fromShift = { x: fromStub.x + perp.x * bundleOffset, y: fromStub.y + perp.y * bundleOffset }
             const toShift = { x: toStub.x + perp.x * bundleOffset, y: toStub.y + perp.y * bundleOffset }
             points = []
             pushPoint(points, fromAnchor.x, fromAnchor.y)
             pushPoint(points, fromBase.x, fromBase.y)
+            pushPoint(points, fromStart.x, fromStart.y)
             pushPoint(points, fromShift.x, fromShift.y)
             pushPoint(points, toShift.x, toShift.y)
+            pushPoint(points, toStart.x, toStart.y)
             pushPoint(points, toBase.x, toBase.y)
             pushPoint(points, toAnchor.x, toAnchor.y)
           } else {
             points = []
             pushPoint(points, fromAnchor.x, fromAnchor.y)
             pushPoint(points, fromBase.x, fromBase.y)
+            pushPoint(points, fromStart.x, fromStart.y)
+            pushPoint(points, toStart.x, toStart.y)
             pushPoint(points, toBase.x, toBase.y)
             pushPoint(points, toAnchor.x, toAnchor.y)
           }
@@ -407,15 +472,15 @@ export function routeLinks(
               }
             })
             if (blockedRects.length) {
-              const midA = { x: fromBase.x, y: toBase.y }
-              const midB = { x: toBase.x, y: fromBase.y }
+              const midA = { x: fromStart.x, y: toStart.y }
+              const midB = { x: toStart.x, y: fromStart.y }
               const score = (a: { x: number; y: number }) => {
                 let hits = 0
                 blockedRects.forEach(rect => {
-                  if (segmentIntersectsRect(fromBase, a, rect, renderTuning.area_clearance ?? 0)) hits += 1
-                  if (segmentIntersectsRect(a, toBase, rect, renderTuning.area_clearance ?? 0)) hits += 1
+                  if (segmentIntersectsRect(fromStart, a, rect, renderTuning.area_clearance ?? 0)) hits += 1
+                  if (segmentIntersectsRect(a, toStart, rect, renderTuning.area_clearance ?? 0)) hits += 1
                 })
-                const length = Math.hypot(a.x - fromBase.x, a.y - fromBase.y) + Math.hypot(toBase.x - a.x, toBase.y - a.y)
+                const length = Math.hypot(a.x - fromStart.x, a.y - fromStart.y) + Math.hypot(toStart.x - a.x, toStart.y - a.y)
                 return hits * 10000 + length
               }
               const scoreA = score(midA)
@@ -424,7 +489,9 @@ export function routeLinks(
               points = []
               pushPoint(points, fromAnchor.x, fromAnchor.y)
               pushPoint(points, fromBase.x, fromBase.y)
+              pushPoint(points, fromStart.x, fromStart.y)
               pushPoint(points, mid.x, mid.y)
+              pushPoint(points, toStart.x, toStart.y)
               pushPoint(points, toBase.x, toBase.y)
               pushPoint(points, toAnchor.x, toAnchor.y)
             }

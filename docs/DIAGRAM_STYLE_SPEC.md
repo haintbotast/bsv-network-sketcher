@@ -123,7 +123,7 @@
 | Đối tượng | Shape | Ghi chú |
 |----------|-------|--------|
 | Area | Rectangle bo góc | Nền nhạt xám nhẹ, label góc trên trái, **không viền**, có **đổ bóng nhẹ** |
-| Device | Rectangle bo góc | Màu theo loại thiết bị, **không viền**, có **đổ bóng nhẹ** |
+| Device | Icon MDI (SVG) | Dùng **subset MDI** theo `device_type`; icon là nguồn chuẩn cho UI + export |
 | Waypoint | Diamond hoặc Circle | Không hiện label khi zoom out |
 | Link | Line | L1 ưu tiên **đường thẳng ngắn nhất** giữa port; nếu bị cản thì dùng **any‑angle (Theta\*)** tránh vật cản và **bo góc nhẹ**; L2/L3 dùng Manhattan; màu theo purpose; nét liền/đứt; **bo góc mềm** (lineJoin/lineCap round) |
 | Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor**, có thể xoay theo hướng link; auto-scale theo zoom (0.6-1.15) và tự giãn để tránh chồng lấn; **viền xám mảnh, không đổ bóng** |
@@ -136,6 +136,22 @@
 - Micro layout sử dụng **kích thước thiết bị sau auto-resize** để tính bounding và sắp xếp trước khi tính macro layout.
 - **Quy tắc nhãn port:** định dạng **chữ cái + khoảng trắng + số hiệu**.  
   Ví dụ: `Gi 0/1`, `Gi 1/0/48`, `HA 1`, `Port 1`.
+
+### 4.0 Bộ icon thiết bị (MDI)
+
+- Nguồn: **Material Design Icons (MDI)** – Apache-2.0.
+- Lưu tại: `frontend/src/assets/icons/mdi/` (có `LICENSE` + `NOTICE.md`).
+- UI dùng **SVG** làm nguồn chuẩn; export PPTX sẽ chuyển sang **PNG** khi triển khai generator.
+
+**Mapping `device_type` → icon:**
+- `Router` → `router-network.svg`
+- `Switch` → `ethernet.svg`
+- `Firewall` → `shield-lock.svg`
+- `Server` → `server.svg`
+- `AP` → `access-point-network.svg`
+- `PC` → `desktop-classic.svg`
+- `Storage` → `nas.svg`
+- `Unknown` → `help-circle-outline.svg`
 
 ### 4.1 Kích thước chuẩn (tham chiếu)
 

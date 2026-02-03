@@ -274,6 +274,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     const textPadY = 2 * labelScale
     const minLabelWidth = 24 * labelScale
     const charWidth = 6 * labelScale
+    const pathCache = new Map<string, { segments: Array<{ ax: number; ay: number; bx: number; by: number; len: number }>; total: number }>()
 
     const rawLabels: Array<{
       id: string
@@ -289,6 +290,10 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       fontSize: number
       textPadX: number
       textPadY: number
+      path: { segments: Array<{ ax: number; ay: number; bx: number; by: number; len: number }>; total: number }
+      fromStart: boolean
+      distance: number
+      originalDistance: number
     }> = []
 
     const computeAngle = (from: { x: number; y: number }, to: { x: number; y: number }) => {
@@ -298,12 +303,69 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       return angle
     }
 
+    const buildPathMetrics = (key: string, points: number[]) => {
+      const cached = pathCache.get(key)
+      if (cached) return cached
+      const segments: Array<{ ax: number; ay: number; bx: number; by: number; len: number }> = []
+      let total = 0
+      for (let i = 0; i + 3 < points.length; i += 2) {
+        const ax = points[i]
+        const ay = points[i + 1]
+        const bx = points[i + 2]
+        const by = points[i + 3]
+        const len = Math.hypot(bx - ax, by - ay)
+        if (len <= 0) continue
+        segments.push({ ax, ay, bx, by, len })
+        total += len
+      }
+      const path = { segments, total }
+      pathCache.set(key, path)
+      return path
+    }
+
+    const resolvePointAlongPath = (
+      path: { segments: Array<{ ax: number; ay: number; bx: number; by: number; len: number }>; total: number },
+      distance: number,
+      fromStart: boolean
+    ) => {
+      if (path.segments.length === 0 || path.total <= 0) return null
+      let remaining = Math.max(distance, 0)
+
+      if (fromStart) {
+        for (const seg of path.segments) {
+          if (remaining <= seg.len) {
+            const t = seg.len > 0 ? remaining / seg.len : 0
+            const x = seg.ax + (seg.bx - seg.ax) * t
+            const y = seg.ay + (seg.by - seg.ay) * t
+            return { x, y, angle: computeAngle({ x: seg.ax, y: seg.ay }, { x: seg.bx, y: seg.by }) }
+          }
+          remaining -= seg.len
+        }
+        const last = path.segments[path.segments.length - 1]
+        return { x: last.bx, y: last.by, angle: computeAngle({ x: last.ax, y: last.ay }, { x: last.bx, y: last.by }) }
+      }
+
+      for (let i = path.segments.length - 1; i >= 0; i -= 1) {
+        const seg = path.segments[i]
+        if (remaining <= seg.len) {
+          const t = seg.len > 0 ? remaining / seg.len : 0
+          const x = seg.bx + (seg.ax - seg.bx) * t
+          const y = seg.by + (seg.ay - seg.by) * t
+          return { x, y, angle: computeAngle({ x: seg.bx, y: seg.by }, { x: seg.ax, y: seg.ay }) }
+        }
+        remaining -= seg.len
+      }
+      const first = path.segments[0]
+      return { x: first.ax, y: first.ay, angle: computeAngle({ x: first.bx, y: first.by }, { x: first.ax, y: first.ay }) }
+    }
+
     props.links.forEach(link => {
       const entry = linkMap.get(link.id)
       if (!entry) return
 
       const fromText = link.fromPort?.trim()
       const toText = link.toPort?.trim()
+      const path = buildPathMetrics(link.id, entry.points)
 
       const placeLabel = (
         id: string,
@@ -313,27 +375,19 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         neighbor: { x: number; y: number },
         deviceId: string,
         deviceRect: Rect,
-        segmentCount: number
+        fromStart: boolean
       ) => {
         if (!text) return
         const width = Math.max(text.length * charWidth + labelPadding, minLabelWidth)
-
-        const dx = neighbor.x - anchor.x
-        const dy = neighbor.y - anchor.y
-        const len = Math.hypot(dx, dy)
-
-        let cx: number
-        let cy: number
-
-        if (len < 1) {
-          const pos = computePortLabelPlacement(anchor, center, width, labelHeight, labelOffset)
-          cx = pos.x + width / 2
-          cy = pos.y + labelHeight / 2
-        } else {
-          const offset = (width / 2 + 4) / len
-          cx = anchor.x + dx * offset
-          cy = anchor.y + dy * offset
-        }
+        const desiredDistance = Math.max(labelOffset, width / 2 + 4)
+        const fallback = computePortLabelPlacement(anchor, center, width, labelHeight, labelOffset)
+        const safeDistance = path.total > 0
+          ? (desiredDistance <= path.total ? desiredDistance : Math.max(path.total * 0.5, 0))
+          : 0
+        const pointOnPath = resolvePointAlongPath(path, safeDistance, fromStart)
+        const cx = pointOnPath ? pointOnPath.x : (fallback.x + width / 2)
+        const cy = pointOnPath ? pointOnPath.y : (fallback.y + labelHeight / 2)
+        const angle = pointOnPath ? pointOnPath.angle : computeAngle(anchor, neighbor)
 
         rawLabels.push({
           id,
@@ -343,12 +397,16 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
           width,
           height: labelHeight,
           text,
-          angle: computeAngle(anchor, neighbor),
+          angle,
           center: { x: cx, y: cy },
           rect: deviceRect,
           fontSize,
           textPadX,
-          textPadY
+          textPadY,
+          path,
+          fromStart,
+          distance: safeDistance,
+          originalDistance: safeDistance
         })
       }
 
@@ -361,7 +419,6 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
 
       const fromRect = deviceViewMap.value.get(link.fromDeviceId)
       const toRect = deviceViewMap.value.get(link.toDeviceId)
-      const segmentCount = entry.points.length / 2
       if (fromRect && fromText) {
         placeLabel(
           `${link.id}-from`,
@@ -371,7 +428,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
           fromNeighbor,
           link.fromDeviceId,
           fromRect,
-          segmentCount
+          true
         )
       }
       if (toRect && toText) {
@@ -383,7 +440,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
           toNeighbor,
           link.toDeviceId,
           toRect,
-          segmentCount
+          false
         )
       }
     })
@@ -402,43 +459,36 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     bySide.forEach(list => {
       if (list.length < 2) return
       const side = list[0].side
-      const originals = list.map(l => ({ x: l.center.x, y: l.center.y }))
+      const originals = list.map(l => l.originalDistance)
 
-      if (side === 'left' || side === 'right') {
-        list.sort((a, b) => a.center.y - b.center.y)
-        let cursor = list[0].center.y
-        list.forEach((label, idx) => {
-          if (idx === 0) return
-          const minGap = (list[idx - 1].height + label.height) / 2 + 2 * labelScale
-          if (label.center.y < cursor + minGap) {
-            label.center.y = cursor + minGap
-          }
-          cursor = label.center.y
-        })
-      } else {
-        list.sort((a, b) => a.center.x - b.center.x)
-        let cursor = list[0].center.x
-        list.forEach((label, idx) => {
-          if (idx === 0) return
-          const minGap = (list[idx - 1].width + label.width) / 2 + 2 * labelScale
-          if (label.center.x < cursor + minGap) {
-            label.center.x = cursor + minGap
-          }
-          cursor = label.center.x
-        })
-      }
+      const isVertical = side === 'left' || side === 'right'
+      const sizeFor = (label: (typeof list)[number]) => (isVertical ? label.height : label.width)
+      list.sort((a, b) => a.distance - b.distance)
+      let cursor = list[0].distance
+      list.forEach((label, idx) => {
+        if (idx === 0) return
+        const minGap = (sizeFor(list[idx - 1]) + sizeFor(label)) / 2 + 2 * labelScale
+        if (label.distance < cursor + minGap) {
+          label.distance = cursor + minGap
+        }
+        cursor = label.distance
+      })
 
       list.forEach((label, idx) => {
         const orig = originals[idx]
-        const dispX = label.center.x - orig.x
-        const dispY = label.center.y - orig.y
-        const dist = Math.hypot(dispX, dispY)
-        if (dist > maxDisplacement) {
-          const scale = maxDisplacement / dist
-          label.center.x = orig.x + dispX * scale
-          label.center.y = orig.y + dispY * scale
+        const delta = label.distance - orig
+        if (Math.abs(delta) > maxDisplacement) {
+          label.distance = orig + Math.sign(delta) * maxDisplacement
         }
       })
+    })
+
+    rawLabels.forEach(label => {
+      const point = resolvePointAlongPath(label.path, label.distance, label.fromStart)
+      if (point) {
+        label.center = { x: point.x, y: point.y }
+        label.angle = point.angle
+      }
     })
 
     return rawLabels.map(label => ({

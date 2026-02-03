@@ -142,6 +142,28 @@ export function routeLinks(
     })
   }
 
+  const hasCorner = (pts: number[]) => {
+    if (pts.length < 6) return false
+    for (let i = 2; i + 3 < pts.length; i += 2) {
+      const ax = pts[i - 2]
+      const ay = pts[i - 1]
+      const bx = pts[i]
+      const by = pts[i + 1]
+      const cx = pts[i + 2]
+      const cy = pts[i + 3]
+      const dx1 = bx - ax
+      const dy1 = by - ay
+      const dx2 = cx - bx
+      const dy2 = cy - by
+      const len1 = Math.hypot(dx1, dy1)
+      const len2 = Math.hypot(dx2, dy2)
+      if (len1 <= 0 || len2 <= 0) continue
+      const dot = (dx1 * dx2 + dy1 * dy2) / (len1 * len2)
+      if (dot < 0.999) return true
+    }
+    return false
+  }
+
   type ExitSide = 'left' | 'right' | 'top' | 'bottom'
   const exitBundleIndex = (() => {
     const index = new Map<string, { index: number; total: number; side: ExitSide }>()
@@ -520,6 +542,17 @@ export function routeLinks(
             ]
           }
         }
+      }
+
+      if (isL1 && !routed && points.length >= 6 && hasCorner(points)) {
+        const cornerRadius = Math.max(2, Math.min(minSegment * 0.8, 12 * scale))
+        const pathPoints: Array<{ x: number; y: number }> = []
+        for (let i = 0; i + 1 < points.length; i += 2) {
+          pathPoints.push({ x: points[i], y: points[i + 1] })
+        }
+        const smoothed = smoothAnyAnglePath(pathPoints, obstacles, clearance, cornerRadius, minSegment)
+        points = []
+        smoothed.forEach(point => pushPoint(points, point.x, point.y))
       }
 
       return {

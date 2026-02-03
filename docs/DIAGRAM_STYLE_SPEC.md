@@ -62,6 +62,7 @@
 - **Anchor port tối ưu 2‑pass:** pass 1 định tuyến để lấy hướng/điểm tham chiếu, pass 2 sắp xếp lại anchor theo side + thứ tự để giãn cách hợp lý và bám tuyến ngắn nhất.
 - **Pair alignment:** với nhiều link giữa 2 thiết bị kề nhau, anchor được **xếp đồng bộ theo thứ tự port phía đối diện** để giảm chéo.
 - **Same-row alignment:** link giữa **2 thiết bị cùng hàng/cùng cột** sẽ ưu tiên **canh thẳng anchor + port label** (ngang hoặc dọc). Chỉ áp dụng khi **đường thẳng không bị vật cản**; nếu bị cản thì giữ routing tránh vật cản.
+- **Stub theo nhãn port (L1):** đoạn link đi ra khỏi thiết bị **tối thiểu bằng bề ngang nhãn port** để nhãn không đè lên biên thiết bị và đường link.
 - Liên‑area **tách lane rộng hơn** so với bundle nội‑area để giảm chồng/đè.
 - Intra‑area: nếu đường thẳng cắt thiết bị khác thì bẻ góc (Manhattan) để tránh xuyên qua device.
 

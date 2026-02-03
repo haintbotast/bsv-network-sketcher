@@ -72,6 +72,13 @@ export function computeSide(rect: Rect, target: { x: number; y: number }) {
   return dy >= 0 ? 'bottom' : 'top'
 }
 
+export function computeSideFromVector(dx: number, dy: number) {
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? 'right' : 'left'
+  }
+  return dy >= 0 ? 'bottom' : 'top'
+}
+
 export function computePortLabelPlacement(
   anchor: { x: number; y: number },
   center: { x: number; y: number },

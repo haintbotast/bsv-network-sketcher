@@ -28,6 +28,8 @@ export type RouteLinksParams = {
   areaCenters: Map<string, { x: number; y: number }>
 }
 
+const LABEL_STUB_PADDING = 4
+
 function computeLocalCorridor(
   fromArea: Rect,
   toArea: Rect,
@@ -181,7 +183,7 @@ export function routeLinks(
       const interBundleOffset = areaBundleOffset + bundleOffset * 0.5
       const bundleStub = (renderTuning.bundle_stub ?? 0) * scale
       const anchorOffset = ((renderTuning.area_anchor_offset ?? 0) + (renderTuning.area_clearance ?? 0)) * scale
-      const exitStub = Math.max(renderTuning.bundle_stub ?? 0, renderTuning.area_clearance ?? 0) * scale
+      const baseExitStub = Math.max(renderTuning.bundle_stub ?? 0, renderTuning.area_clearance ?? 0) * scale
 
       const pushPoint = (arr: number[], x: number, y: number) => {
         const len = arr.length
@@ -220,8 +222,16 @@ export function routeLinks(
 
       const fromSide = fromAnchor.side || computeSide(fromView, toCenter)
       const toSide = toAnchor.side || computeSide(toView, fromCenter)
-      const fromExit = offsetFromAnchor({ ...fromAnchor, side: fromSide }, exitStub)
-      const toExit = offsetFromAnchor({ ...toAnchor, side: toSide }, exitStub)
+      const fromLabelStub = isL1View && meta.fromLabelWidth ? meta.fromLabelWidth + LABEL_STUB_PADDING : 0
+      const toLabelStub = isL1View && meta.toLabelWidth ? meta.toLabelWidth + LABEL_STUB_PADDING : 0
+      const fromExit = offsetFromAnchor(
+        { ...fromAnchor, side: fromSide },
+        Math.max(baseExitStub, fromLabelStub)
+      )
+      const toExit = offsetFromAnchor(
+        { ...toAnchor, side: toSide },
+        Math.max(baseExitStub, toLabelStub)
+      )
 
       let routed = false
       if (allowAStar && !directAllowed) {
@@ -362,23 +372,30 @@ export function routeLinks(
           }
         } else if (isL1) {
           const useCenters = bundleOffset !== 0
-          const dx = useCenters ? (toCenter.x - fromCenter.x) : (toAnchor.x - fromAnchor.x)
-          const dy = useCenters ? (toCenter.y - fromCenter.y) : (toAnchor.y - fromAnchor.y)
+          const fromBase = fromExit
+          const toBase = toExit
+          const dx = useCenters ? (toCenter.x - fromCenter.x) : (toBase.x - fromBase.x)
+          const dy = useCenters ? (toCenter.y - fromCenter.y) : (toBase.y - fromBase.y)
           const dir = normalizeVector(dx, dy)
           const perp = normalizeVector(-dir.y, dir.x)
           if (bundleOffset !== 0 && (dir.x !== 0 || dir.y !== 0)) {
-            const fromStub = { x: fromAnchor.x + dir.x * bundleStub, y: fromAnchor.y + dir.y * bundleStub }
-            const toStub = { x: toAnchor.x - dir.x * bundleStub, y: toAnchor.y - dir.y * bundleStub }
+            const fromStub = { x: fromBase.x + dir.x * bundleStub, y: fromBase.y + dir.y * bundleStub }
+            const toStub = { x: toBase.x - dir.x * bundleStub, y: toBase.y - dir.y * bundleStub }
             const fromShift = { x: fromStub.x + perp.x * bundleOffset, y: fromStub.y + perp.y * bundleOffset }
             const toShift = { x: toStub.x + perp.x * bundleOffset, y: toStub.y + perp.y * bundleOffset }
-            points = [
-              fromAnchor.x, fromAnchor.y,
-              fromShift.x, fromShift.y,
-              toShift.x, toShift.y,
-              toAnchor.x, toAnchor.y
-            ]
+            points = []
+            pushPoint(points, fromAnchor.x, fromAnchor.y)
+            pushPoint(points, fromBase.x, fromBase.y)
+            pushPoint(points, fromShift.x, fromShift.y)
+            pushPoint(points, toShift.x, toShift.y)
+            pushPoint(points, toBase.x, toBase.y)
+            pushPoint(points, toAnchor.x, toAnchor.y)
           } else {
-            points = [fromAnchor.x, fromAnchor.y, toAnchor.x, toAnchor.y]
+            points = []
+            pushPoint(points, fromAnchor.x, fromAnchor.y)
+            pushPoint(points, fromBase.x, fromBase.y)
+            pushPoint(points, toBase.x, toBase.y)
+            pushPoint(points, toAnchor.x, toAnchor.y)
           }
 
           if (bundleOffset === 0) {
@@ -396,21 +413,26 @@ export function routeLinks(
               }
             })
             if (blockedRects.length) {
-              const midA = { x: fromAnchor.x, y: toAnchor.y }
-              const midB = { x: toAnchor.x, y: fromAnchor.y }
+              const midA = { x: fromBase.x, y: toBase.y }
+              const midB = { x: toBase.x, y: fromBase.y }
               const score = (a: { x: number; y: number }) => {
                 let hits = 0
                 blockedRects.forEach(rect => {
-                  if (segmentIntersectsRect(fromAnchor, a, rect, renderTuning.area_clearance ?? 0)) hits += 1
-                  if (segmentIntersectsRect(a, toAnchor, rect, renderTuning.area_clearance ?? 0)) hits += 1
+                  if (segmentIntersectsRect(fromBase, a, rect, renderTuning.area_clearance ?? 0)) hits += 1
+                  if (segmentIntersectsRect(a, toBase, rect, renderTuning.area_clearance ?? 0)) hits += 1
                 })
-                const length = Math.hypot(a.x - fromAnchor.x, a.y - fromAnchor.y) + Math.hypot(toAnchor.x - a.x, toAnchor.y - a.y)
+                const length = Math.hypot(a.x - fromBase.x, a.y - fromBase.y) + Math.hypot(toBase.x - a.x, toBase.y - a.y)
                 return hits * 10000 + length
               }
               const scoreA = score(midA)
               const scoreB = score(midB)
               const mid = scoreA <= scoreB ? midA : midB
-              points = [fromAnchor.x, fromAnchor.y, mid.x, mid.y, toAnchor.x, toAnchor.y]
+              points = []
+              pushPoint(points, fromAnchor.x, fromAnchor.y)
+              pushPoint(points, fromBase.x, fromBase.y)
+              pushPoint(points, mid.x, mid.y)
+              pushPoint(points, toBase.x, toBase.y)
+              pushPoint(points, toAnchor.x, toAnchor.y)
             }
           }
         } else {

@@ -35,6 +35,8 @@ export type LinkMeta = {
   toCenter: { x: number; y: number }
   fromAnchor: { x: number; y: number; side?: string }
   toAnchor: { x: number; y: number; side?: string }
+  fromLabelWidth?: number
+  toLabelWidth?: number
   fromAreaId: string | undefined
   toAreaId: string | undefined
   fromArea: Rect | null | undefined

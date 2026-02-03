@@ -121,17 +121,18 @@ export function buildLinkMetaData(
     const minLabelWidth = 24 * labelScale
     const charWidth = 6 * labelScale
     const baseGap = Math.max(2, Math.min(renderTuning.label_gap_x ?? 0, renderTuning.label_gap_y ?? 0) * 0.5 * labelScale)
+    const computeLabelWidth = (text: string) => Math.max(text.length * charWidth + labelPadding, minLabelWidth)
 
     const buildLabelRect = (
       linkId: string,
-      text: string | undefined,
+      text: string,
+      width: number,
       anchor: { x: number; y: number },
       center: { x: number; y: number },
       neighbor: { x: number; y: number }
     ) => {
-      const content = text?.trim()
+      const content = text.trim()
       if (!content) return
-      const width = Math.max(content.length * charWidth + labelPadding, minLabelWidth)
       const height = labelHeight
       const dx = neighbor.x - anchor.x
       const dy = neighbor.y - anchor.y
@@ -160,8 +161,18 @@ export function buildLinkMetaData(
 
     linkMetas.forEach(meta => {
       if (!meta) return
-      buildLabelRect(meta.link.id, meta.link.fromPort, meta.fromAnchor, meta.fromCenter, meta.toCenter)
-      buildLabelRect(meta.link.id, meta.link.toPort, meta.toAnchor, meta.toCenter, meta.fromCenter)
+      const fromText = meta.link.fromPort?.trim()
+      const toText = meta.link.toPort?.trim()
+      if (fromText) {
+        const width = computeLabelWidth(fromText)
+        meta.fromLabelWidth = width
+        buildLabelRect(meta.link.id, fromText, width, meta.fromAnchor, meta.fromCenter, meta.toCenter)
+      }
+      if (toText) {
+        const width = computeLabelWidth(toText)
+        meta.toLabelWidth = width
+        buildLabelRect(meta.link.id, toText, width, meta.toAnchor, meta.toCenter, meta.fromCenter)
+      }
     })
   }
 

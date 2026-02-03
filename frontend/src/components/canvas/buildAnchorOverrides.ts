@@ -1,5 +1,5 @@
 import type { Rect, RenderTuning, AnchorOverrideMap, LinkMeta, AreaRectEntry, DeviceRectEntry } from './linkRoutingTypes'
-import { clamp, computeSide, segmentIntersectsRect } from './linkRoutingUtils'
+import { clamp, computeSide, computeSideFromVector, segmentIntersectsRect } from './linkRoutingUtils'
 
 export type BuildAnchorOverridesParams = {
   isL1View: boolean
@@ -122,8 +122,14 @@ export function buildAnchorOverrides(
     const toPrev = pts.length >= 4
       ? { x: pts[pts.length - 4], y: pts[pts.length - 3] }
       : { x: entry.fromAnchor.x, y: entry.fromAnchor.y }
-    const fromSide = (entry.fromAnchor.side || computeSide(meta.fromView, meta.toCenter)) as 'left' | 'right' | 'top' | 'bottom'
-    const toSide = (entry.toAnchor.side || computeSide(meta.toView, meta.fromCenter)) as 'left' | 'right' | 'top' | 'bottom'
+    const fromVector = { x: fromNext.x - entry.fromAnchor.x, y: fromNext.y - entry.fromAnchor.y }
+    const toVector = { x: toPrev.x - entry.toAnchor.x, y: toPrev.y - entry.toAnchor.y }
+    const fromSide = (Math.hypot(fromVector.x, fromVector.y) >= 1
+      ? computeSideFromVector(fromVector.x, fromVector.y)
+      : (entry.fromAnchor.side || computeSide(meta.fromView, meta.toCenter))) as 'left' | 'right' | 'top' | 'bottom'
+    const toSide = (Math.hypot(toVector.x, toVector.y) >= 1
+      ? computeSideFromVector(toVector.x, toVector.y)
+      : (entry.toAnchor.side || computeSide(meta.toView, meta.fromCenter))) as 'left' | 'right' | 'top' | 'bottom'
 
     if (meta.link.fromPort) {
       const coord = fromSide === 'left' || fromSide === 'right' ? fromNext.y : fromNext.x

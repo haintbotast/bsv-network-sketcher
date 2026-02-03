@@ -372,8 +372,8 @@ export function buildAnchorOverrides(
 
     ports.forEach(port => {
       const userOverride = getUserOverride(deviceId, port)
-      const aligned = alignedCoordMap.get(port)
-      if (userOverride && !aligned) return
+      const alignedEntry = alignedCoordMap.get(port)
+      if (userOverride && !alignedEntry) return
       const stats = deviceStats.get(port)
       let side = (sideMap.get(port) || 'right') as 'left' | 'right' | 'top' | 'bottom'
       const forcedSide = forcedSideMap.get(port)
@@ -400,12 +400,11 @@ export function buildAnchorOverrides(
         : null
       const pairInfo = pairMap.get(port)
       const pairKey = pairInfo?.neighborId || neighborDeviceMap.get(port) || null
-      const aligned = alignedCoordMap.get(port)
-      const fixedCoord = aligned
-        ? ((side === 'left' || side === 'right') && aligned.axis === 'y'
-          ? aligned.coord
-          : (side === 'top' || side === 'bottom') && aligned.axis === 'x'
-            ? aligned.coord
+      const fixedCoord = alignedEntry
+        ? ((side === 'left' || side === 'right') && alignedEntry.axis === 'y'
+          ? alignedEntry.coord
+          : (side === 'top' || side === 'bottom') && alignedEntry.axis === 'x'
+            ? alignedEntry.coord
             : null)
         : null
 

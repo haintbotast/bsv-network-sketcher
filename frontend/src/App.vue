@@ -132,110 +132,12 @@
 
         <div v-if="rightPanelTab === 'layout'" class="inspector-content">
           <div v-if="!currentUser" class="inspector-empty">
-            <p>Đăng nhập để chỉnh cấu hình bố cục.</p>
+            <p>Đăng nhập để sử dụng chức năng bố cục.</p>
           </div>
           <div v-else class="layout-content">
-            <p class="panel-hint">Bố cục tổng thể (đơn vị inch)</p>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Khoảng cách tầng</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.layer_gap" />
-              </div>
-              <div class="form-group">
-                <label>Khoảng cách thiết bị</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.node_spacing" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Khoảng cách giữa các vùng</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.area_gap" />
-              </div>
-              <div class="form-group">
-                <label>Bù nhãn cổng</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.port_label_band" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Lề trong của vùng</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.area_padding" />
-              </div>
-              <div class="form-group">
-                <label>Lề nhãn khu vực</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.label_band" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Giới hạn độ rộng mỗi hàng</label>
-                <input type="number" step="0.1" v-model.number="layoutTuningForm.max_row_width_base" />
-              </div>
-              <div class="form-group">
-                <label>Tối đa node mỗi hàng</label>
-                <input type="number" step="1" min="1" v-model.number="layoutTuningForm.max_nodes_per_row" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Khoảng cách giữa hàng</label>
-                <input type="number" step="0.05" v-model.number="layoutTuningForm.row_gap" />
-              </div>
-              <div class="form-group">
-                <label>Độ so‑le hàng (0‑1)</label>
-                <input type="number" step="0.05" min="0" max="1" v-model.number="layoutTuningForm.row_stagger" />
-              </div>
-            </div>
-
-            <div class="divider"></div>
-            <p class="panel-hint">Đường nối & nhãn (px)</p>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Khoảng cách bó đường</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.bundle_gap" />
-              </div>
-              <div class="form-group">
-                <label>Độ dài đuôi bó</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.bundle_stub" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Khoảng tránh vùng</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.area_clearance" />
-              </div>
-              <div class="form-group">
-                <label>Đẩy điểm neo</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.area_anchor_offset" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Giãn nhãn ngang</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.label_gap_x" />
-              </div>
-              <div class="form-group">
-                <label>Giãn nhãn dọc</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.label_gap_y" />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label>Đẩy nhãn cổng</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.port_label_offset" />
-              </div>
-              <div class="form-group">
-                <label>Khoảng cách hành lang</label>
-                <input type="number" step="1" v-model.number="renderTuningForm.corridor_gap" />
-              </div>
-            </div>
-
-            <button type="button" class="primary" :disabled="adminConfigSaving" @click="saveAdminConfig">
-              {{ adminConfigSaving ? 'Đang lưu...' : 'Lưu cấu hình' }}
-            </button>
             <button
               type="button"
-              class="secondary"
+              class="primary"
               :disabled="autoLayoutManualApplying || !activeProject || !devices.length"
               @click="runAutoLayoutManual"
             >
@@ -572,24 +474,10 @@ const {
 } = useAuth()
 
 const {
-  adminConfig,
-  layoutTuningForm,
-  renderTuningForm,
-  adminConfigSaving,
   layoutTuning,
   renderTuning,
   loadAdminConfig,
-  saveAdminConfig,
-  resetConfig: resetLayoutConfig,
-} = useLayoutConfig(
-  setNotice,
-  currentUser,
-  () => {
-    if (activeProject.value) {
-      scheduleAutoLayout(activeProject.value.id, true)
-    }
-  },
-)
+} = useLayoutConfig(setNotice, currentUser)
 
 const {
   projects,

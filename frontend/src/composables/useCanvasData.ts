@@ -91,6 +91,7 @@ export function useCanvasData(
           toDeviceId: to.id,
           fromPort: link.from_port,
           toPort: link.to_port,
+          purpose: link.purpose || undefined,
           style: (link.line_style || 'solid') as 'solid' | 'dashed' | 'dotted'
         }
       })

@@ -34,6 +34,28 @@ export const DEFAULT_RENDER_TUNING: RenderTuning = {
 
 export const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']
 export const linkPurposes = ['DEFAULT', 'WAN', 'INTERNET', 'DMZ', 'LAN', 'MGMT', 'HA', 'STORAGE', 'BACKUP', 'VPN']
+export const DEFAULT_LINK_COLOR = '#2b2a28'
+export const LINK_PURPOSE_COLORS: Record<string, string> = {
+  DEFAULT: DEFAULT_LINK_COLOR,
+  INTERNET: '#e74c3c',
+  WAN: '#e67e22',
+  DMZ: '#f1c40f',
+  LAN: '#27ae60',
+  MGMT: '#2980b9',
+  HA: '#16a085',
+  STORAGE: '#1abc9c',
+  BACKUP: '#7f8c8d',
+  VPN: '#9b59b6',
+  UPLINK: '#e67e22',
+  'INTER-AREA': '#e67e22',
+  'INTER_AREA': '#e67e22'
+}
+
+export function resolveLinkPurposeColor(purpose?: string | null) {
+  if (!purpose) return DEFAULT_LINK_COLOR
+  const key = purpose.toUpperCase()
+  return LINK_PURPOSE_COLORS[key] || DEFAULT_LINK_COLOR
+}
 
 export const defaultAreaStyle: AreaStyle = {
   fill_color_rgb: [240, 240, 240],

@@ -7,6 +7,7 @@ import {
   segmentIntersectsRect,
   computeAreaAnchor,
 } from './linkRoutingUtils'
+import { resolveLinkPurposeColor } from '../../composables/canvasConstants'
 import { addOccupancy, connectOrthogonal, routeAnyAnglePath, routeOrthogonalPath, smoothAnyAnglePath } from '../../utils/link_routing'
 
 export type RouteLinksParams = {
@@ -30,7 +31,6 @@ export type RouteLinksParams = {
 }
 
 const LABEL_STUB_PADDING = 4
-const DEFAULT_STROKE = '#2b2a28'
 const DEBUG_STROKE_L2 = '#c0392b'
 const DEBUG_STROKE_L1_DIAGONAL = '#d35400'
 
@@ -208,6 +208,45 @@ export function routeLinks(
     })
 
     return out
+  }
+
+  const roundOrthogonalCorners = (
+    pts: Array<{ x: number; y: number }>,
+    cornerRadius: number,
+    minSegmentValue: number
+  ) => {
+    if (pts.length <= 2) return pts
+    const output: Array<{ x: number; y: number }> = [pts[0]]
+    for (let i = 1; i < pts.length - 1; i += 1) {
+      const prev = pts[i - 1]
+      const curr = pts[i]
+      const next = pts[i + 1]
+      const v1x = prev.x - curr.x
+      const v1y = prev.y - curr.y
+      const v2x = next.x - curr.x
+      const v2y = next.y - curr.y
+      const len1 = Math.hypot(v1x, v1y)
+      const len2 = Math.hypot(v2x, v2y)
+      if (len1 <= 0 || len2 <= 0) {
+        output.push(curr)
+        continue
+      }
+      const dot = (v1x * v2x + v1y * v2y) / (len1 * len2)
+      if (dot > 0.999) {
+        output.push(curr)
+        continue
+      }
+      const offset = Math.min(cornerRadius, len1 * 0.4, len2 * 0.4)
+      if (offset < minSegmentValue * 0.25) {
+        output.push(curr)
+        continue
+      }
+      const p1 = { x: curr.x + (v1x / len1) * offset, y: curr.y + (v1y / len1) * offset }
+      const p2 = { x: curr.x + (v2x / len2) * offset, y: curr.y + (v2y / len2) * offset }
+      output.push(p1, p2)
+    }
+    output.push(pts[pts.length - 1])
+    return output
   }
 
   type ExitSide = 'left' | 'right' | 'top' | 'bottom'
@@ -435,7 +474,9 @@ export function routeLinks(
             appendPoints(assembled, [toExit, toBase, toAnchor])
 
             const simplified = simplifyOrthogonalPath(assembled)
-            simplified.forEach(point => pushPoint(points, point.x, point.y))
+            const cornerRadius = Math.max(4, Math.min(minSegment * 1.2, 14 * scale))
+            const rounded = roundOrthogonalCorners(simplified, cornerRadius, minSegment)
+            rounded.forEach(point => pushPoint(points, point.x, point.y))
             routed = true
           }
         } else {
@@ -643,16 +684,19 @@ export function routeLinks(
           pathPoints.push({ x: points[i], y: points[i + 1] })
         }
         const simplified = simplifyOrthogonalPath(pathPoints)
+        const cornerRadius = Math.max(4, Math.min(minSegment * 1.2, 14 * scale))
+        const rounded = roundOrthogonalCorners(simplified, cornerRadius, minSegment)
         points = []
-        simplified.forEach(point => pushPoint(points, point.x, point.y))
+        rounded.forEach(point => pushPoint(points, point.x, point.y))
       }
 
+      const baseStroke = resolveLinkPurposeColor(link.purpose)
       const debugStroke = (() => {
-        if (!debugOn) return DEFAULT_STROKE
+        if (!debugOn) return baseStroke
         if (!isL1) return DEBUG_STROKE_L2
-        const minDiagonal = Math.max(8, minSegment * 1.2)
+        const minDiagonal = Math.max(12, minSegment * 2)
         if (hasSignificantDiagonal(points, minDiagonal)) return DEBUG_STROKE_L1_DIAGONAL
-        return DEFAULT_STROKE
+        return baseStroke
       })()
 
       return {

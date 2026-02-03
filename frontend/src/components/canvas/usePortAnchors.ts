@@ -225,6 +225,10 @@ export function usePortAnchors(deps: {
       const deviceOverrides = portAnchorOverrides.value.get(deviceId)
       const override = deviceOverrides?.get(portName)
       if (override) {
+        if (overrides) {
+          const autoAnchor = overrides.get(deviceId)?.get(portName)
+          if (autoAnchor && autoAnchor.side === override.side) return autoAnchor
+        }
         const inset = renderTuning.value.port_edge_inset ?? 0
         const usableWidth = Math.max(rect.width - inset * 2, 1)
         const usableHeight = Math.max(rect.height - inset * 2, 1)

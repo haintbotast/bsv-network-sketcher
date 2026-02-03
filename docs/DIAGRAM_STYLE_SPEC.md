@@ -71,7 +71,7 @@
 - **Stub theo nhãn port (L1):** đoạn link đi ra khỏi thiết bị **tối thiểu bằng bề ngang nhãn port** để nhãn không đè lên biên thiết bị và đường link.
 - **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng.
 - **Waypoint (L1):** khi có waypoint giữa 2 Area, link đi qua **nhiều tọa độ neo** trên waypoint (theo lane index) để **không chồng lên nhau**.
-- **Override thủ công (per-port):** người dùng có thể **cố định side + offset_ratio** cho từng port; `offset_ratio` có thể để `null` để **giữ auto offset** theo side đã chọn. Override này **ưu tiên cao nhất** và **không bị auto-layout ghi đè**.
+- **Override thủ công (per-port):** người dùng có thể **cố định side + offset_ratio** cho từng port; `offset_ratio` có thể để `null` để **giữ auto offset** theo side đã chọn. Override **giữ side là ưu tiên cao nhất**, nhưng **có thể tự căn lại tọa độ** để **giữ link thẳng hàng** khi 2 thiết bị cùng hàng/cột và side đã phù hợp.
 - Liên‑area **tách lane rộng hơn** so với bundle nội‑area để giảm chồng/đè.
 - Intra‑area: nếu đường thẳng cắt thiết bị khác thì bẻ góc (Manhattan) để tránh xuyên qua device.
 
@@ -216,8 +216,19 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 
 **Link (theo purpose):**
 
-| Purpose | Màu (RGB) |
-|---------|-----------|
+| Purpose | Màu (RGB) | Màu (HEX) |
+|---------|-----------|-----------|
+| DEFAULT | 43,42,40 | #2b2a28 |
+| INTERNET | 231,76,60 | #e74c3c |
+| WAN | 230,126,34 | #e67e22 |
+| DMZ | 241,196,15 | #f1c40f |
+| LAN | 39,174,96 | #27ae60 |
+| MGMT | 41,128,185 | #2980b9 |
+| HA | 22,160,133 | #16a085 |
+| STORAGE | 26,188,156 | #1abc9c |
+| BACKUP | 127,140,141 | #7f8c8d |
+| VPN | 155,89,182 | #9b59b6 |
+| UPLINK / INTER‑AREA | 230,126,34 | #e67e22 |
 | WAN / INTERNET | 0,112,192 |
 | DMZ | 237,125,49 |
 | LAN | 112,173,71 |

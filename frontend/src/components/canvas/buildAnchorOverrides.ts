@@ -30,10 +30,14 @@ export function buildAnchorOverrides(
     userAnchorOverrides,
   } = ctx
 
+  const getUserOverride = (deviceId: string, port: string | undefined) => {
+    if (!port) return null
+    if (!userAnchorOverrides || userAnchorOverrides.size === 0) return null
+    return userAnchorOverrides.get(deviceId)?.get(port) ?? null
+  }
+
   const hasUserOverride = (deviceId: string, port: string | undefined) => {
-    if (!port) return false
-    if (!userAnchorOverrides || userAnchorOverrides.size === 0) return false
-    return !!userAnchorOverrides.get(deviceId)?.get(port)
+    return !!getUserOverride(deviceId, port)
   }
 
   const portStats = new Map<string, Map<string, {
@@ -138,6 +142,8 @@ export function buildAnchorOverrides(
     const toSide = (Math.hypot(toVector.x, toVector.y) >= 1
       ? computeSideFromVector(toVector.x, toVector.y)
       : (entry.toAnchor.side || computeSide(meta.toView, meta.fromCenter))) as 'left' | 'right' | 'top' | 'bottom'
+    const fromOverride = getUserOverride(meta.link.fromDeviceId, meta.link.fromPort)
+    const toOverride = getUserOverride(meta.link.toDeviceId, meta.link.toPort)
 
     if (meta.link.fromPort && !hasUserOverride(meta.link.fromDeviceId, meta.link.fromPort)) {
       const coord = fromSide === 'left' || fromSide === 'right' ? fromNext.y : fromNext.x
@@ -154,8 +160,6 @@ export function buildAnchorOverrides(
       isL1View
       && meta.link.fromPort
       && meta.link.toPort
-      && !hasUserOverride(meta.link.fromDeviceId, meta.link.fromPort)
-      && !hasUserOverride(meta.link.toDeviceId, meta.link.toPort)
     ) {
       const fromCenter = meta.fromCenter
       const toCenter = meta.toCenter
@@ -170,6 +174,12 @@ export function buildAnchorOverrides(
         axis = 'y'
       } else if (Math.abs(dxCenter) <= colTolerance && Math.abs(dyCenter) > Math.abs(dxCenter)) {
         axis = 'x'
+      }
+
+      if (axis) {
+        const expectedSides = axis === 'y' ? ['left', 'right'] : ['top', 'bottom']
+        if (fromOverride && !expectedSides.includes(fromOverride.side)) axis = null
+        if (toOverride && !expectedSides.includes(toOverride.side)) axis = null
       }
 
       if (axis) {
@@ -205,13 +215,17 @@ export function buildAnchorOverrides(
           const toSideAligned = axis === 'y'
             ? (fromCenter.x >= toCenter.x ? 'right' : 'left')
             : (fromCenter.y >= toCenter.y ? 'bottom' : 'top')
+          if (fromOverride && fromOverride.side !== fromSideAligned) return
+          if (toOverride && toOverride.side !== toSideAligned) return
+          const fromSideFinal = fromOverride?.side ?? fromSideAligned
+          const toSideFinal = toOverride?.side ?? toSideAligned
 
           const fromAnchor = axis === 'y'
-            ? { x: fromSideAligned === 'left' ? fromView.x : fromView.x + fromView.width, y: coord }
-            : { x: coord, y: fromSideAligned === 'top' ? fromView.y : fromView.y + fromView.height }
+            ? { x: fromSideFinal === 'left' ? fromView.x : fromView.x + fromView.width, y: coord }
+            : { x: coord, y: fromSideFinal === 'top' ? fromView.y : fromView.y + fromView.height }
           const toAnchor = axis === 'y'
-            ? { x: toSideAligned === 'left' ? toView.x : toView.x + toView.width, y: coord }
-            : { x: coord, y: toSideAligned === 'top' ? toView.y : toView.y + toView.height }
+            ? { x: toSideFinal === 'left' ? toView.x : toView.x + toView.width, y: coord }
+            : { x: coord, y: toSideFinal === 'top' ? toView.y : toView.y + toView.height }
 
           const obstacles: Rect[] = []
           deviceRects.forEach(({ id, rect }) => {
@@ -232,8 +246,12 @@ export function buildAnchorOverrides(
           if (!blocked) {
             registerAlignedCoord(meta.link.fromDeviceId, meta.link.fromPort, axis, coord)
             registerAlignedCoord(meta.link.toDeviceId, meta.link.toPort, axis, coord)
-            registerForcedSideIfUnset(meta.link.fromDeviceId, meta.link.fromPort, fromSideAligned as 'left' | 'right' | 'top' | 'bottom')
-            registerForcedSideIfUnset(meta.link.toDeviceId, meta.link.toPort, toSideAligned as 'left' | 'right' | 'top' | 'bottom')
+            if (!fromOverride) {
+              registerForcedSideIfUnset(meta.link.fromDeviceId, meta.link.fromPort, fromSideAligned as 'left' | 'right' | 'top' | 'bottom')
+            }
+            if (!toOverride) {
+              registerForcedSideIfUnset(meta.link.toDeviceId, meta.link.toPort, toSideAligned as 'left' | 'right' | 'top' | 'bottom')
+            }
           }
         }
       }
@@ -353,11 +371,15 @@ export function buildAnchorOverrides(
     }>> = { left: [], right: [], top: [], bottom: [] }
 
     ports.forEach(port => {
-      if (hasUserOverride(deviceId, port)) return
+      const userOverride = getUserOverride(deviceId, port)
+      const aligned = alignedCoordMap.get(port)
+      if (userOverride && !aligned) return
       const stats = deviceStats.get(port)
       let side = (sideMap.get(port) || 'right') as 'left' | 'right' | 'top' | 'bottom'
       const forcedSide = forcedSideMap.get(port)
-      if (forcedSide) {
+      if (userOverride) {
+        side = userOverride.side
+      } else if (forcedSide) {
         side = forcedSide
       } else if (stats) {
         const entries = Object.entries(stats.votes) as Array<[string, number]>

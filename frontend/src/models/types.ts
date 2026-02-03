@@ -42,6 +42,7 @@ export type LinkModel = {
   toDeviceId: string
   fromPort: string
   toPort: string
+  purpose?: string
   style: 'solid' | 'dashed' | 'dotted'
 }
 

@@ -17,6 +17,11 @@ FILE_EXPORT_TYPES = {"device_file", "master_file"}
 
 def _generate_pptx(file_path: Path, title: str, metadata: dict[str, Any]) -> None:
     from pptx import Presentation
+    from pptx.dml.color import RGBColor
+    from pptx.enum.shapes import MSO_SHAPE
+    from pptx.util import Inches, Pt
+
+    from app.services.link_palette import get_link_palette_rgb
 
     presentation = Presentation()
     slide = presentation.slides.add_slide(presentation.slide_layouts[1])
@@ -30,6 +35,26 @@ def _generate_pptx(file_path: Path, title: str, metadata: dict[str, Any]) -> Non
     else:
         textbox = shapes.add_textbox(0, 0, presentation.slide_width, presentation.slide_height)
         textbox.text = "\n".join(lines)
+    palette = get_link_palette_rgb()
+    legend_left = Inches(0.6)
+    legend_top = Inches(1.7)
+    swatch_size = Inches(0.22)
+    row_height = Inches(0.28)
+
+    for idx, (purpose, rgb) in enumerate(palette.items()):
+        top = legend_top + row_height * idx
+        swatch = shapes.add_shape(MSO_SHAPE.RECTANGLE, legend_left, top, swatch_size, swatch_size)
+        swatch.fill.solid()
+        swatch.fill.fore_color.rgb = RGBColor(*rgb)
+        swatch.line.color.rgb = RGBColor(*rgb)
+
+        label_box = shapes.add_textbox(legend_left + Inches(0.32), top - Inches(0.02), Inches(2.8), swatch_size)
+        text_frame = label_box.text_frame
+        text_frame.clear()
+        run = text_frame.paragraphs[0].add_run()
+        run.text = purpose
+        run.font.size = Pt(10)
+
     presentation.save(str(file_path))
 
 

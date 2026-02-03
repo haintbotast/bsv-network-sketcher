@@ -1,0 +1,62 @@
+import type { ComputedRef, Ref } from 'vue'
+import type { AreaModel, DeviceModel, L2AssignmentRecord, LinkModel, ViewMode, Viewport } from '../../models/types'
+
+export type Rect = { x: number; y: number; width: number; height: number }
+
+export type RenderLink = {
+  id: string
+  fromAnchor: { x: number; y: number; side?: string }
+  toAnchor: { x: number; y: number; side?: string }
+  fromCenter: { x: number; y: number }
+  toCenter: { x: number; y: number }
+  points: number[]
+  config: Record<string, unknown>
+}
+
+export type AnchorOverrideMap = Map<string, Map<string, { x: number; y: number; side: string }>>
+
+export type RenderTuning = {
+  port_edge_inset?: number
+  port_label_offset?: number
+  bundle_gap?: number
+  bundle_stub?: number
+  area_clearance?: number
+  area_anchor_offset?: number
+  label_gap_x?: number
+  label_gap_y?: number
+  corridor_gap?: number
+}
+
+export type LinkMeta = {
+  link: LinkModel
+  fromView: Rect
+  toView: Rect
+  fromCenter: { x: number; y: number }
+  toCenter: { x: number; y: number }
+  fromAnchor: { x: number; y: number; side?: string }
+  toAnchor: { x: number; y: number; side?: string }
+  fromAreaId: string | undefined
+  toAreaId: string | undefined
+  fromArea: Rect | null | undefined
+  toArea: Rect | null | undefined
+}
+
+export type AreaRectEntry = { id: string; rect: Rect }
+export type DeviceRectEntry = { id: string; rect: Rect }
+
+export type UseLinkRoutingParams = {
+  props: {
+    links: LinkModel[]
+    areas: AreaModel[]
+    devices: DeviceModel[]
+    viewMode?: ViewMode
+    l2Assignments?: L2AssignmentRecord[]
+  }
+  layoutViewport: Ref<Viewport>
+  renderTuning: ComputedRef<RenderTuning>
+  deviceViewMap: ComputedRef<Map<string, Rect>>
+  areaViewMap: ComputedRef<Map<string, Rect>>
+  deviceAreaMap: ComputedRef<Map<string, string>>
+  areaBounds: ComputedRef<{ minX: number; minY: number; maxX: number; maxY: number } | null>
+  isPanning: Ref<boolean>
+}

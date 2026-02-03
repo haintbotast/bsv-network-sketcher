@@ -423,78 +423,83 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import CanvasStage from './components/CanvasStage.vue'
-import type { AreaModel, DeviceModel, LinkModel, Viewport } from './models/types'
-import type { AreaRecord, AreaStyle, DeviceRecord, LinkRecord, ProjectRecord, UserRecord } from './models/api'
-import { getMe, loginUser, logout as logoutUser } from './services/auth'
-import { listProjects, createProject, updateProject } from './services/projects'
-import { listAreas, createArea, updateArea, deleteArea } from './services/areas'
-import { listDevices, createDevice, updateDevice, deleteDevice } from './services/devices'
-import { listLinks, createLink, updateLink, deleteLink } from './services/links'
-import { getToken } from './services/api'
-import { autoLayout, invalidateLayoutCache } from './services/layout'
-import type { LayoutResult } from './services/layout'
-import { getAdminConfig, updateAdminConfig } from './services/adminConfig'
-import type { AdminConfig, LayoutTuning, RenderTuning } from './services/adminConfig'
+import { updateArea } from './services/areas'
+import { updateDevice } from './services/devices'
+import { updateLink } from './services/links'
+import { deviceTypes, linkPurposes } from './composables/canvasConstants'
+import { useViewport } from './composables/useViewport'
+import { useAuth } from './composables/useAuth'
+import { useProjects } from './composables/useProjects'
+import { useCanvasData } from './composables/useCanvasData'
+import type { AreaRow, DeviceRow, LinkRow } from './composables/useCanvasData'
+import { useAutoLayout } from './composables/useAutoLayout'
+import { useViewMode } from './composables/useViewMode'
+import { useLayoutConfig } from './composables/useLayoutConfig'
 
-const UNIT_PX = 120
-const GRID_FALLBACK_X = 4
-const GRID_FALLBACK_Y = 2.5
-const DEFAULT_LAYOUT_TUNING: LayoutTuning = {
-  layer_gap: 1.5,
-  node_spacing: 0.8,
-  port_label_band: 0.2,
-  area_gap: 1.1,
-  area_padding: 0.35,
-  label_band: 0.5,
-  max_row_width_base: 12.0,
-  max_nodes_per_row: 8,
-  row_gap: 0.5,
-  row_stagger: 0.5
-}
-const DEFAULT_RENDER_TUNING: RenderTuning = {
-  port_edge_inset: 6,
-  port_label_offset: 12,
-  bundle_gap: 18,
-  bundle_stub: 18,
-  area_clearance: 18,
-  area_anchor_offset: 18,
-  label_gap_x: 8,
-  label_gap_y: 6,
-  corridor_gap: 40
-}
+const {
+  statusText,
+  notice,
+  noticeType,
+  authForm,
+  currentUser,
+  statusClass,
+  setNotice,
+  fetchHealth,
+  initAuth,
+  handleLogin: authLogin,
+  handleLogout: authLogout,
+} = useAuth()
 
-const statusText = ref('đang kiểm tra...')
-const notice = ref('')
-const noticeType = ref<'info' | 'success' | 'error'>('info')
+const {
+  adminConfig,
+  layoutTuningForm,
+  renderTuningForm,
+  adminConfigSaving,
+  layoutTuning,
+  renderTuning,
+  loadAdminConfig,
+  saveAdminConfig,
+  resetConfig: resetLayoutConfig,
+} = useLayoutConfig(
+  setNotice,
+  currentUser,
+  () => {
+    if (activeProject.value) {
+      scheduleAutoLayout(activeProject.value.id, true)
+    }
+  },
+)
 
-const authForm = reactive({
-  email: '',
-  password: ''
-})
-const currentUser = ref<UserRecord | null>(null)
-const adminConfig = ref<AdminConfig>({})
-const layoutTuningForm = reactive({ ...DEFAULT_LAYOUT_TUNING })
-const renderTuningForm = reactive({ ...DEFAULT_RENDER_TUNING })
-const adminConfigSaving = ref(false)
-const autoLayoutManualApplying = ref(false)
+const {
+  projects,
+  selectedProjectId,
+  projectForm,
+  activeProject,
+  layoutMode,
+  layoutModeSelection,
+  layoutModeUpdating,
+  loadProjects,
+  handleCreateProject,
+  handleLayoutModeChange,
+} = useProjects(setNotice)
 
-const projects = ref<ProjectRecord[]>([])
-const selectedProjectId = ref<string | null>(null)
-const projectForm = reactive({
-  name: '',
-  description: '',
-  layoutMode: 'cisco' as 'cisco' | 'iso' | 'custom'
-})
-
-type AreaRow = AreaRecord & { __temp?: boolean }
-type DeviceRow = DeviceRecord & { __temp?: boolean }
-type LinkRow = LinkRecord & { __temp?: boolean }
-
-const areas = ref<AreaRow[]>([])
-const devices = ref<DeviceRow[]>([])
-const links = ref<LinkRow[]>([])
+// useCanvasData needs scheduleAutoLayout which is defined later - use forwarding wrapper
+const canvasData = useCanvasData(
+  selectedProjectId,
+  setNotice,
+  (projectId, force) => scheduleAutoLayout(projectId, force),
+)
+const {
+  areas, devices, links,
+  canvasAreas, canvasDevices, canvasLinks,
+  loadProjectData,
+  handleAreaAdd, handleAreaChange, handleAreaRemove,
+  handleDeviceAdd, handleDeviceChange, handleDeviceRemove,
+  handleLinkAdd, handleLinkChange, handleLinkRemove,
+  assignDeviceArea,
+} = canvasData
 
 const selectedId = ref<string | null>(null)
 const selectedDraft = ref<any>(null)
@@ -502,60 +507,48 @@ const selectedDraftDirty = ref(false)
 const selectedSavePending = ref(false)
 let syncingDraft = false
 
-const viewport = reactive({
-  scale: 1,
-  offsetX: 0,
-  offsetY: 0
+// Viewport state (from composable)
+const {
+  viewport,
+  viewportState,
+  showRightPanel,
+  rightPanelWidth,
+  rightPanelTab,
+  updateViewport,
+  zoomIn,
+  zoomOut,
+  resetViewport,
+  toggleRightPanel,
+} = useViewport()
+
+// View mode - _selectedAreaNameRef synced via watch after selectedAreaName is defined
+const _selectedAreaNameRef = ref<string | null>(null)
+const {
+  viewMode,
+  l2Assignments,
+  l3Addresses,
+  l2Loaded,
+  l3Loaded,
+  viewModeLabel,
+  setViewMode,
+  resetViewModeData,
+} = useViewMode(selectedProjectId, _selectedAreaNameRef)
+
+// Auto Layout composable
+const {
+  autoLayoutAutoApplying,
+  autoLayoutManualApplying,
+  scheduleAutoLayout,
+  runAutoLayoutManual,
+} = useAutoLayout({
+  areas,
+  devices,
+  links,
+  activeProject,
+  layoutTuning,
+  setNotice,
+  loadProjectData,
 })
-
-const showRightPanel = ref(true)
-const rightPanelWidth = ref(360)
-const rightPanelTab = ref<'properties' | 'layout'>('properties')
-
-const layoutMode = computed(() => activeProject.value?.layout_mode || 'cisco')
-const layoutModeSelection = ref<'cisco' | 'iso' | 'custom'>('cisco')
-const layoutModeUpdating = ref(false)
-const layoutTuning = computed(() => ({
-  ...DEFAULT_LAYOUT_TUNING,
-  ...(adminConfig.value.layout_tuning || {})
-}))
-const renderTuning = computed(() => ({
-  ...DEFAULT_RENDER_TUNING,
-  ...(adminConfig.value.render_tuning || {})
-}))
-
-// View mode for canvas (L1/L2/L3)
-type ViewMode = 'L1' | 'L2' | 'L3'
-const viewMode = ref<ViewMode>('L1')
-
-// L2/L3 data
-type L2AssignmentRecord = {
-  id: string
-  device_id: string
-  device_name?: string | null
-  interface_name: string
-  vlan_id?: number | null
-  port_mode: 'access' | 'trunk'
-}
-
-type L3AddressRecord = {
-  id: string
-  device_id: string
-  device_name?: string | null
-  interface_name: string
-  ip_address: string
-  prefix_length: number
-}
-
-const l2Assignments = ref<L2AssignmentRecord[]>([])
-const l3Addresses = ref<L3AddressRecord[]>([])
-const l2Loaded = ref(false)
-const l3Loaded = ref(false)
-
-// Auto Layout (auto mode only - manual dialog removed)
-const autoLayoutAutoApplying = ref(false)
-const autoLayoutAutoAppliedProjects = new Set<string>()
-let autoLayoutTimer: number | null = null
 
 // Properties Inspector computed properties
 const selectedObject = computed(() => {
@@ -641,537 +634,33 @@ const selectedAreaName = computed(() => {
   return null
 })
 
-const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']
-const linkPurposes = ['DEFAULT', 'WAN', 'INTERNET', 'DMZ', 'LAN', 'MGMT', 'HA', 'STORAGE', 'BACKUP', 'VPN']
-
-const defaultAreaStyle: AreaStyle = {
-  fill_color_rgb: [240, 240, 240],
-  stroke_color_rgb: [51, 51, 51],
-  stroke_width: 1
-}
-
-const statusClass = computed(() => {
-  if (statusText.value === 'healthy') return 'ok'
-  if (statusText.value === 'không kết nối được') return 'error'
-  if (statusText.value === 'lỗi kết nối') return 'error'
-  return 'pending'
-})
-
-const viewModeLabel = computed(() => {
-  const areaName = selectedAreaName.value
-  if (viewMode.value === 'L1') return 'All Areas'
-  if (viewMode.value === 'L2') return areaName || 'Focus on Area'
-  if (viewMode.value === 'L3') {
-    return areaName ? `All Areas · Focus: ${areaName}` : 'All Areas'
-  }
-  return ''
-})
-
-const viewportState = computed<Viewport>(() => ({
-  scale: viewport.scale,
-  offsetX: viewport.offsetX,
-  offsetY: viewport.offsetY
-}))
-
-const activeProject = computed(() => projects.value.find(p => p.id === selectedProjectId.value) || null)
-
-const canvasAreas = computed<AreaModel[]>(() => {
-  return areas.value.map(area => {
-    const style = area.style || defaultAreaStyle
-    const xUnits = area.position_x ?? (area.grid_col - 1) * GRID_FALLBACK_X
-    const yUnits = area.position_y ?? (area.grid_row - 1) * GRID_FALLBACK_Y
-    const widthUnits = area.width || 3
-    const heightUnits = area.height || 1.5
-    return {
-      id: area.id,
-      name: area.name,
-      x: xUnits * UNIT_PX,
-      y: yUnits * UNIT_PX,
-      width: widthUnits * UNIT_PX,
-      height: heightUnits * UNIT_PX,
-      fill: rgbToHex(style.fill_color_rgb),
-      stroke: rgbToHex(style.stroke_color_rgb)
-    }
-  })
-})
-
-const canvasDevices = computed<DeviceModel[]>(() => {
-  return devices.value.map(device => {
-    const xUnits = device.position_x ?? 0
-    const yUnits = device.position_y ?? 0
-    return {
-      id: device.id,
-      areaId: device.area_id,
-      name: device.name,
-      x: xUnits * UNIT_PX,
-      y: yUnits * UNIT_PX,
-      width: (device.width || 1.2) * UNIT_PX,
-      height: (device.height || 0.5) * UNIT_PX,
-      type: device.device_type || 'Unknown'
-    }
-  })
-})
-
-const canvasLinks = computed<LinkModel[]>(() => {
-  const byName = new Map(devices.value.map(device => [device.name, device]))
-  const byId = new Map(devices.value.map(device => [device.id, device]))
-  return links.value
-    .map(link => {
-      const from = link.from_device_name ? byName.get(link.from_device_name) : byId.get(link.from_device_id)
-      const to = link.to_device_name ? byName.get(link.to_device_name) : byId.get(link.to_device_id)
-      if (!from || !to) return null
-      return {
-        id: link.id,
-        fromDeviceId: from.id,
-        toDeviceId: to.id,
-        fromPort: link.from_port,
-        toPort: link.to_port,
-        style: (link.line_style || 'solid') as 'solid' | 'dashed' | 'dotted'
-      }
-    })
-    .filter(Boolean) as LinkModel[]
-})
-
-// Auto-layout preview removed - auto mode applies directly to DB
-
-function rgbToHex(rgb: [number, number, number]) {
-  return `#${rgb.map(value => value.toString(16).padStart(2, '0')).join('')}`
-}
-
-function updateViewport(value: Viewport) {
-  viewport.offsetX = value.offsetX
-  viewport.offsetY = value.offsetY
-  viewport.scale = value.scale
-}
+watch(selectedAreaName, (v) => { _selectedAreaNameRef.value = v })
 
 function handleSelect(payload: { id: string; type?: 'device' | 'area' }) {
   selectedId.value = payload.id
   rightPanelTab.value = 'properties'
 }
 
-function assignDeviceArea(device: DeviceRow, areaId: string) {
-  const area = areas.value.find(item => item.id === areaId)
-  if (!area) return
-  device.area_id = area.id
-  device.area_name = area.name
-  handleDeviceChange({ row: device })
+async function onAuthSuccess() {
+  await loadAdminConfig()
+  await loadProjects()
 }
 
-function zoomIn() {
-  viewport.scale = Math.min(viewport.scale + 0.1, 2)
-}
-
-function zoomOut() {
-  viewport.scale = Math.max(viewport.scale - 0.1, 0.5)
-}
-
-function resetViewport() {
-  viewport.scale = 1
-  viewport.offsetX = 0
-  viewport.offsetY = 0
-}
-
-function toggleRightPanel() {
-  showRightPanel.value = !showRightPanel.value
-}
-
-async function setViewMode(mode: ViewMode) {
-  viewMode.value = mode
-  if (!selectedProjectId.value) return
-
-  // Lazy load L2 data
-  if (mode === 'L2' && !l2Loaded.value) {
-    await fetchL2Data()
-  }
-  // Lazy load L3 data
-  if (mode === 'L3' && !l3Loaded.value) {
-    await fetchL3Data()
-  }
-}
-
-async function fetchL2Data() {
-  if (!selectedProjectId.value) return
-  try {
-    const res = await fetch(
-      `${import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'}/api/v1/projects/${selectedProjectId.value}/l2/assignments`,
-      { headers: { Authorization: `Bearer ${getToken()}` } }
-    )
-    if (res.ok) {
-      l2Assignments.value = await res.json()
-      l2Loaded.value = true
-      console.log('L2 data loaded:', l2Assignments.value.length, 'assignments')
-    } else {
-      console.error('L2 fetch failed:', res.status, res.statusText)
-    }
-  } catch (e) {
-    console.error('Failed to fetch L2 assignments:', e)
-  }
-}
-
-async function fetchL3Data() {
-  if (!selectedProjectId.value) return
-  try {
-    const res = await fetch(
-      `${import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'}/api/v1/projects/${selectedProjectId.value}/l3/addresses`,
-      { headers: { Authorization: `Bearer ${getToken()}` } }
-    )
-    if (res.ok) {
-      l3Addresses.value = await res.json()
-      l3Loaded.value = true
-      console.log('L3 data loaded:', l3Addresses.value.length, 'addresses')
-    } else {
-      console.error('L3 fetch failed:', res.status, res.statusText)
-    }
-  } catch (e) {
-    console.error('Failed to fetch L3 addresses:', e)
-  }
-}
-
-function setNotice(message: string, type: 'info' | 'success' | 'error' = 'info') {
-  notice.value = message
-  noticeType.value = type
-}
-
-function syncTuningForms(config: AdminConfig) {
-  Object.assign(layoutTuningForm, { ...DEFAULT_LAYOUT_TUNING, ...(config.layout_tuning || {}) })
-  Object.assign(renderTuningForm, { ...DEFAULT_RENDER_TUNING, ...(config.render_tuning || {}) })
-}
-
-async function loadAdminConfig() {
-  if (!currentUser.value) return
-  try {
-    const config = await getAdminConfig()
-    adminConfig.value = config
-    syncTuningForms(config)
-  } catch (error: any) {
-    setNotice(error?.message || 'Không thể tải cấu hình layout.', 'error')
-  }
-}
-
-async function saveAdminConfig() {
-  if (adminConfigSaving.value) return
-  adminConfigSaving.value = true
-  try {
-    const payload: AdminConfig = {
-      layout_tuning: { ...layoutTuningForm },
-      render_tuning: { ...renderTuningForm }
-    }
-    const updated = await updateAdminConfig(payload)
-    adminConfig.value = updated
-    syncTuningForms(updated)
-    if (activeProject.value) {
-      await runAutoLayoutAuto(activeProject.value.id, true)
-    }
-    setNotice('Đã lưu cấu hình layout.', 'success')
-  } catch (error: any) {
-    setNotice(error?.message || 'Lưu cấu hình layout thất bại.', 'error')
-  } finally {
-    adminConfigSaving.value = false
-  }
-}
-
-async function fetchHealth() {
-  try {
-    const res = await fetch(`${import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'}/api/v1/health`)
-    if (!res.ok) {
-      statusText.value = 'lỗi kết nối'
-      return
-    }
-    const data = await res.json()
-    statusText.value = data.status ?? 'không xác định'
-  } catch {
-    statusText.value = 'không kết nối được'
-  }
-}
-
-async function initAuth() {
-  const token = getToken()
-  if (!token) return
-  try {
-    currentUser.value = await getMe()
-    await loadAdminConfig()
-    await loadProjects()
-  } catch (error) {
-    logoutUser()
-    currentUser.value = null
-    setNotice('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'error')
-  }
-}
-
-async function handleLogin() {
-  if (!authForm.email || !authForm.password) {
-    setNotice('Vui lòng nhập email và mật khẩu.', 'error')
-    return
-  }
-  try {
-    await loginUser({ email: authForm.email, password: authForm.password })
-    currentUser.value = await getMe()
-    await loadAdminConfig()
-    await loadProjects()
-    setNotice('Đăng nhập thành công.', 'success')
-  } catch (error: any) {
-    setNotice(error?.message || 'Đăng nhập thất bại.', 'error')
-  }
+function handleLogin() {
+  authLogin({ onSuccess: onAuthSuccess })
 }
 
 function handleLogout() {
-  logoutUser()
-  currentUser.value = null
-  adminConfig.value = {}
-  syncTuningForms({})
-  projects.value = []
-  selectedProjectId.value = null
-  areas.value = []
-  devices.value = []
-  links.value = []
-}
-
-async function loadProjects() {
-  try {
-    projects.value = await listProjects()
-    if (!selectedProjectId.value && projects.value.length > 0) {
-      selectedProjectId.value = projects.value[0].id
-    }
-  } catch (error: any) {
-    setNotice(error?.message || 'Không tải được danh sách project.', 'error')
-  }
-}
-
-async function handleCreateProject() {
-  if (!projectForm.name) {
-    setNotice('Tên project không được để trống.', 'error')
-    return
-  }
-  try {
-    const created = await createProject({
-      name: projectForm.name,
-      description: projectForm.description || undefined,
-      layout_mode: projectForm.layoutMode
-    })
-    projects.value = [created, ...projects.value]
-    selectedProjectId.value = created.id
-    projectForm.name = ''
-    projectForm.description = ''
-    setNotice('Đã tạo project.', 'success')
-  } catch (error: any) {
-    setNotice(error?.message || 'Tạo project thất bại.', 'error')
-  }
-}
-
-async function loadProjectData(projectId: string) {
-  try {
-    const [areasData, devicesData, linksData] = await Promise.all([
-      listAreas(projectId),
-      listDevices(projectId),
-      listLinks(projectId)
-    ])
-    areas.value = areasData
-    devices.value = devicesData
-    links.value = linksData
-  } catch (error: any) {
-    setNotice(error?.message || 'Không tải được dữ liệu project.', 'error')
-  }
-}
-
-const areaUpdateTimers = new Map<string, number>()
-const deviceUpdateTimers = new Map<string, number>()
-const linkUpdateTimers = new Map<string, number>()
-
-function scheduleUpdate(map: Map<string, number>, key: string, handler: () => void) {
-  const existing = map.get(key)
-  if (existing) window.clearTimeout(existing)
-  const timer = window.setTimeout(() => {
-    map.delete(key)
-    handler()
-  }, 600)
-  map.set(key, timer)
-}
-
-async function handleAreaAdd(row: AreaRow) {
-  if (!selectedProjectId.value) {
-    setNotice('Vui lòng chọn project trước.', 'error')
-    return
-  }
-  const projectId = selectedProjectId.value
-  try {
-    const created = await createArea(projectId, {
-      name: row.name,
-      grid_row: row.grid_row,
-      grid_col: row.grid_col,
-      position_x: row.position_x,
-      position_y: row.position_y,
-      width: row.width,
-      height: row.height,
-      style: row.style || defaultAreaStyle
-    })
-    const index = areas.value.findIndex(area => area.id === row.id)
-    if (index >= 0) areas.value[index] = created
-    scheduleAutoLayout(projectId, true)
-  } catch (error: any) {
-    setNotice(error?.message || 'Tạo area thất bại.', 'error')
-  }
-}
-
-function handleAreaChange(payload: { row: AreaRow }) {
-  if (!selectedProjectId.value) return
-  const projectId = selectedProjectId.value
-  if (payload.row.__temp) return
-  scheduleUpdate(areaUpdateTimers, payload.row.id, async () => {
-    try {
-      const updated = await updateArea(projectId as string, payload.row.id, {
-        name: payload.row.name,
-        grid_row: payload.row.grid_row,
-        grid_col: payload.row.grid_col,
-        position_x: payload.row.position_x,
-        position_y: payload.row.position_y,
-        width: payload.row.width,
-        height: payload.row.height,
-        style: payload.row.style || undefined
-      })
-      const index = areas.value.findIndex(area => area.id === payload.row.id)
-      if (index >= 0) areas.value[index] = updated
-    } catch (error: any) {
-      setNotice(error?.message || 'Cập nhật area thất bại.', 'error')
+  authLogout({
+    onLogout: () => {
+      resetLayoutConfig()
+      projects.value = []
+      selectedProjectId.value = null
+      areas.value = []
+      devices.value = []
+      links.value = []
     }
   })
-}
-
-async function handleAreaRemove(row: AreaRow) {
-  if (!selectedProjectId.value) return
-  const projectId = selectedProjectId.value
-  if (row.__temp) return
-  try {
-    await deleteArea(projectId, row.id)
-    scheduleAutoLayout(projectId, true)
-  } catch (error: any) {
-    setNotice(error?.message || 'Xóa area thất bại.', 'error')
-  }
-}
-
-async function handleDeviceAdd(row: DeviceRow) {
-  if (!selectedProjectId.value) {
-    setNotice('Vui lòng chọn project trước.', 'error')
-    return
-  }
-  const projectId = selectedProjectId.value
-  if (!row.area_name) {
-    setNotice('Cần chọn area cho device.', 'error')
-    return
-  }
-  try {
-    const created = await createDevice(projectId, {
-      name: row.name,
-      area_name: row.area_name,
-      device_type: row.device_type,
-      position_x: row.position_x,
-      position_y: row.position_y,
-      width: row.width,
-      height: row.height,
-      color_rgb: row.color_rgb || undefined
-    })
-    const index = devices.value.findIndex(device => device.id === row.id)
-    if (index >= 0) devices.value[index] = created
-    scheduleAutoLayout(projectId, true)
-  } catch (error: any) {
-    setNotice(error?.message || 'Tạo device thất bại.', 'error')
-  }
-}
-
-function handleDeviceChange(payload: { row: DeviceRow }) {
-  if (!selectedProjectId.value) return
-  const projectId = selectedProjectId.value
-  if (payload.row.__temp) return
-  scheduleUpdate(deviceUpdateTimers, payload.row.id, async () => {
-    try {
-      const updated = await updateDevice(projectId as string, payload.row.id, {
-        name: payload.row.name,
-        area_name: payload.row.area_name || undefined,
-        device_type: payload.row.device_type,
-        position_x: payload.row.position_x,
-        position_y: payload.row.position_y,
-        width: payload.row.width,
-        height: payload.row.height,
-        color_rgb: payload.row.color_rgb || undefined
-      })
-      const index = devices.value.findIndex(device => device.id === payload.row.id)
-      if (index >= 0) devices.value[index] = updated
-    } catch (error: any) {
-      setNotice(error?.message || 'Cập nhật device thất bại.', 'error')
-    }
-  })
-}
-
-async function handleDeviceRemove(row: DeviceRow) {
-  if (!selectedProjectId.value) return
-  const projectId = selectedProjectId.value
-  if (row.__temp) return
-  try {
-    await deleteDevice(projectId, row.id)
-    scheduleAutoLayout(projectId, true)
-  } catch (error: any) {
-    setNotice(error?.message || 'Xóa device thất bại.', 'error')
-  }
-}
-
-async function handleLinkAdd(row: LinkRow) {
-  if (!selectedProjectId.value) {
-    setNotice('Vui lòng chọn project trước.', 'error')
-    return
-  }
-  const projectId = selectedProjectId.value
-  if (!row.from_device_name || !row.to_device_name) {
-    setNotice('Cần chọn thiết bị đầu/cuối cho link.', 'error')
-    return
-  }
-  try {
-    const created = await createLink(projectId, {
-      from_device: row.from_device_name,
-      from_port: row.from_port,
-      to_device: row.to_device_name,
-      to_port: row.to_port,
-      purpose: row.purpose || undefined,
-      line_style: row.line_style || 'solid'
-    })
-    const index = links.value.findIndex(link => link.id === row.id)
-    if (index >= 0) links.value[index] = created
-    scheduleAutoLayout(projectId, true)
-  } catch (error: any) {
-    setNotice(error?.message || 'Tạo link thất bại.', 'error')
-  }
-}
-
-function handleLinkChange(payload: { row: LinkRow }) {
-  if (!selectedProjectId.value) return
-  const projectId = selectedProjectId.value
-  if (payload.row.__temp) return
-  scheduleUpdate(linkUpdateTimers, payload.row.id, async () => {
-    try {
-      const updated = await updateLink(projectId as string, payload.row.id, {
-        from_device: payload.row.from_device_name || undefined,
-        from_port: payload.row.from_port,
-        to_device: payload.row.to_device_name || undefined,
-        to_port: payload.row.to_port,
-        purpose: payload.row.purpose || undefined,
-        line_style: payload.row.line_style || undefined
-      })
-      const index = links.value.findIndex(link => link.id === payload.row.id)
-      if (index >= 0) links.value[index] = updated
-    } catch (error: any) {
-      setNotice(error?.message || 'Cập nhật link thất bại.', 'error')
-    }
-  })
-}
-
-async function handleLinkRemove(row: LinkRow) {
-  if (!selectedProjectId.value) return
-  const projectId = selectedProjectId.value
-  if (row.__temp) return
-  try {
-    await deleteLink(projectId, row.id)
-    scheduleAutoLayout(projectId, true)
-  } catch (error: any) {
-    setNotice(error?.message || 'Xóa link thất bại.', 'error')
-  }
 }
 
 // Properties Inspector handlers
@@ -1268,12 +757,7 @@ async function handleSelectedObjectDelete() {
 }
 
 watch(selectedProjectId, async (projectId) => {
-  // Reset L2/L3 loaded flags when project changes
-  l2Loaded.value = false
-  l3Loaded.value = false
-  l2Assignments.value = []
-  l3Addresses.value = []
-  viewMode.value = 'L1'
+  resetViewModeData()
 
   if (projectId) {
     await loadProjectData(projectId)
@@ -1290,123 +774,14 @@ watch(selectedProjectId, async (projectId) => {
 })
 
 watch(layoutModeSelection, async (value) => {
-  if (!activeProject.value) return
-  if (layoutModeUpdating.value) return
-  if (activeProject.value.layout_mode === value) return
-  layoutModeUpdating.value = true
-  try {
-    const updated = await updateProject(activeProject.value.id, { layout_mode: value })
-    projects.value = projects.value.map(project => (project.id === updated.id ? updated : project))
-    setNotice('Đã cập nhật layout mode.', 'success')
-    scheduleAutoLayout(updated.id, true)
-  } catch (error: any) {
-    setNotice(error?.message || 'Cập nhật layout mode thất bại.', 'error')
-    layoutModeSelection.value = activeProject.value.layout_mode
-  } finally {
-    layoutModeUpdating.value = false
-  }
+  await handleLayoutModeChange(value, (projectId) => {
+    scheduleAutoLayout(projectId, true)
+  })
 })
-
-function computeAutoLayoutTuning() {
-  const tuning = layoutTuning.value
-  const layer_gap = Number((tuning.layer_gap ?? DEFAULT_LAYOUT_TUNING.layer_gap).toFixed(2))
-  const node_spacing = Number((tuning.node_spacing ?? DEFAULT_LAYOUT_TUNING.node_spacing).toFixed(2))
-  return { layer_gap, node_spacing }
-}
-
-function hasStoredLayout() {
-  const epsilon = 0.0001
-  const deviceHasLayout = devices.value.some(device =>
-    Math.abs(device.position_x ?? 0) > epsilon || Math.abs(device.position_y ?? 0) > epsilon
-  )
-  const areaHasLayout = areas.value.some(area =>
-    Math.abs(area.position_x ?? 0) > epsilon || Math.abs(area.position_y ?? 0) > epsilon
-  )
-  return deviceHasLayout || areaHasLayout
-}
-
-function scheduleAutoLayout(projectId: string, force = false) {
-  if (autoLayoutTimer) window.clearTimeout(autoLayoutTimer)
-  autoLayoutTimer = window.setTimeout(() => {
-    autoLayoutTimer = null
-    runAutoLayoutAuto(projectId, force)
-  }, 800)
-}
-
-async function runAutoLayoutAuto(projectId: string, force = false) {
-  if (autoLayoutAutoApplying.value) return
-  if (!force && autoLayoutAutoAppliedProjects.has(projectId)) return
-  if (!devices.value.length) return
-  if (!force && hasStoredLayout()) {
-    autoLayoutAutoAppliedProjects.add(projectId)
-    return
-  }
-
-  const hasAreas = areas.value.length > 0
-  if (!hasAreas && !links.value.length) return
-
-  autoLayoutAutoApplying.value = true
-  try {
-    const tuning = computeAutoLayoutTuning()
-    await autoLayout(projectId, {
-      layer_gap: tuning.layer_gap,
-      node_spacing: tuning.node_spacing,
-      apply_to_db: true,
-      group_by_area: hasAreas,
-      layout_scope: 'project',
-      anchor_routing: true,
-      overview_mode: 'l1-only',
-      normalize_topology: true
-    })
-    autoLayoutAutoAppliedProjects.add(projectId)
-    await loadProjectData(projectId)
-    await invalidateLayoutCache(projectId)
-    setNotice('Auto-layout đã được áp dụng tự động.', 'success')
-  } catch (error: any) {
-    setNotice(error?.message || 'Auto-layout tự động thất bại.', 'error')
-  } finally {
-    autoLayoutAutoApplying.value = false
-  }
-}
-
-async function runAutoLayoutManual() {
-  if (!activeProject.value || autoLayoutManualApplying.value) return
-  if (!devices.value.length) {
-    setNotice('Chưa có thiết bị để chạy auto-layout.', 'error')
-    return
-  }
-
-  autoLayoutManualApplying.value = true
-  const projectId = activeProject.value.id
-  const hasAreas = areas.value.length > 0
-  try {
-    const tuning = computeAutoLayoutTuning()
-    await autoLayout(projectId, {
-      layer_gap: tuning.layer_gap,
-      node_spacing: tuning.node_spacing,
-      apply_to_db: true,
-      group_by_area: hasAreas,
-      layout_scope: 'project',
-      anchor_routing: true,
-      overview_mode: 'l1-only',
-      normalize_topology: true
-    })
-    autoLayoutAutoAppliedProjects.add(projectId)
-    await loadProjectData(projectId)
-    await invalidateLayoutCache(projectId)
-    setNotice('Đã chạy lại auto-layout.', 'success')
-  } catch (error: any) {
-    setNotice(error?.message || 'Chạy lại auto-layout thất bại.', 'error')
-  } finally {
-    autoLayoutManualApplying.value = false
-  }
-}
-
-// Manual auto-layout preview/apply functions removed - auto mode only
 
 onMounted(() => {
   fetchHealth()
-  initAuth()
+  initAuth({ onSuccess: onAuthSuccess })
 })
 </script>
 

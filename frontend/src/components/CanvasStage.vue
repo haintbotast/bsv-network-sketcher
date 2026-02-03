@@ -449,8 +449,8 @@ const visibleSubnetGroups = computed(() => {
 })
 
 const DEVICE_GAP = 12
-const ROLE_ORDER_MAIN = ['router', 'firewall', 'core', 'dist', 'access', 'endpoint']
-const ROLE_ORDER_SUB = ['access', 'endpoint']
+const ROLE_ORDER_MAIN = ['router', 'firewall', 'core', 'dist', 'server', 'access', 'endpoint']
+const ROLE_ORDER_SUB = ['access', 'server', 'endpoint']
 
 const DEVICE_COLORS: Array<{ match: (device: DeviceModel) => boolean; color: [number, number, number] }> = [
   { match: device => device.type === 'Router' || /RTR|ROUTER|ISP/i.test(device.name), color: [70, 130, 180] },
@@ -499,6 +499,9 @@ function resolveDeviceRole(device: DeviceModel) {
   }
   if (name.includes('DIST')) {
     return 'dist'
+  }
+  if (device.type === 'Switch' && (name.includes('SRV') || name.includes('SERVER') || name.includes('STORAGE') || name.includes('NAS') || name.includes('SAN'))) {
+    return 'server'
   }
   if (name.includes('ACC') || name.includes('ACCESS')) {
     return 'access'

@@ -38,16 +38,36 @@ def simple_layer_layout(devices: list, links: list, config: LayoutConfig) -> Lay
     start_time = time.time()
 
     # Device type to layer mapping (NS gốc style)
+    # Layer assignment (top-to-bottom):
+    # 0: Router/Firewall
+    # 1: Core switch
+    # 2: Distribution/Access switch
+    # 3: Server switch
+    # 4: Server/Storage
+    # 5: Endpoints (AP/PC/Unknown)
     device_type_layers = {
         "Firewall": 0,
         "Router": 0,
-        "Switch": 1,
-        "Server": 2,
-        "Storage": 2,
-        "AP": 3,
-        "PC": 3,
-        "Unknown": 3,
+        "Server": 4,
+        "Storage": 4,
+        "AP": 5,
+        "PC": 5,
+        "Unknown": 5,
     }
+
+    def normalize_name(value: str | None) -> str:
+        return (value or "").upper()
+
+    def detect_switch_layer(device_name: str) -> int:
+        if "CORE" in device_name:
+            return 1
+        if "DIST" in device_name or "DISTR" in device_name:
+            return 2
+        if "SRV" in device_name or "SERVER" in device_name or "STORAGE" in device_name or "NAS" in device_name or "SAN" in device_name:
+            return 3
+        if "ACC" in device_name or "ACCESS" in device_name:
+            return 2
+        return 2
 
     # Group devices by layer
     layers: dict[int, list] = {}
@@ -55,7 +75,10 @@ def simple_layer_layout(devices: list, links: list, config: LayoutConfig) -> Lay
 
     for device in devices:
         device_type = getattr(device, "device_type", "Unknown")
-        layer_idx = device_type_layers.get(device_type, 3)
+        if device_type == "Switch":
+            layer_idx = detect_switch_layer(normalize_name(getattr(device, "name", "")))
+        else:
+            layer_idx = device_type_layers.get(device_type, 5)
         layers.setdefault(layer_idx, []).append(device)
 
     # Build adjacency graph for topology-aware ordering

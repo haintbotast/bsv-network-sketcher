@@ -41,7 +41,7 @@
 
 **Nguyên tắc chung (bắt buộc):**
 - **Macro (Area):** sắp xếp các Area theo location/tầng; không để thiết bị xuyên Area.
-- **Micro (Device):** mỗi Area là một lưới **top‑to‑bottom** (Core/Distribution ở trên, Access ở giữa, Endpoints ở dưới).
+- **Micro (Device):** mỗi Area là một lưới **top‑to‑bottom** theo thứ tự: **Router/Firewall → Core Switch → Distribution/Access Switch → Server Switch → Server/Storage → Endpoints**.
 - Cho phép **nhiều hàng trong cùng tầng** và **so‑le nhẹ** để giảm đường vòng liên kết; vẫn giữ hướng top‑down.
 - Ưu tiên **thiết bị cùng loại ở cùng một hàng** nếu kích thước hàng cho phép (ví dụ cụm HA/Sync).
 - Ưu tiên **gom nhóm thiết bị có cùng prefix tên** (ví dụ `HN-SW-CORE-xx`, `HN-SW-DIST-xx`) để các thiết bị liên quan đứng gần nhau.
@@ -99,7 +99,7 @@
 - Thiết bị **Server/NAS/Storage/Server Switch** không được nằm trong area Project/Office/IT; phải gom về **Area Server**.
 - Thiết bị **Monitor/NOC/NMS** được gộp vào **Area IT** (không tạo Area Monitor riêng).
 - **Access Switch** phải nằm **trong area nghiệp vụ** (Head Office/Department/Project/IT), **không tạo area Access riêng**.
-- **Server Switch** được xem là **Distribution Switch** trong lớp Server; server chỉ kết nối lên **Server Distribution Switch**.
+- **Server Switch** nằm dưới lớp Distribution/Access, đóng vai trò Distribution trong lớp Server; server chỉ kết nối lên **Server Switch**.
 
 ---
 

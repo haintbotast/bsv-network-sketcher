@@ -59,8 +59,12 @@
 - Link đi qua **anchor** trên biên Area để giảm cắt xuyên.
 - Ưu tiên **corridor cục bộ** giữa 2 Area nếu có **gap sạch** (không bị Area khác chặn); fallback về corridor global ngoài biên Area khi không hợp lệ.
 - **Cho phép tuyến liên‑area/waypoint đi ra ngoài đường bao sơ đồ** khi cần để giảm cắt chéo; viewport/pan phải **tính cả waypoint + link extents** để tránh bị cắt mất đoạn.
-- **Liên‑area qua waypoint:** tuyến **anchor → waypoint → anchor** ưu tiên **any‑angle (Theta\*) + bo góc nhẹ** để giảm gãy góc; nếu không tìm được đường thì fallback hành lang.
-- Routing link ưu tiên **tránh vật cản** (area/device/**interface tag**) và **giảm chồng lấn**; nếu không bị cản thì giữ đường thẳng ngắn nhất, nếu bị cản thì dùng **any‑angle (Theta\*)** để vẫn ưu tiên đường chéo và **bo góc nhẹ**.
+- **Liên‑area qua waypoint:**  
+  - **L1:** giữ **Manhattan (ngang/dọc)**, **không shortcut chéo**; bo góc bằng **lineJoin round**.  
+  - **L2/L3:** ưu tiên **any‑angle (Theta\*) + bo góc nhẹ**; nếu không tìm được đường thì fallback hành lang.
+- Routing link ưu tiên **tránh vật cản** (area/device/**interface tag**) và **giảm chồng lấn**:  
+  - **L1:** giữ **orthogonal**; nếu không bị cản thì đường thẳng ngắn nhất, nếu bị cản thì **A\*** theo lưới và **không tạo đoạn chéo**.  
+  - **L2/L3:** có thể dùng **any‑angle (Theta\*)** để ưu tiên đường chéo và **bo góc nhẹ**.
 - **Anchor port tối ưu 2‑pass:** pass 1 định tuyến để lấy hướng/điểm tham chiếu, pass 2 sắp xếp lại anchor theo side + thứ tự để giãn cách hợp lý và bám tuyến ngắn nhất.
 - **Pair alignment:** với nhiều link giữa 2 thiết bị kề nhau, anchor được **xếp đồng bộ theo thứ tự port phía đối diện** để giảm chéo.
 - **Same-row alignment:** link giữa **2 thiết bị cùng hàng/cùng cột** sẽ ưu tiên **canh thẳng anchor + port label** (ngang hoặc dọc). Chỉ áp dụng khi **đường thẳng không bị vật cản**; nếu bị cản thì giữ routing tránh vật cản.
@@ -126,7 +130,7 @@
 | Area | Rectangle bo góc | Nền nhạt xám nhẹ, label góc trên trái, **không viền**, có **đổ bóng nhẹ** |
 | Device | Rectangle bo góc | Màu theo loại thiết bị, **không viền**, có **đổ bóng nhẹ** |
 | Waypoint | Diamond hoặc Circle | Không hiện label khi zoom out |
-| Link | Line | **L1 ưu tiên Manhattan (ngang/dọc)** theo tuyến tối ưu tránh vật cản, **không dùng đường chéo dài**; **bo góc nhẹ** ở các điểm rẽ; L2/L3 dùng Manhattan; màu theo purpose; nét liền/đứt; **bo góc mềm** (lineJoin/lineCap round) |
+| Link | Line | **L1 ưu tiên Manhattan (ngang/dọc)** theo tuyến tối ưu tránh vật cản, **không shortcut chéo**; bo góc bằng **lineJoin/lineCap round**. **L2/L3 ưu tiên any‑angle (Theta\*) + bo góc nhẹ**; màu theo purpose; nét liền/đứt |
 | Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor**, có thể xoay theo hướng link; auto-scale theo zoom (0.6-1.15) và tự giãn để tránh chồng lấn; **viền xám mảnh, không đổ bóng** |
 
 - Auto-layout cần **tính thêm vùng đệm Interface Tag** khi giãn khoảng cách giữa thiết bị để tránh chồng lấn.

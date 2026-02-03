@@ -182,6 +182,34 @@ export function routeLinks(
     return false
   }
 
+  const simplifyOrthogonalPath = (pts: Array<{ x: number; y: number }>) => {
+    if (pts.length <= 2) return pts
+    const eps = 0.5
+    const out: Array<{ x: number; y: number }> = []
+
+    pts.forEach(point => {
+      const last = out[out.length - 1]
+      if (last && Math.abs(point.x - last.x) <= eps && Math.abs(point.y - last.y) <= eps) {
+        return
+      }
+      out.push(point)
+      while (out.length >= 3) {
+        const a = out[out.length - 3]
+        const b = out[out.length - 2]
+        const c = out[out.length - 1]
+        const colX = Math.abs(a.x - b.x) <= eps && Math.abs(b.x - c.x) <= eps
+        const colY = Math.abs(a.y - b.y) <= eps && Math.abs(b.y - c.y) <= eps
+        if (colX || colY) {
+          out.splice(out.length - 2, 1)
+        } else {
+          break
+        }
+      }
+    })
+
+    return out
+  }
+
   type ExitSide = 'left' | 'right' | 'top' | 'bottom'
   const exitBundleIndex = (() => {
     const index = new Map<string, { index: number; total: number; side: ExitSide }>()
@@ -406,9 +434,8 @@ export function routeLinks(
             })
             appendPoints(assembled, [toExit, toBase, toAnchor])
 
-            const cornerRadius = Math.max(2, Math.min(minSegment * 0.6, 10 * scale))
-            const smoothed = smoothAnyAnglePath(assembled, obstacles, clearance, cornerRadius, minSegment)
-            smoothed.forEach(point => pushPoint(points, point.x, point.y))
+            const simplified = simplifyOrthogonalPath(assembled)
+            simplified.forEach(point => pushPoint(points, point.x, point.y))
             routed = true
           }
         } else {
@@ -611,14 +638,13 @@ export function routeLinks(
       }
 
       if (isL1 && !routed && points.length >= 6 && hasCorner(points)) {
-        const cornerRadius = Math.max(2, Math.min(minSegment * 0.8, 12 * scale))
         const pathPoints: Array<{ x: number; y: number }> = []
         for (let i = 0; i + 1 < points.length; i += 2) {
           pathPoints.push({ x: points[i], y: points[i + 1] })
         }
-        const smoothed = smoothAnyAnglePath(pathPoints, obstacles, clearance, cornerRadius, minSegment)
+        const simplified = simplifyOrthogonalPath(pathPoints)
         points = []
-        smoothed.forEach(point => pushPoint(points, point.x, point.y))
+        simplified.forEach(point => pushPoint(points, point.x, point.y))
       }
 
       const debugStroke = (() => {

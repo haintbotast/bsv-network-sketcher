@@ -235,14 +235,36 @@ export function routeLinks(
 
       let routed = false
       // Use direct any-angle routing for all links (waypoint logic disabled)
-      if (allowAStar && !directAllowed) {
+      if (allowAStar && !directAllowed && grid) {
         const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
+
+        // Apply bundle offset perpendicular to link direction to separate parallel links
+        const dir = normalizeVector(toCenter.x - fromCenter.x, toCenter.y - fromCenter.y)
+        const perp = { x: -dir.y, y: dir.x }
+        const offsetFromExit = {
+          x: fromExit.x + perp.x * bundleOffset,
+          y: fromExit.y + perp.y * bundleOffset
+        }
+        const offsetToExit = {
+          x: toExit.x + perp.x * bundleOffset,
+          y: toExit.y + perp.y * bundleOffset
+        }
+
+        // Convert grid format to GridSpec
+        const gridSpec = {
+          originX: grid.minX,
+          originY: grid.minY,
+          size: grid.cellSize,
+          cols: grid.cols,
+          rows: grid.rows
+        }
+
         const route = routeAnyAnglePath({
-          start: fromExit,
-          end: toExit,
+          start: offsetFromExit,
+          end: offsetToExit,
           obstacles,
           clearance,
-          grid,
+          grid: gridSpec,
           occupancy,
           preferAxis
         })

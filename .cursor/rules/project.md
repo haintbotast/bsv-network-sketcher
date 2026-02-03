@@ -68,6 +68,7 @@ globs:
 - Khi người dùng cung cấp chỉ thị mới, cập nhật file này và các file hướng dẫn theo công cụ
   (AGENTS.md, CLAUDE.md) để đồng bộ.
 - Sau mỗi lần hoàn thành yêu cầu, **tự động commit/push** nếu không bị chặn; nếu không thể thì báo rõ lý do.
+- Luôn **đồng bộ thay đổi** sang thư mục triển khai `/opt/bsv-ns-deploy`; nếu không thể thì báo rõ lý do.
 - Mọi thay đổi về topology/triển khai/luồng dữ liệu phải cập nhật PROJECT_TOPOLOGY.md.
 - Mọi thay đổi về yêu cầu nghiệp vụ/sản phẩm/kỹ thuật phải cập nhật BRD/PRD/SRS tương ứng.
 - Mọi thay đổi về hình khối/màu/nét/chữ phải cập nhật DIAGRAM_STYLE_SPEC.md.

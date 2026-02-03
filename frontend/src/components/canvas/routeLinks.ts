@@ -234,9 +234,8 @@ export function routeLinks(
       )
 
       let routed = false
-      // Only use direct any-angle routing for intra-area links
-      // Inter-area links should go through waypoint first
-      if (allowAStar && !directAllowed && isIntraArea) {
+      // Use direct any-angle routing for all links (waypoint logic disabled)
+      if (allowAStar && !directAllowed) {
         const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
         const route = routeAnyAnglePath({
           start: fromExit,
@@ -264,147 +263,83 @@ export function routeLinks(
 
       if (!routed) {
         if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
-          const wpKey = fromAreaId < toAreaId ? `${fromAreaId}|${toAreaId}` : `${toAreaId}|${fromAreaId}`
-          const wp = waypointAreaMap.get(wpKey)
-
-          if (wp) {
-            const axis = resolveLaneAxis(fromAreaId, toAreaId)
-            const wpInset = Math.max(2, 4 * scale)
-            const maxOffsetX = Math.max(0, wp.rect.width / 2 - wpInset)
-            const maxOffsetY = Math.max(0, wp.rect.height / 2 - wpInset)
-            const wpOffsetX = axis === 'x' ? clamp(interBundleOffset, -maxOffsetX, maxOffsetX) : 0
-            const wpOffsetY = axis === 'y' ? clamp(interBundleOffset, -maxOffsetY, maxOffsetY) : 0
-            const wpTarget = { x: wp.cx + wpOffsetX, y: wp.cy + wpOffsetY }
-
-            const waypointObstacles = obstacles.filter(rect => rect !== wp.rect)
-            const routeToWp = routeAnyAnglePath({
-              start: fromExit,
-              end: wpTarget,
-              obstacles: waypointObstacles,
-              clearance,
-              grid,
-              occupancy,
-              preferAxis: axis === 'x' ? 'y' : 'x'
-            })
-            const routeFromWp = routeAnyAnglePath({
-              start: wpTarget,
-              end: toExit,
-              obstacles: waypointObstacles,
-              clearance,
-              grid,
-              occupancy,
-              preferAxis: axis === 'x' ? 'y' : 'x'
-            })
-
-            if (routeToWp && routeFromWp) {
-              const cornerRadius = Math.max(2, Math.min(minSegment * 0.8, 12 * scale))
-              const segment1 = smoothAnyAnglePath(routeToWp.points, waypointObstacles, clearance, cornerRadius, minSegment)
-              const segment2 = smoothAnyAnglePath(routeFromWp.points, waypointObstacles, clearance, cornerRadius, minSegment)
-
-              points = []
-              pushPoint(points, fromAnchor.x, fromAnchor.y)
-              segment1.forEach(point => pushPoint(points, point.x, point.y))
-              segment2.forEach((point, idx) => {
-                if (idx === 0) return
-                pushPoint(points, point.x, point.y)
-              })
-              pushPoint(points, toAnchor.x, toAnchor.y)
-
-              addOccupancy(occupancy, routeToWp.gridPath)
-              addOccupancy(occupancy, routeFromWp.gridPath)
-              routed = true
+          // Waypoint routing disabled - use corridor fallback directly
+          const localCorridor = computeLocalCorridor(
+            fromArea,
+            toArea,
+            fromExit,
+            toExit,
+            fromAreaId,
+            toAreaId,
+            interBundleOffset,
+            clearance,
+            areaRects
+          )
+          if (localCorridor) {
+            const { axis, coord, fromAreaAnchor, toAreaAnchor } = localCorridor
+            points = []
+            pushPoint(points, fromAnchor.x, fromAnchor.y)
+            pushPoint(points, fromExit.x, fromExit.y)
+            pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+            if (axis === 'x') {
+              pushPoint(points, coord, fromAreaAnchor.y)
+              pushPoint(points, coord, toAreaAnchor.y)
             } else {
-              const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, wpTarget, interBundleOffset, anchorOffset)
-              const toAreaAnchor = computeAreaAnchor(toArea, toExit, wpTarget, interBundleOffset, anchorOffset)
-              points = []
-              pushPoint(points, fromAnchor.x, fromAnchor.y)
-              pushPoint(points, fromExit.x, fromExit.y)
-              pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-              pushPoint(points, wpTarget.x, fromAreaAnchor.y)
-              pushPoint(points, wpTarget.x, wpTarget.y)
-              pushPoint(points, wpTarget.x, toAreaAnchor.y)
-              pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-              pushPoint(points, toExit.x, toExit.y)
-              pushPoint(points, toAnchor.x, toAnchor.y)
+              pushPoint(points, fromAreaAnchor.x, coord)
+              pushPoint(points, toAreaAnchor.x, coord)
             }
+            pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+            pushPoint(points, toExit.x, toExit.y)
+            pushPoint(points, toAnchor.x, toAnchor.y)
           } else {
-            const localCorridor = computeLocalCorridor(
-              fromArea,
-              toArea,
-              fromExit,
-              toExit,
-              fromAreaId,
-              toAreaId,
-              interBundleOffset,
-              clearance,
-              areaRects
-            )
-            if (localCorridor) {
-              const { axis, coord, fromAreaAnchor, toAreaAnchor } = localCorridor
-              points = []
-              pushPoint(points, fromAnchor.x, fromAnchor.y)
-              pushPoint(points, fromExit.x, fromExit.y)
-              pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-              if (axis === 'x') {
-                pushPoint(points, coord, fromAreaAnchor.y)
-                pushPoint(points, coord, toAreaAnchor.y)
-              } else {
-                pushPoint(points, fromAreaAnchor.x, coord)
-                pushPoint(points, toAreaAnchor.x, coord)
-              }
-              pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-              pushPoint(points, toExit.x, toExit.y)
-              pushPoint(points, toAnchor.x, toAnchor.y)
-            } else {
-              const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, anchorOffset)
-              const toAreaAnchor = computeAreaAnchor(toArea, toExit, fromExit, interBundleOffset, anchorOffset)
-              if (areaBounds) {
-                const corridorGap = (renderTuning.corridor_gap ?? 0) + (renderTuning.area_clearance ?? 0) + Math.abs(interBundleOffset)
-                const dx = toAnchor.x - fromAnchor.x
-                const dy = toAnchor.y - fromAnchor.y
-                if (Math.abs(dx) >= Math.abs(dy)) {
-                  const topY = areaBounds.minY - corridorGap
-                  const bottomY = areaBounds.maxY + corridorGap
-                  const midY = (fromAnchor.y + toAnchor.y) / 2
-                  const corridorBaseY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
-                  const corridorY = corridorBaseY + interBundleOffset
-                  points = []
-                  pushPoint(points, fromAnchor.x, fromAnchor.y)
-                  pushPoint(points, fromExit.x, fromExit.y)
-                  pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-                  pushPoint(points, fromAreaAnchor.x, corridorY)
-                  pushPoint(points, toAreaAnchor.x, corridorY)
-                  pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-                  pushPoint(points, toExit.x, toExit.y)
-                  pushPoint(points, toAnchor.x, toAnchor.y)
-                } else {
-                  const leftX = areaBounds.minX - corridorGap
-                  const rightX = areaBounds.maxX + corridorGap
-                  const midX = (fromAnchor.x + toAnchor.x) / 2
-                  const corridorBaseX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
-                  const corridorX = corridorBaseX + interBundleOffset
-                  points = []
-                  pushPoint(points, fromAnchor.x, fromAnchor.y)
-                  pushPoint(points, fromExit.x, fromExit.y)
-                  pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-                  pushPoint(points, corridorX, fromAreaAnchor.y)
-                  pushPoint(points, corridorX, toAreaAnchor.y)
-                  pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-                  pushPoint(points, toExit.x, toExit.y)
-                  pushPoint(points, toAnchor.x, toAnchor.y)
-                }
-              } else {
-                const midX = (fromAnchor.x + toAnchor.x) / 2 + interBundleOffset
+            const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, anchorOffset)
+            const toAreaAnchor = computeAreaAnchor(toArea, toExit, fromExit, interBundleOffset, anchorOffset)
+            if (areaBounds) {
+              const corridorGap = (renderTuning.corridor_gap ?? 0) + (renderTuning.area_clearance ?? 0) + Math.abs(interBundleOffset)
+              const dx = toAnchor.x - fromAnchor.x
+              const dy = toAnchor.y - fromAnchor.y
+              if (Math.abs(dx) >= Math.abs(dy)) {
+                const topY = areaBounds.minY - corridorGap
+                const bottomY = areaBounds.maxY + corridorGap
+                const midY = (fromAnchor.y + toAnchor.y) / 2
+                const corridorBaseY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
+                const corridorY = corridorBaseY + interBundleOffset
                 points = []
                 pushPoint(points, fromAnchor.x, fromAnchor.y)
                 pushPoint(points, fromExit.x, fromExit.y)
                 pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-                pushPoint(points, midX, fromAreaAnchor.y)
-                pushPoint(points, midX, toAreaAnchor.y)
+                pushPoint(points, fromAreaAnchor.x, corridorY)
+                pushPoint(points, toAreaAnchor.x, corridorY)
+                pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+                pushPoint(points, toExit.x, toExit.y)
+                pushPoint(points, toAnchor.x, toAnchor.y)
+              } else {
+                const leftX = areaBounds.minX - corridorGap
+                const rightX = areaBounds.maxX + corridorGap
+                const midX = (fromAnchor.x + toAnchor.x) / 2
+                const corridorBaseX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
+                const corridorX = corridorBaseX + interBundleOffset
+                points = []
+                pushPoint(points, fromAnchor.x, fromAnchor.y)
+                pushPoint(points, fromExit.x, fromExit.y)
+                pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+                pushPoint(points, corridorX, fromAreaAnchor.y)
+                pushPoint(points, corridorX, toAreaAnchor.y)
                 pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
                 pushPoint(points, toExit.x, toExit.y)
                 pushPoint(points, toAnchor.x, toAnchor.y)
               }
+            } else {
+              const midX = (fromAnchor.x + toAnchor.x) / 2 + interBundleOffset
+              points = []
+              pushPoint(points, fromAnchor.x, fromAnchor.y)
+              pushPoint(points, fromExit.x, fromExit.y)
+              pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+              pushPoint(points, midX, fromAreaAnchor.y)
+              pushPoint(points, midX, toAreaAnchor.y)
+              pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+              pushPoint(points, toExit.x, toExit.y)
+              pushPoint(points, toAnchor.x, toAnchor.y)
             }
           }
         } else if (isL1) {

@@ -54,7 +54,6 @@
           @click="() => emitSelect(device.id, 'device')"
         >
           <v-rect :config="device.rect" />
-          <v-image v-if="device.icon" :config="device.icon" />
           <v-text :config="device.label" />
         </v-group>
         <v-group
@@ -107,7 +106,6 @@ import type { AreaModel, DeviceModel, LinkModel, Viewport, ViewMode, L2Assignmen
 import type { PortAnchorOverrideMap } from './canvas/linkRoutingTypes'
 import { getVisibleBounds, logicalRectToView } from '../utils/viewport'
 import { useLinkRouting } from './canvas/useLinkRouting'
-import { getDeviceIconImage } from './canvas/deviceIcons'
 
 const props = defineProps<{
   areas: AreaModel[]
@@ -454,6 +452,21 @@ const DEVICE_GAP = 12
 const ROLE_ORDER_MAIN = ['router', 'firewall', 'core', 'dist', 'server', 'access', 'endpoint']
 const ROLE_ORDER_SUB = ['access', 'server', 'endpoint']
 
+const DEVICE_COLORS: Array<{ match: (device: DeviceModel) => boolean; color: [number, number, number] }> = [
+  { match: device => device.type === 'Router' || /RTR|ROUTER|ISP/i.test(device.name), color: [70, 130, 180] },
+  { match: device => device.type === 'Firewall' || /FW|FIREWALL|VPN|SECURITY/i.test(device.name), color: [220, 80, 80] },
+  { match: device => /CORE|SW-CORE/i.test(device.name), color: [34, 139, 34] },
+  { match: device => /DIST|DISTR/i.test(device.name), color: [60, 179, 113] },
+  { match: device => /ACC|ACCESS/i.test(device.name), color: [0, 139, 139] },
+  { match: device => device.type === 'Server' || /SRV|SERVER|APP|WEB|DB/i.test(device.name), color: [106, 90, 205] },
+  { match: device => device.type === 'Storage' || /STO|NAS|SAN|STORAGE|BACKUP/i.test(device.name), color: [205, 133, 63] },
+  { match: device => device.type === 'AP' || /\\bAP\\b/i.test(device.name), color: [0, 139, 139] }
+]
+
+function rgbToHex(rgb: [number, number, number]) {
+  return `#${rgb.map(value => value.toString(16).padStart(2, '0')).join('')}`
+}
+
 function adjustHexLightness(hex: string, delta: number) {
   const cleaned = hex.replace('#', '')
   if (cleaned.length !== 6) return hex
@@ -462,6 +475,15 @@ function adjustHexLightness(hex: string, delta: number) {
   const b = parseInt(cleaned.slice(4, 6), 16)
   const adjust = (value: number) => Math.min(255, Math.max(0, Math.round(value + 255 * delta)))
   return `#${[adjust(r), adjust(g), adjust(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`
+}
+
+function resolveDeviceFill(device: DeviceModel) {
+  for (const entry of DEVICE_COLORS) {
+    if (entry.match(device)) {
+      return rgbToHex(entry.color)
+    }
+  }
+  return '#d9d9d9'
 }
 
 function resolveDeviceRole(device: DeviceModel) {
@@ -629,14 +651,7 @@ const visibleDevices = computed(() => {
     .map(device => {
       const rect = deviceViewMap.value.get(device.id)!
       const isSelected = props.selectedId === device.id
-      const iconImage = getDeviceIconImage(device.type || 'Unknown')
-      const labelBand = Math.min(22, rect.height * 0.4)
-      const iconPadding = 6
-      const iconMaxWidth = Math.max(rect.width - iconPadding * 2, 12)
-      const iconMaxHeight = Math.max(rect.height - labelBand - iconPadding, 12)
-      const iconSize = Math.max(12, Math.min(iconMaxWidth, iconMaxHeight))
-      const iconX = (rect.width - iconSize) / 2
-      const iconY = labelBand + Math.max(0, (rect.height - labelBand - iconSize) / 2)
+      const fill = resolveDeviceFill(device)
       return {
         id: device.id,
         group: {
@@ -652,21 +667,16 @@ const visibleDevices = computed(() => {
           y: 0,
           width: rect.width,
           height: rect.height,
-          fill: 'transparent',
+          fill,
           stroke: isSelected ? '#d66c3b' : 'transparent',
           strokeWidth: isSelected ? 2 : 0,
           cornerRadius: 8,
-          shadowEnabled: false
+          shadowColor: 'rgba(0, 0, 0, 0.22)',
+          shadowBlur: 6,
+          shadowOffset: { x: 0, y: 3 },
+          shadowOpacity: 0.22,
+          shadowForStrokeEnabled: false
         },
-        icon: iconImage ? {
-          x: iconX,
-          y: iconY,
-          width: iconSize,
-          height: iconSize,
-          image: iconImage,
-          opacity: 0.92,
-          listening: false
-        } : null,
         label: {
           x: 8,
           y: 8,

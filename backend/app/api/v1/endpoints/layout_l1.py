@@ -59,7 +59,7 @@ def compute_layout_l1(
         """Detect area tier with enhanced granularity (0-10)."""
         label = normalize(name)
         tier_hints = [
-            (0, ["edge", "wan", "internet", "isp"]),
+            (0, ["router", "rtr", "edge", "wan", "internet", "isp"]),
             (1, ["security", "firewall", "fw", "ids", "ips", "waf", "vpn", "soc"]),
             (2, ["dmz", "proxy", "datacenter", "data center", "dc"]),
             (3, ["core"]),
@@ -81,7 +81,7 @@ def compute_layout_l1(
         name = normalize(getattr(device, "name", ""))
         dtype = normalize(getattr(device, "device_type", ""))
         tier_keywords = [
-            (0, ["edge", "wan", "internet", "isp"]),
+            (0, ["router", "rtr", "edge", "wan", "internet", "isp"]),
             (1, ["firewall", "fw", "ids", "ips", "waf", "security", "vpn", "soc"]),
             (2, ["dmz", "proxy"]),
             (3, ["core"]),
@@ -366,7 +366,10 @@ def compute_layout_l1(
         device_hint = min(device_tiers) if device_tiers else None
 
         if area_hint is not None and device_hint is not None:
-            if area_hint in {1, 2, 10}:
+            # Router (tier 0) always takes highest priority
+            if device_hint == 0:
+                tier = 0
+            elif area_hint in {1, 2, 10}:
                 tier = area_hint
             else:
                 tier = min(area_hint, device_hint)

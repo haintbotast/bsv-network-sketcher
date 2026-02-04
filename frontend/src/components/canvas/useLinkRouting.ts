@@ -384,7 +384,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       ) => {
         if (!text) return
         const width = Math.max(text.length * charWidth + labelPadding, minLabelWidth)
-        const desiredDistance = Math.max(labelOffset, width / 2 + 4)
+        const desiredDistance = labelOffset
         const fallback = computePortLabelPlacement(anchor, center, width, labelHeight, labelOffset)
         const safeDistance = path.total > 0
           ? (desiredDistance <= path.total ? desiredDistance : Math.max(path.total * 0.5, 0))
@@ -451,42 +451,45 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     })
 
     // Single-pass collision avoidance per device-side
-    const bySide = new Map<string, typeof rawLabels>()
-    rawLabels.forEach(label => {
-      const key = `${label.deviceId}-${label.side}`
-      const list = bySide.get(key) || []
-      list.push(label)
-      bySide.set(key, list)
-    })
-
-    const maxDisplacement = 60 * labelScale
-
-    bySide.forEach(list => {
-      if (list.length < 2) return
-      const side = list[0].side
-      const originals = list.map(l => l.originalDistance)
-
-      const isVertical = side === 'left' || side === 'right'
-      const sizeFor = (label: (typeof list)[number]) => (isVertical ? label.height : label.width)
-      list.sort((a, b) => a.distance - b.distance)
-      let cursor = list[0].distance
-      list.forEach((label, idx) => {
-        if (idx === 0) return
-        const minGap = (sizeFor(list[idx - 1]) + sizeFor(label)) / 2 + 2 * labelScale
-        if (label.distance < cursor + minGap) {
-          label.distance = cursor + minGap
-        }
-        cursor = label.distance
+    const allowLabelShift = false
+    if (allowLabelShift) {
+      const bySide = new Map<string, typeof rawLabels>()
+      rawLabels.forEach(label => {
+        const key = `${label.deviceId}-${label.side}`
+        const list = bySide.get(key) || []
+        list.push(label)
+        bySide.set(key, list)
       })
 
-      list.forEach((label, idx) => {
-        const orig = originals[idx]
-        const delta = label.distance - orig
-        if (Math.abs(delta) > maxDisplacement) {
-          label.distance = orig + Math.sign(delta) * maxDisplacement
-        }
+      const maxDisplacement = 60 * labelScale
+
+      bySide.forEach(list => {
+        if (list.length < 2) return
+        const side = list[0].side
+        const originals = list.map(l => l.originalDistance)
+
+        const isVertical = side === 'left' || side === 'right'
+        const sizeFor = (label: (typeof list)[number]) => (isVertical ? label.height : label.width)
+        list.sort((a, b) => a.distance - b.distance)
+        let cursor = list[0].distance
+        list.forEach((label, idx) => {
+          if (idx === 0) return
+          const minGap = (sizeFor(list[idx - 1]) + sizeFor(label)) / 2 + 2 * labelScale
+          if (label.distance < cursor + minGap) {
+            label.distance = cursor + minGap
+          }
+          cursor = label.distance
+        })
+
+        list.forEach((label, idx) => {
+          const orig = originals[idx]
+          const delta = label.distance - orig
+          if (Math.abs(delta) > maxDisplacement) {
+            label.distance = orig + Math.sign(delta) * maxDisplacement
+          }
+        })
       })
-    })
+    }
 
     rawLabels.forEach(label => {
       const point = resolvePointAlongPath(label.path, label.distance, label.fromStart)

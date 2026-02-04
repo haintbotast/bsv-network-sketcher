@@ -378,19 +378,21 @@ export function routeLinks(
       const directOrthogonal = Math.abs(fromAnchor.x - toAnchor.x) < 1 || Math.abs(fromAnchor.y - toAnchor.y) < 1
       const directAllowed = isL1 && !lineBlocked && directOrthogonal
       // Allow diagonal direct line when no obstacles block the path
-      const diagonalAllowed = !lineBlocked && !directOrthogonal
+      const diagonalAllowed = !isL1 && !lineBlocked && !directOrthogonal
 
       const fromSide = fromAnchor.side || computeSide(fromView, toCenter)
       const toSide = toAnchor.side || computeSide(toView, fromCenter)
-      const fromLabelStub = isL1View && meta.fromLabelWidth ? meta.fromLabelWidth + LABEL_STUB_PADDING : 0
-      const toLabelStub = isL1View && meta.toLabelWidth ? meta.toLabelWidth + LABEL_STUB_PADDING : 0
+      const labelStub = isL1View
+        ? Math.max(0, (renderTuning.port_label_offset ?? 0) * scale) + LABEL_STUB_PADDING
+        : 0
+      const stubDistance = Math.max(baseExitStub, labelStub)
       const fromBase = offsetFromAnchor(
         { ...fromAnchor, side: fromSide },
-        Math.max(baseExitStub, fromLabelStub)
+        stubDistance
       )
       const toBase = offsetFromAnchor(
         { ...toAnchor, side: toSide },
-        Math.max(baseExitStub, toLabelStub)
+        stubDistance
       )
       const fromExitShift = resolveExitShift(`${link.id}|from`)
       const toExitShift = resolveExitShift(`${link.id}|to`)

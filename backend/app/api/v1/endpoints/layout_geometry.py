@@ -78,7 +78,7 @@ def estimate_label_clearance(ports_by_device: dict[str, set[str]], render_tuning
     label_offset = float(tuning.get("port_label_offset", 12))
 
     label_width_px = max(max_len * LABEL_CHAR_WIDTH_PX + LABEL_PADDING_PX, LABEL_MIN_WIDTH_PX)
-    label_width_px += label_gap_x + label_offset
-    label_height_px = LABEL_HEIGHT_PX + label_gap_y + label_offset
+    label_width_px += label_gap_x + label_offset * 2
+    label_height_px = LABEL_HEIGHT_PX + label_gap_y + label_offset * 2
 
     return label_width_px / UNIT_PX, label_height_px / UNIT_PX

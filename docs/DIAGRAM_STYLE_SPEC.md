@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-03  
+> **Cập nhật:** 2026-02-04  
 > **Mục tiêu:** Chuẩn hóa hình khối, nét vẽ, màu sắc, chữ và nền cho toàn hệ thống (UI + Konva + export).
 
 ---
@@ -139,9 +139,9 @@
 - Auto-layout cần **tính thêm vùng đệm Interface Tag** khi giãn khoảng cách giữa thiết bị để tránh chồng lấn.
 - Auto-layout cần **tính thêm băng nhãn** khi xác định kích thước node và khoảng cách:
   - **L1:** cộng `port_label_band` vào kích thước node (rộng/cao) và vào `node_spacing`/`layer_gap`.
-  - **L1 (thực tế):** ước lượng **bề ngang nhãn port** theo độ dài port + `render_tuning` để tăng `node_spacing`/`row_gap` (tránh nhãn bị kẹp giữa thiết bị).
+  - **L1 (thực tế):** ước lượng **bề ngang nhãn port** theo độ dài port + `render_tuning`, **cộng thêm 2×`port_label_offset`** để tăng `node_spacing`/`row_gap` (tránh nhãn bị kẹp giữa thiết bị).
   - **L2/L3:** cộng `label_band` vào chiều cao node để chừa chỗ nhãn L2/L3 dưới thiết bị; đồng thời chừa band nhãn cho group (VLAN/Subnet).
-- **Kích thước thiết bị (Device):** tự động **nới rộng theo độ dài tên** và **tăng chiều cao theo mật độ port** để tránh chồng nhãn.
+- **Kích thước thiết bị (Device):** tự động **nới rộng theo độ dài tên + độ dài nhãn port dài nhất** và **tăng chiều cao theo mật độ port** để tránh chồng nhãn.
 - Micro layout sử dụng **kích thước thiết bị sau auto-resize** để tính bounding và sắp xếp trước khi tính macro layout.
 - **Quy tắc nhãn port:** định dạng **chữ cái + khoảng trắng + số hiệu**.  
   Ví dụ: `Gi 0/1`, `Gi 1/0/48`, `HA 1`, `Port 1`.

@@ -1,7 +1,8 @@
 """
-Device auto-sizing logic based on port count.
+Device auto-sizing logic based on port count and port label length.
 
-Auto-resizes device dimensions based on number of ports (from L1 links + L2 assignments).
+Auto-resizes device dimensions based on number of ports (from L1 links + L2 assignments)
+and the longest port label to keep straight link spacing reasonable.
 """
 
 from __future__ import annotations
@@ -33,11 +34,11 @@ PORT_EDGE_INSET_IN = 6.0 / 120.0
 PORT_LABEL_HEIGHT_IN = 22.0 / 120.0
 
 
-async def compute_device_port_counts(db: AsyncSession, project_id: str) -> dict[str, int]:
+async def compute_device_port_counts(db: AsyncSession, project_id: str) -> dict[str, dict[str, int]]:
     """
-    Compute port count for each device in project.
+    Compute port stats for each device in project.
 
-    Counts unique ports from:
+    Counts unique ports and label lengths from:
     - L1 links (from_port, to_port)
     - L2 interface assignments (interface_name)
 
@@ -46,7 +47,7 @@ async def compute_device_port_counts(db: AsyncSession, project_id: str) -> dict[
         project_id: Project ID
 
     Returns:
-        dict[device_id, port_count]
+        dict[device_id, {"count": int, "max_label_len": int}]
     """
     port_counts: dict[str, set[str]] = {}
 
@@ -85,11 +86,20 @@ async def compute_device_port_counts(db: AsyncSession, project_id: str) -> dict[
         if assignment.device_id in port_counts and assignment.interface_name:
             port_counts[assignment.device_id].add(assignment.interface_name.strip())
 
-    # Convert sets to counts
-    return {device_id: len(ports) for device_id, ports in port_counts.items()}
+    # Convert sets to counts + max port label length
+    stats: dict[str, dict[str, int]] = {}
+    for device_id, ports in port_counts.items():
+        max_len = max((len(p) for p in ports), default=0)
+        stats[device_id] = {"count": len(ports), "max_label_len": max_len}
+
+    return stats
 
 
-def compute_device_size(port_count: int, name: str | None = None) -> tuple[float, float]:
+def compute_device_size(
+    port_count: int,
+    name: str | None = None,
+    max_port_label_len: int = 0,
+) -> tuple[float, float]:
     """
     Compute device width and height based on port count.
 
@@ -101,6 +111,8 @@ def compute_device_size(port_count: int, name: str | None = None) -> tuple[float
 
     Args:
         port_count: Number of ports on device
+        name: Device name (for width sizing)
+        max_port_label_len: Maximum port label length (for width sizing)
 
     Returns:
         tuple[width, height] in inches
@@ -122,8 +134,16 @@ def compute_device_size(port_count: int, name: str | None = None) -> tuple[float
     # Each port needs PORT_LABEL_HEIGHT_IN spacing (same as height calculation)
     ports_width = (PORT_LABEL_HEIGHT_IN * (max_ports_per_side + 1)) + PORT_EDGE_INSET_IN * 2
 
+    # Width from port label text length (if provided)
+    port_label_width = LABEL_MIN_WIDTH_IN
+    if max_port_label_len > 0:
+        port_label_width = max(
+            max_port_label_len * LABEL_CHAR_WIDTH_IN + LABEL_PADDING_IN * 2,
+            LABEL_MIN_WIDTH_IN,
+        )
+
     # Final width: max of base, label, and ports requirement
-    width = max(BASE_WIDTH, text_width, ports_width, MIN_WIDTH)
+    width = max(BASE_WIDTH, text_width, ports_width, port_label_width, MIN_WIDTH)
     width = min(width, MAX_WIDTH)
 
     # Height from ports on left/right sides
@@ -137,23 +157,25 @@ def compute_device_size(port_count: int, name: str | None = None) -> tuple[float
 async def auto_resize_devices_by_ports(
     db: AsyncSession,
     project_id: str,
-    port_counts: dict[str, int],
+    port_stats: dict[str, dict[str, int]],
 ) -> None:
     """
-    Auto-resize devices based on port counts.
+    Auto-resize devices based on port stats.
 
     Updates device.width and device.height in database based on computed
-    dimensions from port_count.
+    dimensions from port_count and port label length.
 
     Args:
         db: Database session
         project_id: Project ID
-        port_counts: dict[device_id, port_count] from compute_device_port_counts()
+        port_stats: dict[device_id, stats] from compute_device_port_counts()
 
     Side effects:
         Updates device.width and device.height in database
     """
-    for device_id, port_count in port_counts.items():
+    for device_id, stats in port_stats.items():
+        port_count = stats.get("count", 0)
+        max_label_len = stats.get("max_label_len", 0)
         # Get device first to access name
         result = await db.execute(
             select(Device).where(Device.id == device_id)
@@ -162,7 +184,7 @@ async def auto_resize_devices_by_ports(
 
         if device:
             # Compute new size (ports + name)
-            width, height = compute_device_size(port_count, device.name)
+            width, height = compute_device_size(port_count, device.name, max_label_len)
             device.width = width
             device.height = height
 

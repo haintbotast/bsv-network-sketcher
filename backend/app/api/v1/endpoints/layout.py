@@ -61,8 +61,8 @@ async def compute_auto_layout(
 
     # Auto-resize devices based on port count (if enabled)
     if options.auto_resize_devices and options.apply_to_db:
-        port_counts = await compute_device_port_counts(db, project_id)
-        await auto_resize_devices_by_ports(db, project_id, port_counts)
+        port_stats = await compute_device_port_counts(db, project_id)
+        await auto_resize_devices_by_ports(db, project_id, port_stats)
         devices = await device_service.get_devices(db, project_id)
 
     admin_config = await get_admin_config(db)

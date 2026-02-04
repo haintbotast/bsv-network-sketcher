@@ -179,6 +179,8 @@ def compute_layout_l1(
                 insert_at = ordered.index(2) + 1
             elif 1 in ordered:
                 insert_at = ordered.index(1) + 1
+            elif 0 in ordered:
+                insert_at = ordered.index(0) + 1
             else:
                 insert_at = 0
             ordered.insert(insert_at, 10)

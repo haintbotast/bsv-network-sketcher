@@ -91,6 +91,7 @@
   - **Tier 8: Department** (Department-specific networks)
   - **Tier 9: Project** (Project-specific networks)
   - **Tier 10: Servers/Storage** (servers, storage)
+  - **Quy tắc ưu tiên:** Tier 10 **không được đứng trước** Tier 0/1; nếu thiếu Tier 1/2 thì **xếp Tier 10 sau Tier 0**.
 - Mỗi tier có **width factor** riêng:
   - Tier 0-4 (Infrastructure): rộng hơn (1.3-1.5x), tối đa 2 areas/hàng
   - Tier 5-6 (Campus/Branch): vừa phải (1.1-1.2x), tối đa 3 areas/hàng

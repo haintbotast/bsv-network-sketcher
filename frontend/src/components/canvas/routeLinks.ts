@@ -360,7 +360,7 @@ export function routeLinks(
           obstacles.push(rect)
         })
       }
-      if (isL1 && labelObstacles.length) {
+      if (!isL1 && labelObstacles.length) {
         labelObstacles.forEach(entry => {
           if (entry.linkId === link.id) return
           obstacles.push(entry.rect)

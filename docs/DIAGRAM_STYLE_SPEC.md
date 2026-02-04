@@ -69,6 +69,7 @@
 - **Pair alignment:** với nhiều link giữa 2 thiết bị kề nhau, anchor được **xếp đồng bộ theo thứ tự port phía đối diện** để giảm chéo.
 - **Same-row alignment:** link giữa **2 thiết bị cùng hàng/cùng cột** sẽ ưu tiên **canh thẳng anchor + port label** (ngang hoặc dọc). Chỉ áp dụng khi **đường thẳng không bị vật cản**; nếu bị cản thì giữ routing tránh vật cản.
 - **Stub theo nhãn port (L1):** đoạn link đi ra khỏi thiết bị **tối thiểu bằng bề ngang nhãn port** để nhãn không đè lên biên thiết bị và đường link.
+- **Thứ tự thiết bị (L1 micro):** **Router ở hàng trên**, Firewall **ở hàng dưới Router**, Core/Distro nằm dưới Firewall.
 - **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng.
 - **Waypoint (L1):** khi có waypoint giữa 2 Area, link đi qua **nhiều tọa độ neo** trên waypoint (theo lane index) để **không chồng lên nhau**.
 - **Override thủ công (per-port):** người dùng có thể **cố định side + offset_ratio** cho từng port; `offset_ratio` có thể để `null` để **giữ auto offset** theo side đã chọn. Override **giữ side là ưu tiên cao nhất**, nhưng **có thể tự căn lại tọa độ** để **giữ link thẳng hàng** khi 2 thiết bị cùng hàng/cột và side đã phù hợp.

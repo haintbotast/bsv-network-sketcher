@@ -39,20 +39,21 @@ def simple_layer_layout(devices: list, links: list, config: LayoutConfig) -> Lay
 
     # Device type to layer mapping (NS gốc style)
     # Layer assignment (top-to-bottom):
-    # 0: Router/Firewall
-    # 1: Core switch
-    # 2: Distribution/Access switch
-    # 3: Server switch
-    # 4: Server/Storage
-    # 5: Endpoints (AP/PC/Unknown)
+    # 0: Router (edge/WAN)
+    # 1: Firewall/Security
+    # 2: Core switch
+    # 3: Distribution/Access switch
+    # 4: Server switch
+    # 5: Server/Storage
+    # 6: Endpoints (AP/PC/Unknown)
     device_type_layers = {
-        "Firewall": 0,
         "Router": 0,
-        "Server": 4,
-        "Storage": 4,
-        "AP": 5,
-        "PC": 5,
-        "Unknown": 5,
+        "Firewall": 1,
+        "Server": 5,
+        "Storage": 5,
+        "AP": 6,
+        "PC": 6,
+        "Unknown": 6,
     }
 
     def normalize_name(value: str | None) -> str:
@@ -60,14 +61,14 @@ def simple_layer_layout(devices: list, links: list, config: LayoutConfig) -> Lay
 
     def detect_switch_layer(device_name: str) -> int:
         if "CORE" in device_name:
-            return 1
+            return 2
         if "DIST" in device_name or "DISTR" in device_name:
-            return 2
-        if "SRV" in device_name or "SERVER" in device_name or "STORAGE" in device_name or "NAS" in device_name or "SAN" in device_name:
             return 3
+        if "SRV" in device_name or "SERVER" in device_name or "STORAGE" in device_name or "NAS" in device_name or "SAN" in device_name:
+            return 4
         if "ACC" in device_name or "ACCESS" in device_name:
-            return 2
-        return 2
+            return 3
+        return 3
 
     # Group devices by layer
     layers: dict[int, list] = {}

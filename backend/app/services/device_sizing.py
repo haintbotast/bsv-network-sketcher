@@ -14,13 +14,13 @@ from app.db.models import Device, L1Link, InterfaceL2Assignment
 
 # Base dimensions (inches)
 BASE_WIDTH = 1.2
-BASE_HEIGHT = 0.5
+BASE_HEIGHT = 0.8
 
 # Sizing strategy: prioritize horizontal expansion (ports on left/right)
 WIDTH_PER_PORT = 0.15  # Each port adds 0.15 inch to width
 MIN_WIDTH = 1.2  # Minimum width
 MAX_WIDTH = 3.6  # Maximum width to prevent overly wide devices
-MAX_HEIGHT = 1.2  # Upper bound to keep layout stable
+MAX_HEIGHT = 1.6  # Upper bound to keep layout stable
 
 # Text sizing (approx, based on UI defaults)
 LABEL_CHAR_WIDTH_IN = 6.0 / 120.0
@@ -28,8 +28,9 @@ LABEL_PADDING_IN = 8.0 / 120.0
 LABEL_MIN_WIDTH_IN = 24.0 / 120.0
 
 # Port label sizing heuristic (based on default render tuning)
+# Each port needs spacing of ~22px (label height 14px + gap 8px)
 PORT_EDGE_INSET_IN = 6.0 / 120.0
-PORT_LABEL_HEIGHT_IN = 16.0 / 120.0
+PORT_LABEL_HEIGHT_IN = 22.0 / 120.0
 
 
 async def compute_device_port_counts(db: AsyncSession, project_id: str) -> dict[str, int]:
@@ -93,9 +94,10 @@ def compute_device_size(port_count: int, name: str | None = None) -> tuple[float
     Compute device width and height based on port count.
 
     Strategy:
-    - Prioritize horizontal (width) expansion
-    - Ports are typically on left/right sides of device
-    - Increase height only for high-density devices (>24 ports)
+    - Ports distributed across 4 sides (left, right, top, bottom)
+    - Height accommodates ports on left/right sides
+    - Width accommodates ports on top/bottom sides AND device label
+    - Use heuristic: max ports per side = ceil(total / 3)
 
     Args:
         port_count: Number of ports on device
@@ -103,9 +105,11 @@ def compute_device_size(port_count: int, name: str | None = None) -> tuple[float
     Returns:
         tuple[width, height] in inches
     """
-    # Width from ports
-    computed_width = BASE_WIDTH + (port_count * WIDTH_PER_PORT)
-    width_from_ports = max(MIN_WIDTH, min(MAX_WIDTH, computed_width))
+    import math
+
+    # Heuristic: assume max ports per side = ceil(port_count / 3)
+    # This accounts for ports being distributed across 2-3 sides typically
+    max_ports_per_side = max(1, math.ceil(port_count / 3))
 
     # Width from label text
     label = (name or "").strip()
@@ -113,12 +117,17 @@ def compute_device_size(port_count: int, name: str | None = None) -> tuple[float
         text_width = max(len(label) * LABEL_CHAR_WIDTH_IN + LABEL_PADDING_IN * 2, LABEL_MIN_WIDTH_IN)
     else:
         text_width = LABEL_MIN_WIDTH_IN
-    width = max(width_from_ports, text_width, MIN_WIDTH)
+
+    # Width from ports on top/bottom sides
+    # Each port needs PORT_LABEL_HEIGHT_IN spacing (same as height calculation)
+    ports_width = (PORT_LABEL_HEIGHT_IN * (max_ports_per_side + 1)) + PORT_EDGE_INSET_IN * 2
+
+    # Final width: max of base, label, and ports requirement
+    width = max(BASE_WIDTH, text_width, ports_width, MIN_WIDTH)
     width = min(width, MAX_WIDTH)
 
-    # Height from port density (approx by side)
-    side_count = max(1, (port_count + 1) // 2)
-    required_height = (PORT_LABEL_HEIGHT_IN * (side_count + 1)) + PORT_EDGE_INSET_IN * 2
+    # Height from ports on left/right sides
+    required_height = (PORT_LABEL_HEIGHT_IN * (max_ports_per_side + 1)) + PORT_EDGE_INSET_IN * 2
     height = max(BASE_HEIGHT, required_height)
     height = min(height, MAX_HEIGHT)
 
@@ -145,16 +154,15 @@ async def auto_resize_devices_by_ports(
         Updates device.width and device.height in database
     """
     for device_id, port_count in port_counts.items():
-        # Compute new size (ports + name)
-        width, height = compute_device_size(port_count, getattr(device, "name", None))
-
-        # Update device
+        # Get device first to access name
         result = await db.execute(
             select(Device).where(Device.id == device_id)
         )
         device = result.scalar_one_or_none()
 
         if device:
+            # Compute new size (ports + name)
+            width, height = compute_device_size(port_count, device.name)
             device.width = width
             device.height = height
 

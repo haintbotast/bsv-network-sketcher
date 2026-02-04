@@ -287,7 +287,7 @@ export function routeLinks(
   })()
 
   const exitBundleGapBase = (renderTuning.bundle_gap ?? 0) * scale
-  const exitBundleGap = exitBundleGapBase > 0 ? Math.max(4, exitBundleGapBase * 0.6) : 0
+  const exitBundleGap = exitBundleGapBase > 0 ? Math.max(6, exitBundleGapBase * 0.85) : 0
   const resolveExitShift = (key: string) => {
     const entry = exitBundleIndex.get(key)
     if (!entry || entry.total <= 1 || exitBundleGap <= 0) return { dx: 0, dy: 0 }
@@ -331,8 +331,9 @@ export function routeLinks(
       const bundleOffset = bundle && bundle.total > 1
         ? (bundle.index - (bundle.total - 1) / 2) * ((renderTuning.bundle_gap ?? 0) * scale)
         : 0
+      // Increased multiplier for better corridor separation
       const interAreaBundleGap = (renderTuning.bundle_gap ?? 0) * scale
-        * (areaBundle && areaBundle.total > 4 ? 1.9 : 1.6)
+        * (areaBundle && areaBundle.total > 4 ? 2.5 : 2.0)
       const areaBundleOffset = areaBundle && areaBundle.total > 1
         ? (areaBundle.index - (areaBundle.total - 1) / 2) * interAreaBundleGap
         : 0
@@ -366,7 +367,7 @@ export function routeLinks(
         })
       }
 
-      const lineBlocked = isL1 && obstacles.some(rect =>
+      const lineBlocked = obstacles.some(rect =>
         segmentIntersectsRect(
           { x: fromAnchor.x, y: fromAnchor.y },
           { x: toAnchor.x, y: toAnchor.y },
@@ -376,6 +377,8 @@ export function routeLinks(
       )
       const directOrthogonal = Math.abs(fromAnchor.x - toAnchor.x) < 1 || Math.abs(fromAnchor.y - toAnchor.y) < 1
       const directAllowed = isL1 && !lineBlocked && directOrthogonal
+      // Allow diagonal direct line when no obstacles block the path
+      const diagonalAllowed = !lineBlocked && !directOrthogonal
 
       const fromSide = fromAnchor.side || computeSide(fromView, toCenter)
       const toSide = toAnchor.side || computeSide(toView, fromCenter)
@@ -395,8 +398,29 @@ export function routeLinks(
       const toExit = { x: toBase.x + toExitShift.dx, y: toBase.y + toExitShift.dy }
 
       let routed = false
+
+      // Direct diagonal routing when no obstacles block the path
+      if (diagonalAllowed && !routed) {
+        // Check if we need stub for port labels
+        const needFromStub = isL1View && meta.fromLabelWidth && meta.fromLabelWidth > 10
+        const needToStub = isL1View && meta.toLabelWidth && meta.toLabelWidth > 10
+
+        if (needFromStub || needToStub) {
+          // Use stubs only when port labels exist
+          pushPoint(points, fromAnchor.x, fromAnchor.y)
+          if (needFromStub) pushPoint(points, fromBase.x, fromBase.y)
+          if (needToStub) pushPoint(points, toBase.x, toBase.y)
+          pushPoint(points, toAnchor.x, toAnchor.y)
+        } else {
+          // Pure diagonal line - no bends
+          pushPoint(points, fromAnchor.x, fromAnchor.y)
+          pushPoint(points, toAnchor.x, toAnchor.y)
+        }
+        routed = true
+      }
+
       // Use direct any-angle routing for all links (waypoint logic disabled)
-      if (allowAStar && !directAllowed && grid) {
+      if (allowAStar && !directAllowed && !routed && grid) {
         const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
         const bundleShift = preferAxis === 'x'
           ? { x: 0, y: bundleOffset }

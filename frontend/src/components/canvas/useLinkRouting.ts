@@ -279,6 +279,8 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     const textPadY = 2 * labelScale
     const minLabelWidth = 24 * labelScale
     const charWidth = 6 * labelScale
+    const labelInset = ((props.viewMode || 'L1') === 'L1') ? charWidth : 0
+    const adjustedLabelOffset = Math.max(0, labelOffset - labelInset)
     const pathCache = new Map<string, { segments: Array<{ ax: number; ay: number; bx: number; by: number; len: number }>; total: number }>()
 
     const rawLabels: Array<{
@@ -384,8 +386,8 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       ) => {
         if (!text) return
         const width = Math.max(text.length * charWidth + labelPadding, minLabelWidth)
-        const desiredDistance = labelOffset
-        const fallback = computePortLabelPlacement(anchor, center, width, labelHeight, labelOffset)
+        const desiredDistance = adjustedLabelOffset
+        const fallback = computePortLabelPlacement(anchor, center, width, labelHeight, adjustedLabelOffset)
         const safeDistance = path.total > 0
           ? (desiredDistance <= path.total ? desiredDistance : Math.max(path.total * 0.5, 0))
           : 0
@@ -523,9 +525,13 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       text: {
         x: label.textPadX,
         y: label.textPadY,
+        width: Math.max(label.width - label.textPadX * 2, 1),
+        height: Math.max(label.height - label.textPadY * 2, 1),
         text: label.text,
         fontSize: label.fontSize,
-        fill: '#2b2a28'
+        fill: '#2b2a28',
+        align: 'center',
+        verticalAlign: 'middle'
       }
     }))
   })

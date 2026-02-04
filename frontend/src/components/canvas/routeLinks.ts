@@ -328,6 +328,9 @@ export function routeLinks(
       const isL1 = isL1View
       const bundle = linkBundleIndex.get(link.id)
       const areaBundle = laneIndex.get(link.id) || areaBundleIndex.get(link.id)
+      const fromExitEntry = exitBundleIndex.get(`${link.id}|from`)
+      const toExitEntry = exitBundleIndex.get(`${link.id}|to`)
+      const hasExitBundle = (fromExitEntry?.total ?? 0) > 1 || (toExitEntry?.total ?? 0) > 1
       const bundleOffset = bundle && bundle.total > 1
         ? (bundle.index - (bundle.total - 1) / 2) * ((renderTuning.bundle_gap ?? 0) * scale)
         : 0
@@ -376,7 +379,7 @@ export function routeLinks(
         )
       )
       const directOrthogonal = Math.abs(fromAnchor.x - toAnchor.x) < 1 || Math.abs(fromAnchor.y - toAnchor.y) < 1
-      const directAllowed = isL1 && !lineBlocked && directOrthogonal
+      const directAllowed = isL1 && !lineBlocked && directOrthogonal && !hasExitBundle
       // Allow diagonal direct line when no obstacles block the path
       const diagonalAllowed = !isL1 && !lineBlocked && !directOrthogonal
 

@@ -33,6 +33,8 @@ export type RouteLinksParams = {
 const LABEL_STUB_PADDING = 4
 const DEBUG_STROKE_L2 = '#c0392b'
 const DEBUG_STROKE_L1_DIAGONAL = '#d35400'
+const LABEL_SCALE_MIN = 0.6
+const LABEL_SCALE_MAX = 1.15
 
 function computeLocalCorridor(
   fromArea: Rect,
@@ -416,18 +418,22 @@ export function routeLinks(
       // Allow diagonal direct line when no obstacles block the path
       const diagonalAllowed = !isL1 && !lineBlocked && !directOrthogonal
 
-      const labelStub = isL1View
-        ? Math.max(0, (renderTuning.port_label_offset ?? 0) * scale) + LABEL_STUB_PADDING
+      const labelScale = clamp(scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
+      const labelInset = Math.max(2, Math.round(6 * labelScale))
+      const labelOffset = (renderTuning.port_label_offset ?? 0) * labelScale
+      const baseLabelDistance = Math.max(0, labelOffset - labelInset)
+      const fromLabelWidth = meta.fromLabelWidth ?? 0
+      const toLabelWidth = meta.toLabelWidth ?? 0
+      const fromLabelStub = isL1View && fromLabelWidth > 0
+        ? baseLabelDistance + fromLabelWidth / 2 + LABEL_STUB_PADDING
         : 0
-      const stubDistance = Math.max(baseExitStub, labelStub)
-      const fromBase = offsetFromAnchor(
-        fromAnchor,
-        stubDistance
-      )
-      const toBase = offsetFromAnchor(
-        toAnchor,
-        stubDistance
-      )
+      const toLabelStub = isL1View && toLabelWidth > 0
+        ? baseLabelDistance + toLabelWidth / 2 + LABEL_STUB_PADDING
+        : 0
+      const fromStubDistance = Math.max(baseExitStub, fromLabelStub)
+      const toStubDistance = Math.max(baseExitStub, toLabelStub)
+      const fromBase = offsetFromAnchor(fromAnchor, fromStubDistance)
+      const toBase = offsetFromAnchor(toAnchor, toStubDistance)
       const fromExitShift = isL1 ? { dx: 0, dy: 0 } : resolveExitShift(`${link.id}|from`)
       const toExitShift = isL1 ? { dx: 0, dy: 0 } : resolveExitShift(`${link.id}|to`)
       const fromExit = { x: fromBase.x + fromExitShift.dx, y: fromBase.y + fromExitShift.dy }

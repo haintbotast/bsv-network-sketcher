@@ -132,18 +132,23 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     })
 
     const padding = (renderTuning.value.corridor_gap ?? 0) * scale + clearance + gridBase * 2
-    const grid = Number.isFinite(minX)
-      ? buildGridSpec(
-        { minX: minX - padding, minY: minY - padding, maxX: maxX + padding, maxY: maxY + padding },
-        gridBase
-      )
+    const gridBounds = Number.isFinite(minX)
+      ? { minX: minX - padding, minY: minY - padding, maxX: maxX + padding, maxY: maxY + padding }
       : null
+    const grid = (() => {
+      if (!gridBounds) return null
+      const width = Math.max(1, gridBounds.maxX - gridBounds.minX)
+      const height = Math.max(1, gridBounds.maxY - gridBounds.minY)
+      const targetCell = Math.ceil(Math.sqrt((width * height) / maxGridNodes))
+      const cellSize = Math.max(gridBase, targetCell)
+      return buildGridSpec(gridBounds, cellSize)
+    })()
 
     const areaRects = Array.from(areaViewMap.value.entries()).map(([id, rect]) => ({ id, rect }))
     const deviceRects = Array.from(deviceViewMap.value.entries()).map(([id, rect]) => ({ id, rect }))
 
     const gridNodeCount = grid ? grid.cols * grid.rows : 0
-    const allowAStar = isL1View && grid && props.links.length <= maxRouteLinks && gridNodeCount > 0 && gridNodeCount <= maxGridNodes
+    const allowAStar = isL1View && grid && props.links.length <= maxRouteLinks && gridNodeCount > 0
 
     const areaCenters = new Map<string, { x: number; y: number }>()
     areaRects.forEach(({ id, rect }) => {
@@ -279,9 +284,8 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     const textPadY = 2 * labelScale
     const minLabelWidth = 24 * labelScale
     const charWidth = 6 * labelScale
-    const slashWidth = charWidth
-    const slashHeight = Math.max(4, Math.round(0.65 * labelHeight))
-    const labelInset = ((props.viewMode || 'L1') === 'L1') ? slashWidth : 0
+    const slashInset = Math.max(2, charWidth)
+    const labelInset = ((props.viewMode || 'L1') === 'L1') ? slashInset : 0
     const adjustedLabelOffset = Math.max(0, labelOffset - labelInset)
     const deviceLabelPadding = 8
     const deviceFontSize = 13 * labelScale
@@ -417,7 +421,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
           ? (desiredDistance <= path.total ? desiredDistance : Math.max(path.total * 0.5, 0))
           : 0
         const side = anchor.side || computeSide(deviceRect, neighbor)
-        const allowedInset = (side === 'left' || side === 'right') ? slashWidth : slashHeight
+        const allowedInset = slashInset
         const minInsetDistance = (side === 'left' || side === 'right')
           ? Math.max(0, width / 2 - allowedInset)
           : Math.max(0, labelHeight / 2 - allowedInset)

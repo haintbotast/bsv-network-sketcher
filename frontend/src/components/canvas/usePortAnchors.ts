@@ -1,11 +1,12 @@
 import { computed, type ComputedRef } from 'vue'
-import type { LinkModel, L2AssignmentRecord, ViewMode } from '../../models/types'
+import type { DeviceModel, LinkModel, L2AssignmentRecord, ViewMode } from '../../models/types'
 import type { Rect, AnchorOverrideMap, RenderTuning, PortAnchorOverrideMap } from './linkRoutingTypes'
-import { clamp, comparePorts, computePortAnchorFallback, computeSide } from './linkRoutingUtils'
+import { clamp, comparePorts, computePortAnchorFallback, computeSide, extractPortIndex } from './linkRoutingUtils'
 
 export function usePortAnchors(deps: {
   props: {
     links: LinkModel[]
+    devices?: DeviceModel[]
     l2Assignments?: L2AssignmentRecord[]
     viewMode?: ViewMode
   }
@@ -14,6 +15,53 @@ export function usePortAnchors(deps: {
   portAnchorOverrides?: ComputedRef<PortAnchorOverrideMap>
 }) {
   const { props, renderTuning, deviceViewMap, portAnchorOverrides } = deps
+  const deviceInfoMap = computed(() => {
+    const map = new Map<string, { type: string; name: string }>()
+    const devices = (props as { devices?: DeviceModel[] }).devices || []
+    devices.forEach(device => {
+      map.set(device.id, { type: device.type || '', name: device.name || '' })
+    })
+    return map
+  })
+
+  const normalizeType = (value: string) => value.trim().toLowerCase()
+  const normalizeName = (value: string) => value.trim().toLowerCase()
+  const isServerLike = (type: string, name: string) => {
+    const t = normalizeType(type)
+    if (t === 'server' || t === 'storage') return true
+    const n = normalizeName(name)
+    return /(server|srv|app|web|db|nas|san|storage|backup)/.test(n)
+  }
+  const isEndpointLike = (type: string, name: string) => {
+    const t = normalizeType(type)
+    if (['pc', 'printer', 'camera', 'phone', 'ipphone', 'endpoint', 'ap'].includes(t)) return true
+    const n = normalizeName(name)
+    return /(pc|printer|prn|cam|cctv|phone|ipphone|endpoint|client|terminal|ap)/.test(n)
+  }
+  const isUplinkPort = (port: string) => {
+    const idx = extractPortIndex(port)
+    return idx === 1
+  }
+  const resolvePreferredSide = (
+    deviceId: string,
+    port: string | undefined,
+    deviceRect: Rect,
+    neighborRect: Rect,
+    fallbackSide: string
+  ) => {
+    if (!port) return fallbackSide
+    const info = deviceInfoMap.value.get(deviceId)
+    if (!info) return fallbackSide
+    if (!isUplinkPort(port)) return fallbackSide
+    if (!isServerLike(info.type, info.name) && !isEndpointLike(info.type, info.name)) {
+      return fallbackSide
+    }
+    const centerY = deviceRect.y + deviceRect.height / 2
+    const neighborY = neighborRect.y + neighborRect.height / 2
+    if (neighborY < centerY) return 'top'
+    if (neighborY > centerY) return 'bottom'
+    return fallbackSide
+  }
 
   const devicePortList = computed(() => {
     const map = new Map<string, string[]>()
@@ -104,8 +152,12 @@ export function usePortAnchors(deps: {
       const fromRect = deviceViewMap.value.get(link.fromDeviceId)
       const toRect = deviceViewMap.value.get(link.toDeviceId)
       if (!fromRect || !toRect) return
-      const fromSide = computeSide(fromRect, { x: toRect.x + toRect.width / 2, y: toRect.y + toRect.height / 2 })
-      const toSide = computeSide(toRect, { x: fromRect.x + fromRect.width / 2, y: fromRect.y + fromRect.height / 2 })
+      const toCenter = { x: toRect.x + toRect.width / 2, y: toRect.y + toRect.height / 2 }
+      const fromCenter = { x: fromRect.x + fromRect.width / 2, y: fromRect.y + fromRect.height / 2 }
+      const fromFallback = computeSide(fromRect, toCenter)
+      const toFallback = computeSide(toRect, fromCenter)
+      const fromSide = resolvePreferredSide(link.fromDeviceId, link.fromPort, fromRect, toRect, fromFallback)
+      const toSide = resolvePreferredSide(link.toDeviceId, link.toPort, toRect, fromRect, toFallback)
       if (link.fromPort) bump(link.fromDeviceId, link.fromPort, fromSide)
       if (link.toPort) bump(link.toDeviceId, link.toPort, toSide)
     })

@@ -211,7 +211,11 @@ export function usePortAnchors(deps: {
       const effectiveLabelOffset = Math.max(0, labelOffset - labelInset)
       const labelHeight = 16
       const labelGap = Math.max(2, (renderTuning.value.label_gap_y ?? 0) * 0.5)
-      const minSpacing = Math.max(baseSpacing + effectiveLabelOffset, labelHeight + labelGap)
+      const labelSpacingPenalty = Math.round(labelHeight * 0.5)
+      const minSpacing = Math.max(
+        baseSpacing + effectiveLabelOffset + labelSpacingPenalty,
+        labelHeight + labelGap
+      )
       const sideCap = (s: string) => {
         const len = (s === 'left' || s === 'right') ? rect.height : rect.width
         return Math.max(1, Math.floor((len - portEdgeInset * 2) / minSpacing))

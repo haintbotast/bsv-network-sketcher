@@ -296,10 +296,17 @@ export function routeLinks(
     ? Math.max(6, exitBundleGapBase, labelGapBase, gridCell)
     : 0
   const portEdgeInset = renderTuning.port_edge_inset ?? 0
+  const resolveExitGap = (entry?: { total: number }) => {
+    if (!entry || entry.total <= 1 || exitBundleGap <= 0) return 0
+    const extra = Math.max(0, entry.total - 4)
+    const scaleFactor = clamp(1 + extra * 0.12, 1, 2.5)
+    return exitBundleGap * scaleFactor
+  }
   const resolveExitShift = (key: string) => {
     const entry = exitBundleIndex.get(key)
-    if (!entry || entry.total <= 1 || exitBundleGap <= 0) return { dx: 0, dy: 0 }
-    const offset = (entry.index - (entry.total - 1) / 2) * exitBundleGap
+    const gap = resolveExitGap(entry)
+    if (!entry || gap <= 0) return { dx: 0, dy: 0 }
+    const offset = (entry.index - (entry.total - 1) / 2) * gap
     if (entry.side === 'left' || entry.side === 'right') {
       return { dx: 0, dy: offset }
     }
@@ -319,8 +326,9 @@ export function routeLinks(
   }
   const resolveAnchorShift = (key: string, side: ExitSide, rect: Rect, anchor: { x: number; y: number }) => {
     const entry = exitBundleIndex.get(key)
-    if (!entry || entry.total <= 1 || exitBundleGap <= 0) return { x: anchor.x, y: anchor.y, side }
-    const offset = (entry.index - (entry.total - 1) / 2) * exitBundleGap
+    const gap = resolveExitGap(entry)
+    if (!entry || gap <= 0) return { x: anchor.x, y: anchor.y, side }
+    const offset = (entry.index - (entry.total - 1) / 2) * gap
     return shiftAnchorAlongSide(anchor, rect, side, offset)
   }
 

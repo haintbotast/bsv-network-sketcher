@@ -288,7 +288,11 @@ export function routeLinks(
   })()
 
   const exitBundleGapBase = (renderTuning.bundle_gap ?? 0) * scale
-  const exitBundleGap = exitBundleGapBase > 0 ? Math.max(6, exitBundleGapBase) : 0
+  const labelGapBase = (renderTuning.port_label_offset ?? 0) * scale
+  const gridCell = grid?.cellSize ?? 0
+  const exitBundleGap = exitBundleGapBase > 0
+    ? Math.max(6, exitBundleGapBase, labelGapBase, gridCell)
+    : 0
   const resolveExitShift = (key: string) => {
     const entry = exitBundleIndex.get(key)
     if (!entry || entry.total <= 1 || exitBundleGap <= 0) return { dx: 0, dy: 0 }

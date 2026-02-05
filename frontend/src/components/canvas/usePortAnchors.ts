@@ -162,7 +162,7 @@ export function usePortAnchors(deps: {
           const ay = na ? na.ySum / na.count : rect.y + rect.height / 2
           const by = nb ? nb.ySum / nb.count : rect.y + rect.height / 2
           if (ay !== by) return ay - by
-          return (orderMap.get(a) ?? 0) - (orderMap.get(b) ?? 0)
+          return comparePorts(a, b)
         })
         const spacing = (rect.height - portEdgeInset * 2) / (count + 1)
         list.forEach((port, index) => {
@@ -181,7 +181,7 @@ export function usePortAnchors(deps: {
           const ax = na ? na.xSum / na.count : rect.x + rect.width / 2
           const bx = nb ? nb.xSum / nb.count : rect.x + rect.width / 2
           if (ax !== bx) return ax - bx
-          return (orderMap.get(a) ?? 0) - (orderMap.get(b) ?? 0)
+          return comparePorts(a, b)
         })
         const spacing = (rect.width - portEdgeInset * 2) / (count + 1)
         list.forEach((port, index) => {

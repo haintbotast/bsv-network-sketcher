@@ -119,9 +119,9 @@ def compute_device_size(
     """
     import math
 
-    # Heuristic: assume max ports per side = ceil(port_count / 3)
-    # This accounts for ports being distributed across 2-3 sides typically
-    max_ports_per_side = max(1, math.ceil(port_count / 3))
+    # Heuristic: assume max ports per side = ceil(port_count / 2)
+    # Ports tend to cluster on 2 sides (top/bottom) in typical topologies
+    max_ports_per_side = max(1, math.ceil(port_count / 2))
 
     # Width from label text
     label = (name or "").strip()

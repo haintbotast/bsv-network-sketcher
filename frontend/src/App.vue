@@ -735,8 +735,6 @@ type PortLinkEntry = {
   }>
 }
 
-const linkLineStyles: Array<'solid' | 'dashed' | 'dotted'> = ['solid', 'dashed', 'dotted']
-
 const selectedDeviceId = computed(() => {
   if (selectedObjectType.value !== 'Device' || !selectedObject.value) return null
   return (selectedObject.value as DeviceRow).id
@@ -750,6 +748,8 @@ const selectedDeviceName = computed(() => {
 const deviceNameById = computed(() => {
   return new Map(devices.value.map(device => [device.id, device.name]))
 })
+
+const linkLineStyles: Array<'solid' | 'dashed' | 'dotted'> = ['solid', 'dashed', 'dotted']
 
 const deviceIdByName = computed(() => {
   return new Map(devices.value.map(device => [device.name, device.id]))

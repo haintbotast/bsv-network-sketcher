@@ -34,8 +34,7 @@ Tài liệu chi tiết xem: `docs/DEPLOYMENT_TRIAL_PLAN.md`.
 ```bash
 # Sync backend code
 rsync -av --exclude='venv/' --exclude='__pycache__/' --exclude='*.pyc' \
-  --exclude='data/*.db' --exclude='data/*.db-*' \
-  --exclude='logs/' --exclude='exports/' --exclude='uploads/' \
+  --exclude='data/' --exclude='logs/' --exclude='exports/' --exclude='uploads/' \
   /home/haint/Projects/bsv/bsv-network-sketcher/backend/app/ \
   /opt/bsv-ns-deploy/backend/app/
 
@@ -72,6 +71,8 @@ pip install -r requirements.txt
 - Ghi nhận commit/tag triển khai trong bảng phiên bản ở `docs/DEPLOYMENT_TRIAL_PLAN.md`.
 - Luôn backup SQLite trước khi chạy thử nghiệm chính thức.
 - **Không commit thư mục venv, data/*.db, logs/, exports/, uploads/** (đã có trong .gitignore).
+- **Cấm** dùng `rsync --delete` nếu **không exclude** `backend/data`, `backend/exports`, `backend/logs`, `backend/uploads`.
+- **Không** đồng bộ hoặc ghi đè thư mục `backend/data` khi sync sang `/opt/bsv-ns-deploy`.
 
 ## Ghi chú sản phẩm
 - Đây là **BSV Network Sketcher**, được port từ **Network Sketcher** gốc.

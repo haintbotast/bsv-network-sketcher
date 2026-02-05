@@ -60,6 +60,10 @@ Các hướng dẫn này áp dụng cho mọi công cụ AI lập trình (Codex,
 - Nếu yêu cầu mới xung đột với file này hoặc kế hoạch, hỏi người dùng và cập nhật cả hai.
 - Khi người dùng cung cấp chỉ thị mới, cập nhật file này và các file hướng dẫn theo công cụ
   (CLAUDE.md, .cursor/rules/project.md) để đồng bộ.
+- **An toàn dữ liệu triển khai:**  
+  - **Cấm** dùng `rsync --delete` nếu **không exclude** `backend/data`, `backend/exports`, `backend/logs`, `backend/uploads`.  
+  - **Không** đồng bộ hoặc ghi đè thư mục `backend/data` trên `/opt/bsv-ns-deploy`.  
+  - Chỉ dùng lệnh sync **đúng theo** `docs/DEPLOYMENT_GUIDE.md` hoặc `TRIEN_KHAI_THU_NGHIEM.md`.
 - Sau mỗi lần hoàn thành yêu cầu, **tự động commit/push** nếu không bị chặn; nếu không thể thì báo rõ lý do.
 - Luôn **đồng bộ thay đổi** sang thư mục triển khai `/opt/bsv-ns-deploy`; nếu không thể thì báo rõ lý do.
 - Mọi thay đổi về topology/triển khai/luồng dữ liệu phải cập nhật PROJECT_TOPOLOGY.md.

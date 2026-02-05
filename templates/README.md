@@ -9,6 +9,7 @@
 - `templates/samples/minimal.json`: 1 area, 2 devices, 1 link (smoke test).
 - `templates/samples/small.json`: ~10 devices, ~10 links (test cơ bản).
 - `templates/samples/medium.json`: ~20 devices, ~27 links (test trung bình).
+- `templates/samples/network_diagram_rebuild.json`: phục dựng sơ đồ từ `docs/Network diagram.pdf`.
 
 ---
 

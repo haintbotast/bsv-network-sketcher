@@ -138,7 +138,7 @@ rsync -av --delete \
 # Sync backend code từ source sang deploy
 rsync -av --delete \
   --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' \
-  --exclude='data' --exclude='logs' --exclude='exports' \
+  --exclude='data' --exclude='logs' --exclude='exports' --exclude='uploads' \
   /home/<user>/Projects/bsv/bsv-network-sketcher/backend/ \
   /opt/bsv-ns-deploy/backend/
 
@@ -151,12 +151,14 @@ rsync -av --delete \
 ```bash
 rsync -av --exclude='node_modules' --exclude='venv' --exclude='__pycache__' \
   --exclude='*.pyc' --exclude='.git' --exclude='*.db' --exclude='dist' \
-  --exclude='logs' --exclude='exports' \
+  --exclude='logs' --exclude='exports' --exclude='uploads' \
+  --exclude='backend/data' --exclude='backend/exports' --exclude='backend/logs' --exclude='backend/uploads' \
   /home/<user>/Projects/bsv/bsv-network-sketcher/ /opt/bsv-ns-deploy/
 ```
 
 **Lưu ý:**
 - Sử dụng `--delete` để xóa file không còn tồn tại trong source
+- **Cấm** dùng `--delete` nếu **không exclude** `backend/data` (DB), `backend/exports`, `backend/logs`, `backend/uploads`
 - Exclude các thư mục build/runtime để tránh mất dữ liệu
 - Frontend HMR nhanh hơn (~100ms), backend reload chậm hơn (~1-2s)
 
@@ -273,7 +275,7 @@ sleep 2
 # 2. Sync code mới nhất
 rsync -av --delete \
   --exclude='venv' --exclude='__pycache__' --exclude='*.pyc' \
-  --exclude='data' --exclude='logs' --exclude='exports' \
+  --exclude='data' --exclude='logs' --exclude='exports' --exclude='uploads' \
   /home/<user>/Projects/bsv/bsv-network-sketcher/backend/ \
   /opt/bsv-ns-deploy/backend/
 

@@ -108,6 +108,89 @@ function computeLocalCorridor(
   return null
 }
 
+interface SharedCorridor {
+  axis: 'x' | 'y'
+  coord: number
+  laneSpacing: number
+  type: 'local' | 'global'
+}
+
+function computeSharedCorridors(
+  areaViewMap: Map<string, Rect>,
+  areaCenters: Map<string, { x: number; y: number }>,
+  linkMetas: Array<LinkMeta | null>,
+  areaBounds: { minX: number; minY: number; maxX: number; maxY: number } | null,
+  renderTuning: RenderTuning,
+  scale: number,
+): Map<string, SharedCorridor> {
+  const result = new Map<string, SharedCorridor>()
+  const laneSpacing = Math.max(6, (renderTuning.bundle_gap ?? 0) * scale * 2.0)
+  const pairKey = (a: string, b: string) => a < b ? `${a}|${b}` : `${b}|${a}`
+
+  // Thu thập các cặp vùng liên kết duy nhất
+  const pairs = new Set<string>()
+  for (const meta of linkMetas) {
+    if (!meta) continue
+    if (!meta.fromAreaId || !meta.toAreaId || meta.fromAreaId === meta.toAreaId) continue
+    pairs.add(pairKey(meta.fromAreaId, meta.toAreaId))
+  }
+
+  for (const key of pairs) {
+    const [idA, idB] = key.split('|')
+    const areaA = areaViewMap.get(idA)
+    const areaB = areaViewMap.get(idB)
+    const cA = areaCenters.get(idA)
+    const cB = areaCenters.get(idB)
+    if (!areaA || !areaB || !cA || !cB) continue
+
+    const dx = Math.abs(cB.x - cA.x)
+    const dy = Math.abs(cB.y - cA.y)
+    const isHorizSep = dx >= dy
+
+    // Đặt hành lang cục bộ ở giữa khe 2 vùng (kiểm tra blocking ở per-link)
+    let localFound = false
+    if (isHorizSep) {
+      const leftArea = cA.x <= cB.x ? areaA : areaB
+      const rightArea = cA.x <= cB.x ? areaB : areaA
+      const gap = rightArea.x - (leftArea.x + leftArea.width)
+      if (gap > 0) {
+        const coord = leftArea.x + leftArea.width + gap / 2
+        result.set(key, { axis: 'x', coord, laneSpacing, type: 'local' })
+        localFound = true
+      }
+    } else {
+      const topArea = cA.y <= cB.y ? areaA : areaB
+      const bottomArea = cA.y <= cB.y ? areaB : areaA
+      const gap = bottomArea.y - (topArea.y + topArea.height)
+      if (gap > 0) {
+        const coord = topArea.y + topArea.height + gap / 2
+        result.set(key, { axis: 'y', coord, laneSpacing, type: 'local' })
+        localFound = true
+      }
+    }
+
+    // Hành lang toàn cục: đặt ngoài rìa tất cả vùng
+    if (!localFound && areaBounds) {
+      const corridorGap = ((renderTuning.corridor_gap ?? 0) + (renderTuning.area_clearance ?? 0)) * scale
+      if (isHorizSep) {
+        const midY = (cA.y + cB.y) / 2
+        const topY = areaBounds.minY - corridorGap
+        const bottomY = areaBounds.maxY + corridorGap
+        const coord = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
+        result.set(key, { axis: 'y', coord, laneSpacing, type: 'global' })
+      } else {
+        const midX = (cA.x + cB.x) / 2
+        const leftX = areaBounds.minX - corridorGap
+        const rightX = areaBounds.maxX + corridorGap
+        const coord = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
+        result.set(key, { axis: 'x', coord, laneSpacing, type: 'global' })
+      }
+    }
+  }
+
+  return result
+}
+
 export function routeLinks(
   linkMetas: Array<LinkMeta | null>,
   laneIndex: Map<string, { index: number; total: number }>,
@@ -341,6 +424,11 @@ export function routeLinks(
     toCenter: { x: number; y: number }
   }>()
 
+  const sharedCorridors = computeSharedCorridors(
+    areaViewMap, areaCenters, linkMetas,
+    areaBounds, renderTuning, scale,
+  )
+
   const links = linkMetas
     .map(meta => {
       if (!meta) return null
@@ -509,6 +597,73 @@ export function routeLinks(
           pushPoint(points, toBase.x, toBase.y)
           pushPoint(points, toAnchor.x, toAnchor.y)
           routed = true
+        }
+      }
+
+      // Hành lang chia sẻ cho tuyến liên vùng (shared corridor routing)
+      if (!routed && isL1 && fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
+        const pairKey = getPairKey(fromAreaId, toAreaId)
+        const corridor = sharedCorridors.get(pairKey)
+        if (corridor) {
+          const laneOffset = areaBundle && areaBundle.total > 1
+            ? (areaBundle.index - (areaBundle.total - 1) / 2) * corridor.laneSpacing
+            : 0
+          const laneCoord = corridor.coord + laneOffset
+          // Hướng anchor về phía corridor thay vì phía thiết bị đích
+          const corridorTarget = corridor.axis === 'x'
+            ? { x: laneCoord, y: fromExit.y }
+            : { x: fromExit.x, y: laneCoord }
+          const corridorTargetTo = corridor.axis === 'x'
+            ? { x: laneCoord, y: toExit.y }
+            : { x: toExit.x, y: laneCoord }
+          const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, corridorTarget, laneOffset, 0)
+          const toAreaAnchor = computeAreaAnchor(toArea, toExit, corridorTargetTo, laneOffset, 0)
+
+          // Chỉ kiểm tra đoạn corridor (giữa 2 vùng), không kiểm tra exit stub
+          const corridorSegments: Array<{ a: { x: number; y: number }; b: { x: number; y: number } }> = []
+          if (corridor.axis === 'x') {
+            corridorSegments.push(
+              { a: fromAreaAnchor, b: { x: laneCoord, y: fromAreaAnchor.y } },
+              { a: { x: laneCoord, y: fromAreaAnchor.y }, b: { x: laneCoord, y: toAreaAnchor.y } },
+              { a: { x: laneCoord, y: toAreaAnchor.y }, b: toAreaAnchor },
+            )
+          } else {
+            corridorSegments.push(
+              { a: fromAreaAnchor, b: { x: fromAreaAnchor.x, y: laneCoord } },
+              { a: { x: fromAreaAnchor.x, y: laneCoord }, b: { x: toAreaAnchor.x, y: laneCoord } },
+              { a: { x: toAreaAnchor.x, y: laneCoord }, b: toAreaAnchor },
+            )
+          }
+          const blocked = corridorSegments.some(seg =>
+            obstacles.some(r => segmentIntersectsRect(seg.a, seg.b, r, clearance))
+          )
+
+          if (!blocked) {
+            const corridorPath: Array<{ x: number; y: number }> = [
+              fromAnchor, fromBase, fromExit, fromAreaAnchor,
+            ]
+            if (corridor.axis === 'x') {
+              corridorPath.push({ x: laneCoord, y: fromAreaAnchor.y })
+              corridorPath.push({ x: laneCoord, y: toAreaAnchor.y })
+            } else {
+              corridorPath.push({ x: fromAreaAnchor.x, y: laneCoord })
+              corridorPath.push({ x: toAreaAnchor.x, y: laneCoord })
+            }
+            corridorPath.push(toAreaAnchor, toExit, toBase, toAnchor)
+            points = []
+            corridorPath.forEach(p => pushPoint(points, p.x, p.y))
+            // Bo góc cho đường hành lang
+            const pathPoints: Array<{ x: number; y: number }> = []
+            for (let i = 0; i + 1 < points.length; i += 2) {
+              pathPoints.push({ x: points[i], y: points[i + 1] })
+            }
+            const simplified = simplifyOrthogonalPath(pathPoints)
+            const cornerRadius = Math.max(4, Math.min(minSegment * 1.2, 14 * scale))
+            const rounded = roundOrthogonalCorners(simplified, cornerRadius, minSegment)
+            points = []
+            rounded.forEach(point => pushPoint(points, point.x, point.y))
+            routed = true
+          }
         }
       }
 

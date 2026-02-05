@@ -280,6 +280,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     const minLabelWidth = 24 * labelScale
     const charWidth = 6 * labelScale
     const slashWidth = charWidth
+    const slashHeight = Math.max(4, Math.round(0.65 * labelHeight))
     const labelInset = ((props.viewMode || 'L1') === 'L1') ? slashWidth : 0
     const adjustedLabelOffset = Math.max(0, labelOffset - labelInset)
     const deviceLabelPadding = 8
@@ -416,7 +417,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
           ? (desiredDistance <= path.total ? desiredDistance : Math.max(path.total * 0.5, 0))
           : 0
         const side = anchor.side || computeSide(deviceRect, neighbor)
-        const allowedInset = slashWidth
+        const allowedInset = (side === 'left' || side === 'right') ? slashWidth : slashHeight
         const minInsetDistance = (side === 'left' || side === 'right')
           ? Math.max(0, width / 2 - allowedInset)
           : Math.max(0, labelHeight / 2 - allowedInset)

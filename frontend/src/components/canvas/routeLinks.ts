@@ -412,6 +412,7 @@ export function routeLinks(
       )
       const directOrthogonal = Math.abs(fromAnchor.x - toAnchor.x) < 1 || Math.abs(fromAnchor.y - toAnchor.y) < 1
       const directAllowed = isL1 && !lineBlocked && directOrthogonal && !hasExitBundle
+      const parallelAllowed = isL1 && !lineBlocked && directOrthogonal
       // Allow diagonal direct line when no obstacles block the path
       const diagonalAllowed = !isL1 && !lineBlocked && !directOrthogonal
 
@@ -452,6 +453,49 @@ export function routeLinks(
           pushPoint(points, toAnchor.x, toAnchor.y)
         }
         routed = true
+      }
+
+      // Parallel straight routing for bundled links on same row/col
+      if (parallelAllowed && hasExitBundle && !routed) {
+        const alignIsVertical = Math.abs(fromAnchor.x - toAnchor.x) < 1
+        const delta = alignIsVertical
+          ? (fromAnchor.x - toAnchor.x)
+          : (fromAnchor.y - toAnchor.y)
+        const offset = Math.abs(delta) < 0.5 ? 0 : delta
+        const offsetFromExit = alignIsVertical
+          ? { x: fromExit.x + offset, y: fromExit.y }
+          : { x: fromExit.x, y: fromExit.y + offset }
+        const offsetToExit = alignIsVertical
+          ? { x: toExit.x + offset, y: toExit.y }
+          : { x: toExit.x, y: toExit.y + offset }
+        const path = [
+          fromAnchor,
+          fromBase,
+          fromExit,
+          offsetFromExit,
+          offsetToExit,
+          toExit,
+          toBase,
+          toAnchor,
+        ]
+        const blocked = path.some((p, idx) => {
+          if (idx === 0) return false
+          const a = path[idx - 1]
+          const b = p
+          return obstacles.some(rect => segmentIntersectsRect(a, b, rect, clearance))
+        })
+        if (!blocked) {
+          points = []
+          pushPoint(points, fromAnchor.x, fromAnchor.y)
+          pushPoint(points, fromBase.x, fromBase.y)
+          pushPoint(points, fromExit.x, fromExit.y)
+          pushPoint(points, offsetFromExit.x, offsetFromExit.y)
+          pushPoint(points, offsetToExit.x, offsetToExit.y)
+          pushPoint(points, toExit.x, toExit.y)
+          pushPoint(points, toBase.x, toBase.y)
+          pushPoint(points, toAnchor.x, toAnchor.y)
+          routed = true
+        }
       }
 
       // Use direct any-angle routing for all links (waypoint logic disabled)

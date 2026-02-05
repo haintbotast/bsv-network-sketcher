@@ -293,6 +293,7 @@ export function routeLinks(
   const exitBundleGap = exitBundleGapBase > 0
     ? Math.max(6, exitBundleGapBase, labelGapBase, gridCell)
     : 0
+  const portEdgeInset = renderTuning.port_edge_inset ?? 0
   const resolveExitShift = (key: string) => {
     const entry = exitBundleIndex.get(key)
     if (!entry || entry.total <= 1 || exitBundleGap <= 0) return { dx: 0, dy: 0 }
@@ -302,14 +303,23 @@ export function routeLinks(
     }
     return { dx: offset, dy: 0 }
   }
-  const resolveLaneShift = (linkId: string) => {
-    const fromEntry = exitBundleIndex.get(`${linkId}|from`)
-    const toEntry = exitBundleIndex.get(`${linkId}|to`)
-    const entry = (!fromEntry || (toEntry && (toEntry.total ?? 0) > (fromEntry.total ?? 0)))
-      ? toEntry
-      : fromEntry
-    if (!entry || entry.total <= 1 || exitBundleGap <= 0) return 0
-    return (entry.index - (entry.total - 1) / 2) * exitBundleGap
+  const shiftAnchorAlongSide = (anchor: { x: number; y: number }, rect: Rect, side: ExitSide, offset: number) => {
+    if (side === 'left' || side === 'right') {
+      const minY = rect.y + portEdgeInset
+      const maxY = rect.y + rect.height - portEdgeInset
+      const y = clamp(anchor.y + offset, minY, maxY)
+      return { x: anchor.x, y, side }
+    }
+    const minX = rect.x + portEdgeInset
+    const maxX = rect.x + rect.width - portEdgeInset
+    const x = clamp(anchor.x + offset, minX, maxX)
+    return { x, y: anchor.y, side }
+  }
+  const resolveAnchorShift = (key: string, side: ExitSide, rect: Rect, anchor: { x: number; y: number }) => {
+    const entry = exitBundleIndex.get(key)
+    if (!entry || entry.total <= 1 || exitBundleGap <= 0) return { x: anchor.x, y: anchor.y, side }
+    const offset = (entry.index - (entry.total - 1) / 2) * exitBundleGap
+    return shiftAnchorAlongSide(anchor, rect, side, offset)
   }
 
   const occupancy = new Map<string, number>()
@@ -330,13 +340,12 @@ export function routeLinks(
         toView,
         fromCenter,
         toCenter,
-        fromAnchor,
-        toAnchor,
         fromAreaId,
         toAreaId,
         fromArea,
         toArea
       } = meta
+      let { fromAnchor, toAnchor } = meta
 
       let points: number[] = []
       const isL1 = isL1View
@@ -345,7 +354,15 @@ export function routeLinks(
       const fromExitEntry = exitBundleIndex.get(`${link.id}|from`)
       const toExitEntry = exitBundleIndex.get(`${link.id}|to`)
       const hasExitBundle = (fromExitEntry?.total ?? 0) > 1 || (toExitEntry?.total ?? 0) > 1
-      const laneShift = isL1 ? resolveLaneShift(link.id) : 0
+      const fromSide = (fromAnchor.side || computeSide(fromView, toCenter)) as ExitSide
+      const toSide = (toAnchor.side || computeSide(toView, fromCenter)) as ExitSide
+      if (isL1) {
+        fromAnchor = resolveAnchorShift(`${link.id}|from`, fromSide, fromView, fromAnchor)
+        toAnchor = resolveAnchorShift(`${link.id}|to`, toSide, toView, toAnchor)
+      } else {
+        fromAnchor = { ...fromAnchor, side: fromSide }
+        toAnchor = { ...toAnchor, side: toSide }
+      }
       const bundleOffset = bundle && bundle.total > 1
         ? (bundle.index - (bundle.total - 1) / 2) * ((renderTuning.bundle_gap ?? 0) * scale)
         : 0
@@ -355,7 +372,7 @@ export function routeLinks(
       const areaBundleOffset = areaBundle && areaBundle.total > 1
         ? (areaBundle.index - (areaBundle.total - 1) / 2) * interAreaBundleGap
         : 0
-      const interBundleOffset = areaBundleOffset + bundleOffset * 0.5 + laneShift
+      const interBundleOffset = areaBundleOffset + bundleOffset * 0.5
       const bundleStub = (renderTuning.bundle_stub ?? 0) * scale
       const anchorOffset = ((renderTuning.area_anchor_offset ?? 0) + (renderTuning.area_clearance ?? 0)) * scale
       const baseExitStub = Math.max(renderTuning.bundle_stub ?? 0, renderTuning.area_clearance ?? 0) * scale
@@ -398,22 +415,20 @@ export function routeLinks(
       // Allow diagonal direct line when no obstacles block the path
       const diagonalAllowed = !isL1 && !lineBlocked && !directOrthogonal
 
-      const fromSide = fromAnchor.side || computeSide(fromView, toCenter)
-      const toSide = toAnchor.side || computeSide(toView, fromCenter)
       const labelStub = isL1View
         ? Math.max(0, (renderTuning.port_label_offset ?? 0) * scale) + LABEL_STUB_PADDING
         : 0
       const stubDistance = Math.max(baseExitStub, labelStub)
       const fromBase = offsetFromAnchor(
-        { ...fromAnchor, side: fromSide },
+        fromAnchor,
         stubDistance
       )
       const toBase = offsetFromAnchor(
-        { ...toAnchor, side: toSide },
+        toAnchor,
         stubDistance
       )
-      const fromExitShift = resolveExitShift(`${link.id}|from`)
-      const toExitShift = resolveExitShift(`${link.id}|to`)
+      const fromExitShift = isL1 ? { dx: 0, dy: 0 } : resolveExitShift(`${link.id}|from`)
+      const toExitShift = isL1 ? { dx: 0, dy: 0 } : resolveExitShift(`${link.id}|to`)
       const fromExit = { x: fromBase.x + fromExitShift.dx, y: fromBase.y + fromExitShift.dy }
       const toExit = { x: toBase.x + toExitShift.dx, y: toBase.y + toExitShift.dy }
 
@@ -443,8 +458,8 @@ export function routeLinks(
       if (allowAStar && !directAllowed && !routed && grid) {
         const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
         const bundleShift = preferAxis === 'x'
-          ? { x: 0, y: bundleOffset + laneShift }
-          : { x: bundleOffset + laneShift, y: 0 }
+          ? { x: 0, y: bundleOffset }
+          : { x: bundleOffset, y: 0 }
         const offsetFromExit = {
           x: fromExit.x + bundleShift.x,
           y: fromExit.y + bundleShift.y
@@ -642,8 +657,8 @@ export function routeLinks(
         } else if (isL1) {
           const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
           const bundleShift = preferAxis === 'x'
-            ? { x: 0, y: bundleOffset + laneShift }
-            : { x: bundleOffset + laneShift, y: 0 }
+            ? { x: 0, y: bundleOffset }
+            : { x: bundleOffset, y: 0 }
           const fromStart = { x: fromExit.x + bundleShift.x, y: fromExit.y + bundleShift.y }
           const toStart = { x: toExit.x + bundleShift.x, y: toExit.y + bundleShift.y }
 

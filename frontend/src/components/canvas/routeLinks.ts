@@ -43,7 +43,8 @@ function computeLocalCorridor(
   toAreaId: string | null,
   interBundleOffset: number,
   clearanceValue: number,
-  areaRects: AreaRectEntry[]
+  areaRects: AreaRectEntry[],
+  deviceRects: DeviceRectEntry[]
 ) {
   const minGap = Math.max(6, clearanceValue + Math.abs(interBundleOffset))
   const fromRight = fromArea.x + fromArea.width
@@ -75,7 +76,7 @@ function computeLocalCorridor(
     const blocked = areaRects.some(({ id, rect }) => {
       if (id === fromAreaId || id === toAreaId) return false
       return segmentIntersectsRect(segStart, segEnd, rect, clearanceValue)
-    })
+    }) || deviceRects.some(({ rect }) => segmentIntersectsRect(segStart, segEnd, rect, clearanceValue))
     if (blocked) return null
     return { axis: 'x' as const, coord: corridorX, fromAreaAnchor, toAreaAnchor }
   }
@@ -97,7 +98,7 @@ function computeLocalCorridor(
     const blocked = areaRects.some(({ id, rect }) => {
       if (id === fromAreaId || id === toAreaId) return false
       return segmentIntersectsRect(segStart, segEnd, rect, clearanceValue)
-    })
+    }) || deviceRects.some(({ rect }) => segmentIntersectsRect(segStart, segEnd, rect, clearanceValue))
     if (blocked) return null
     return { axis: 'y' as const, coord: corridorY, fromAreaAnchor, toAreaAnchor }
   }
@@ -287,7 +288,7 @@ export function routeLinks(
   })()
 
   const exitBundleGapBase = (renderTuning.bundle_gap ?? 0) * scale
-  const exitBundleGap = exitBundleGapBase > 0 ? Math.max(6, exitBundleGapBase * 0.85) : 0
+  const exitBundleGap = exitBundleGapBase > 0 ? Math.max(6, exitBundleGapBase) : 0
   const resolveExitShift = (key: string) => {
     const entry = exitBundleIndex.get(key)
     if (!entry || entry.total <= 1 || exitBundleGap <= 0) return { dx: 0, dy: 0 }
@@ -458,7 +459,7 @@ export function routeLinks(
             occupancy,
             preferAxis,
             turnPenalty: gridSpec.size * 1.2,
-            congestionPenalty: gridSpec.size * 25
+            congestionPenalty: gridSpec.size * 80
           })
         }
 
@@ -546,7 +547,8 @@ export function routeLinks(
             toAreaId,
             interBundleOffset,
             clearance,
-            areaRects
+            areaRects,
+            deviceRects
           )
           if (localCorridor) {
             const { axis, coord, fromAreaAnchor, toAreaAnchor } = localCorridor

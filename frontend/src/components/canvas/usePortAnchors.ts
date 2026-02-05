@@ -151,6 +151,49 @@ export function usePortAnchors(deps: {
         buckets[side].push(port)
       })
 
+      // --- Port side capacity rebalancing ---
+      // If too many ports assigned to one side, move excess to adjacent sides
+      const minSpacing = renderTuning.value.bundle_gap ?? 22
+      const sideCap = (s: string) => {
+        const len = (s === 'left' || s === 'right') ? rect.height : rect.width
+        return Math.max(1, Math.floor((len - portEdgeInset * 2) / minSpacing))
+      }
+      const adjSides: Record<string, [string, string]> = {
+        left: ['top', 'bottom'], right: ['top', 'bottom'],
+        top: ['left', 'right'], bottom: ['left', 'right']
+      }
+      const sideAlign = (side: string, n: { xSum: number; ySum: number; count: number } | undefined) => {
+        if (!n) return 0
+        const cx = rect.x + rect.width / 2
+        const cy = rect.y + rect.height / 2
+        const nx = n.xSum / n.count
+        const ny = n.ySum / n.count
+        if (side === 'left') return -(nx - cx)
+        if (side === 'right') return nx - cx
+        if (side === 'top') return -(ny - cy)
+        return ny - cy
+      }
+      for (const side of ['left', 'right', 'top', 'bottom']) {
+        const list = buckets[side]
+        const cap = sideCap(side)
+        if (list.length <= cap) continue
+        // Keep ports most aligned with this side, move the rest
+        list.sort((a, b) => sideAlign(side, neighborMap.get(b)) - sideAlign(side, neighborMap.get(a)))
+        const excess = list.splice(cap)
+        const [adj0, adj1] = adjSides[side]
+        for (const port of excess) {
+          const s0 = sideCap(adj0) - buckets[adj0].length
+          const s1 = sideCap(adj1) - buckets[adj1].length
+          if (s0 <= 0 && s1 <= 0) { list.push(port); continue }
+          if (s0 <= 0) { buckets[adj1].push(port); continue }
+          if (s1 <= 0) { buckets[adj0].push(port); continue }
+          // Both have space - pick side more aligned with port's neighbor
+          const a0 = sideAlign(adj0, neighborMap.get(port))
+          const a1 = sideAlign(adj1, neighborMap.get(port))
+          buckets[a0 >= a1 ? adj0 : adj1].push(port)
+        }
+      }
+
       const anchors = new Map<string, { x: number; y: number; side: string }>()
       ;(['left', 'right'] as const).forEach(side => {
         const list = buckets[side]

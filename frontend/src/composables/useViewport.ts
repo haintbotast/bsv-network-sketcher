@@ -10,7 +10,7 @@ export function useViewport() {
 
   const showRightPanel = ref(true)
   const rightPanelWidth = ref(360)
-  const rightPanelTab = ref<'properties' | 'layout'>('properties')
+  const rightPanelTab = ref<'properties' | 'layout' | 'data'>('properties')
 
   const viewportState = computed<Viewport>(() => ({
     scale: viewport.scale,

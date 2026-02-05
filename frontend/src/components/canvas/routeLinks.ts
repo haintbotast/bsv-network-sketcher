@@ -108,26 +108,132 @@ function computeLocalCorridor(
   return null
 }
 
-interface SharedCorridor {
-  axis: 'x' | 'y'
-  coord: number
-  laneSpacing: number
-  type: 'local' | 'global'
+type PadSide = 'left' | 'right'
+
+interface AreaPadInfo {
+  leftX: number
+  rightX: number
+  leftMinX: number
+  leftMaxX: number
+  rightMinX: number
+  rightMaxX: number
+  inset: number
 }
 
-function computeSharedCorridors(
+interface PadCorridor {
+  side: PadSide
+  coord: number
+  laneSpacing: number
+}
+
+function computeAreaPadInfo(
+  areaRects: AreaRectEntry[],
+  deviceRects: DeviceRectEntry[],
+  deviceAreaMap: Map<string, string>,
+  renderTuning: RenderTuning,
+  scale: number,
+): Map<string, AreaPadInfo> {
+  const result = new Map<string, AreaPadInfo>()
+  const minInset = Math.max(6, Math.round((renderTuning.area_clearance ?? 0) * 0.4 * scale))
+  const defaultPadRatio = 0.22
+
+  const deviceBounds = new Map<string, { minX: number; minY: number; maxX: number; maxY: number; count: number }>()
+  deviceRects.forEach(({ id, rect }) => {
+    const areaId = deviceAreaMap.get(id)
+    if (!areaId) return
+    const entry = deviceBounds.get(areaId) || {
+      minX: rect.x,
+      minY: rect.y,
+      maxX: rect.x + rect.width,
+      maxY: rect.y + rect.height,
+      count: 0
+    }
+    entry.minX = Math.min(entry.minX, rect.x)
+    entry.minY = Math.min(entry.minY, rect.y)
+    entry.maxX = Math.max(entry.maxX, rect.x + rect.width)
+    entry.maxY = Math.max(entry.maxY, rect.y + rect.height)
+    entry.count += 1
+    deviceBounds.set(areaId, entry)
+  })
+
+  const resolveInset = (padSize: number) => {
+    if (!Number.isFinite(padSize) || padSize <= 0) return minInset
+    const maxInset = Math.max(minInset, padSize - minInset)
+    return clamp(padSize * 0.5, minInset, maxInset)
+  }
+
+  areaRects.forEach(({ id, rect }) => {
+    const bounds = deviceBounds.get(id)
+    const fallbackPadX = rect.width * defaultPadRatio
+    const fallbackPadY = rect.height * defaultPadRatio
+
+    const padLeft = bounds ? Math.max(0, bounds.minX - rect.x) : fallbackPadX
+    const padRight = bounds ? Math.max(0, rect.x + rect.width - bounds.maxX) : fallbackPadX
+    const padTop = bounds ? Math.max(0, bounds.minY - rect.y) : fallbackPadY
+    const padBottom = bounds ? Math.max(0, rect.y + rect.height - bounds.maxY) : fallbackPadY
+
+    const leftInset = resolveInset(padLeft)
+    const rightInset = resolveInset(padRight)
+
+    const leftMinX = rect.x + minInset
+    const leftMaxX = rect.x + Math.max(minInset, padLeft - minInset)
+    const rightMinX = rect.x + rect.width - Math.max(minInset, padRight - minInset)
+    const rightMaxX = rect.x + rect.width - minInset
+
+    const safeLeftMax = leftMaxX < leftMinX ? leftMinX : leftMaxX
+    const safeRightMin = rightMinX > rightMaxX ? rightMaxX : rightMinX
+
+    const leftX = clamp(rect.x + leftInset, leftMinX, safeLeftMax)
+    const rightX = clamp(rect.x + rect.width - rightInset, safeRightMin, rightMaxX)
+
+    const inset = Math.max(minInset, Math.min(padTop, padBottom, rect.height * 0.25))
+
+    result.set(id, {
+      leftX,
+      rightX,
+      leftMinX,
+      leftMaxX: safeLeftMax,
+      rightMinX: safeRightMin,
+      rightMaxX,
+      inset
+    })
+  })
+
+  return result
+}
+
+function resolvePadCorridorCoord(
+  side: PadSide,
+  baseCoord: number,
+  padA: AreaPadInfo,
+  padB: AreaPadInfo,
+) {
+  const minCoord = side === 'left'
+    ? Math.max(padA.leftMinX, padB.leftMinX)
+    : Math.max(padA.rightMinX, padB.rightMinX)
+  const maxCoord = side === 'left'
+    ? Math.min(padA.leftMaxX, padB.leftMaxX)
+    : Math.min(padA.rightMaxX, padB.rightMaxX)
+  if (minCoord <= maxCoord) {
+    return clamp(baseCoord, minCoord, maxCoord)
+  }
+  return baseCoord
+}
+
+function computePadCorridors(
   areaViewMap: Map<string, Rect>,
   areaCenters: Map<string, { x: number; y: number }>,
   linkMetas: Array<LinkMeta | null>,
-  areaBounds: { minX: number; minY: number; maxX: number; maxY: number } | null,
+  areaPadMap: Map<string, AreaPadInfo>,
+  areaRects: AreaRectEntry[],
+  deviceRects: DeviceRectEntry[],
   renderTuning: RenderTuning,
   scale: number,
-): Map<string, SharedCorridor> {
-  const result = new Map<string, SharedCorridor>()
+): Map<string, PadCorridor> {
+  const result = new Map<string, PadCorridor>()
   const laneSpacing = Math.max(6, (renderTuning.bundle_gap ?? 0) * scale * 2.0)
   const pairKey = (a: string, b: string) => a < b ? `${a}|${b}` : `${b}|${a}`
 
-  // Thu thập các cặp vùng liên kết duy nhất
   const pairs = new Set<string>()
   for (const meta of linkMetas) {
     if (!meta) continue
@@ -139,53 +245,55 @@ function computeSharedCorridors(
     const [idA, idB] = key.split('|')
     const areaA = areaViewMap.get(idA)
     const areaB = areaViewMap.get(idB)
+    const padA = areaPadMap.get(idA)
+    const padB = areaPadMap.get(idB)
     const cA = areaCenters.get(idA)
     const cB = areaCenters.get(idB)
-    if (!areaA || !areaB || !cA || !cB) continue
+    if (!areaA || !areaB || !padA || !padB || !cA || !cB) continue
 
-    const dx = Math.abs(cB.x - cA.x)
-    const dy = Math.abs(cB.y - cA.y)
-    const isHorizSep = dx >= dy
+    const baseLeft = (padA.leftX + padB.leftX) / 2
+    const baseRight = (padA.rightX + padB.rightX) / 2
+    const leftCoord = resolvePadCorridorCoord('left', baseLeft, padA, padB)
+    const rightCoord = resolvePadCorridorCoord('right', baseRight, padA, padB)
 
-    // Đặt hành lang cục bộ ở giữa khe 2 vùng (kiểm tra blocking ở per-link)
-    let localFound = false
-    if (isHorizSep) {
-      const leftArea = cA.x <= cB.x ? areaA : areaB
-      const rightArea = cA.x <= cB.x ? areaB : areaA
-      const gap = rightArea.x - (leftArea.x + leftArea.width)
-      if (gap > 0) {
-        const coord = leftArea.x + leftArea.width + gap / 2
-        result.set(key, { axis: 'x', coord, laneSpacing, type: 'local' })
-        localFound = true
+    const scoreSide = (side: PadSide, corridorX: number) => {
+      const fromX = side === 'left' ? padA.leftX : padA.rightX
+      const toX = side === 'left' ? padB.leftX : padB.rightX
+      const fromY = clamp(cA.y, areaA.y + padA.inset, areaA.y + areaA.height - padA.inset)
+      const toY = clamp(cB.y, areaB.y + padB.inset, areaB.y + areaB.height - padB.inset)
+      const points = [
+        { x: fromX, y: fromY },
+        { x: corridorX, y: fromY },
+        { x: corridorX, y: toY },
+        { x: toX, y: toY }
+      ]
+      let hits = 0
+      let length = 0
+      for (let i = 1; i < points.length; i += 1) {
+        const a = points[i - 1]
+        const b = points[i]
+        length += Math.abs(b.x - a.x) + Math.abs(b.y - a.y)
+        areaRects.forEach(({ id, rect }) => {
+          if (id === idA || id === idB) return
+          if (segmentIntersectsRect(a, b, rect, 0)) hits += 1
+        })
+        deviceRects.forEach(({ rect }) => {
+          if (segmentIntersectsRect(a, b, rect, 0)) hits += 1
+        })
       }
-    } else {
-      const topArea = cA.y <= cB.y ? areaA : areaB
-      const bottomArea = cA.y <= cB.y ? areaB : areaA
-      const gap = bottomArea.y - (topArea.y + topArea.height)
-      if (gap > 0) {
-        const coord = topArea.y + topArea.height + gap / 2
-        result.set(key, { axis: 'y', coord, laneSpacing, type: 'local' })
-        localFound = true
-      }
+      return { hits, length }
     }
 
-    // Hành lang toàn cục: đặt ngoài rìa tất cả vùng
-    if (!localFound && areaBounds) {
-      const corridorGap = ((renderTuning.corridor_gap ?? 0) + (renderTuning.area_clearance ?? 0)) * scale
-      if (isHorizSep) {
-        const midY = (cA.y + cB.y) / 2
-        const topY = areaBounds.minY - corridorGap
-        const bottomY = areaBounds.maxY + corridorGap
-        const coord = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
-        result.set(key, { axis: 'y', coord, laneSpacing, type: 'global' })
-      } else {
-        const midX = (cA.x + cB.x) / 2
-        const leftX = areaBounds.minX - corridorGap
-        const rightX = areaBounds.maxX + corridorGap
-        const coord = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
-        result.set(key, { axis: 'x', coord, laneSpacing, type: 'global' })
-      }
-    }
+    const leftScore = scoreSide('left', leftCoord)
+    const rightScore = scoreSide('right', rightCoord)
+    const pickLeft = leftScore.hits === rightScore.hits
+      ? leftScore.length <= rightScore.length
+      : leftScore.hits < rightScore.hits
+    result.set(key, {
+      side: pickLeft ? 'left' : 'right',
+      coord: pickLeft ? leftCoord : rightCoord,
+      laneSpacing
+    })
   }
 
   return result
@@ -424,9 +532,22 @@ export function routeLinks(
     toCenter: { x: number; y: number }
   }>()
 
-  const sharedCorridors = computeSharedCorridors(
-    areaViewMap, areaCenters, linkMetas,
-    areaBounds, renderTuning, scale,
+  const areaPadMap = computeAreaPadInfo(
+    areaRects,
+    deviceRects,
+    deviceAreaMap,
+    renderTuning,
+    scale,
+  )
+  const padCorridors = computePadCorridors(
+    areaViewMap,
+    areaCenters,
+    linkMetas,
+    areaPadMap,
+    areaRects,
+    deviceRects,
+    renderTuning,
+    scale,
   )
 
   const links = linkMetas
@@ -481,7 +602,21 @@ export function routeLinks(
         arr.push(x, y)
       }
 
-      const isIntraArea = fromAreaId && toAreaId && fromAreaId === toAreaId
+      const computePadAnchor = (
+        areaRect: Rect,
+        fromPoint: { x: number; y: number },
+        side: PadSide,
+        shift: number,
+        padInfo: AreaPadInfo,
+      ) => {
+        const minY = areaRect.y + padInfo.inset
+        const maxY = areaRect.y + areaRect.height - padInfo.inset
+        const y = clamp(fromPoint.y + shift, minY, maxY)
+        const x = side === 'left' ? padInfo.leftX : padInfo.rightX
+        return { x, y }
+      }
+
+      const isIntraArea = !!(fromAreaId && toAreaId && fromAreaId === toAreaId)
       const obstacles: Array<Rect> = []
       deviceRects.forEach(({ id, rect }) => {
         if (id === link.fromDeviceId || id === link.toDeviceId) return
@@ -509,8 +644,9 @@ export function routeLinks(
         )
       )
       const directOrthogonal = Math.abs(fromAnchor.x - toAnchor.x) < 1 || Math.abs(fromAnchor.y - toAnchor.y) < 1
-      const directAllowed = isL1 && !lineBlocked && directOrthogonal && !hasExitBundle
-      const parallelAllowed = isL1 && !lineBlocked && directOrthogonal
+      const isInterArea = !!(fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea)
+      const directAllowed = isL1 && !lineBlocked && directOrthogonal && !hasExitBundle && !isInterArea
+      const parallelAllowed = isL1 && !lineBlocked && directOrthogonal && !isInterArea
       // Allow diagonal direct line when no obstacles block the path
       const diagonalAllowed = !isL1 && !lineBlocked && !directOrthogonal
 
@@ -600,70 +736,45 @@ export function routeLinks(
         }
       }
 
-      // Hành lang chia sẻ cho tuyến liên vùng (shared corridor routing)
-      if (!routed && isL1 && fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
+      // Hành lang pad cho tuyến liên-area (ép trái/phải trong vùng đệm)
+      if (!routed && isL1 && isInterArea && fromAreaId && toAreaId && fromArea && toArea) {
         const pairKey = getPairKey(fromAreaId, toAreaId)
-        const corridor = sharedCorridors.get(pairKey)
-        if (corridor) {
+        const corridor = padCorridors.get(pairKey)
+        const padFrom = areaPadMap.get(fromAreaId)
+        const padTo = areaPadMap.get(toAreaId)
+        if (corridor && padFrom && padTo) {
           const laneOffset = areaBundle && areaBundle.total > 1
             ? (areaBundle.index - (areaBundle.total - 1) / 2) * corridor.laneSpacing
             : 0
-          const laneCoord = corridor.coord + laneOffset
-          // Hướng anchor về phía corridor thay vì phía thiết bị đích
-          const corridorTarget = corridor.axis === 'x'
-            ? { x: laneCoord, y: fromExit.y }
-            : { x: fromExit.x, y: laneCoord }
-          const corridorTargetTo = corridor.axis === 'x'
-            ? { x: laneCoord, y: toExit.y }
-            : { x: toExit.x, y: laneCoord }
-          const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, corridorTarget, laneOffset, 0)
-          const toAreaAnchor = computeAreaAnchor(toArea, toExit, corridorTargetTo, laneOffset, 0)
-
-          // Chỉ kiểm tra đoạn corridor (giữa 2 vùng), không kiểm tra exit stub
-          const corridorSegments: Array<{ a: { x: number; y: number }; b: { x: number; y: number } }> = []
-          if (corridor.axis === 'x') {
-            corridorSegments.push(
-              { a: fromAreaAnchor, b: { x: laneCoord, y: fromAreaAnchor.y } },
-              { a: { x: laneCoord, y: fromAreaAnchor.y }, b: { x: laneCoord, y: toAreaAnchor.y } },
-              { a: { x: laneCoord, y: toAreaAnchor.y }, b: toAreaAnchor },
-            )
-          } else {
-            corridorSegments.push(
-              { a: fromAreaAnchor, b: { x: fromAreaAnchor.x, y: laneCoord } },
-              { a: { x: fromAreaAnchor.x, y: laneCoord }, b: { x: toAreaAnchor.x, y: laneCoord } },
-              { a: { x: toAreaAnchor.x, y: laneCoord }, b: toAreaAnchor },
-            )
-          }
-          const blocked = corridorSegments.some(seg =>
-            obstacles.some(r => segmentIntersectsRect(seg.a, seg.b, r, clearance))
+          const laneCoord = resolvePadCorridorCoord(
+            corridor.side,
+            corridor.coord + laneOffset,
+            padFrom,
+            padTo,
           )
 
-          if (!blocked) {
-            const corridorPath: Array<{ x: number; y: number }> = [
-              fromAnchor, fromBase, fromExit, fromAreaAnchor,
-            ]
-            if (corridor.axis === 'x') {
-              corridorPath.push({ x: laneCoord, y: fromAreaAnchor.y })
-              corridorPath.push({ x: laneCoord, y: toAreaAnchor.y })
-            } else {
-              corridorPath.push({ x: fromAreaAnchor.x, y: laneCoord })
-              corridorPath.push({ x: toAreaAnchor.x, y: laneCoord })
-            }
-            corridorPath.push(toAreaAnchor, toExit, toBase, toAnchor)
-            points = []
-            corridorPath.forEach(p => pushPoint(points, p.x, p.y))
-            // Bo góc cho đường hành lang
-            const pathPoints: Array<{ x: number; y: number }> = []
-            for (let i = 0; i + 1 < points.length; i += 2) {
-              pathPoints.push({ x: points[i], y: points[i + 1] })
-            }
-            const simplified = simplifyOrthogonalPath(pathPoints)
-            const cornerRadius = Math.max(4, Math.min(minSegment * 1.2, 14 * scale))
-            const rounded = roundOrthogonalCorners(simplified, cornerRadius, minSegment)
-            points = []
-            rounded.forEach(point => pushPoint(points, point.x, point.y))
-            routed = true
+          const fromAreaAnchor = computePadAnchor(fromArea, fromExit, corridor.side, laneOffset, padFrom)
+          const toAreaAnchor = computePadAnchor(toArea, toExit, corridor.side, laneOffset, padTo)
+
+          const corridorPath: Array<{ x: number; y: number }> = [
+            fromAnchor, fromBase, fromExit, fromAreaAnchor,
+          ]
+          corridorPath.push({ x: laneCoord, y: fromAreaAnchor.y })
+          corridorPath.push({ x: laneCoord, y: toAreaAnchor.y })
+          corridorPath.push(toAreaAnchor, toExit, toBase, toAnchor)
+          points = []
+          corridorPath.forEach(p => pushPoint(points, p.x, p.y))
+          // Bo góc cho đường hành lang
+          const pathPoints: Array<{ x: number; y: number }> = []
+          for (let i = 0; i + 1 < points.length; i += 2) {
+            pathPoints.push({ x: points[i], y: points[i + 1] })
           }
+          const simplified = simplifyOrthogonalPath(pathPoints)
+          const cornerRadius = Math.max(4, Math.min(minSegment * 1.2, 14 * scale))
+          const rounded = roundOrthogonalCorners(simplified, cornerRadius, minSegment)
+          points = []
+          rounded.forEach(point => pushPoint(points, point.x, point.y))
+          routed = true
         }
       }
 

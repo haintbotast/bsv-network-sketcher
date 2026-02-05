@@ -118,6 +118,13 @@
             </button>
             <button
               type="button"
+              :class="{ active: rightPanelTab === 'data' }"
+              @click="rightPanelTab = 'data'"
+            >
+              Dữ liệu
+            </button>
+            <button
+              type="button"
               :class="{ active: rightPanelTab === 'layout' }"
               @click="rightPanelTab = 'layout'"
             >
@@ -171,14 +178,58 @@
           </div>
         </div>
 
-        <div v-else-if="!selectedObject" class="inspector-empty">
-          <p>Chọn một đối tượng trên canvas để xem và chỉnh sửa thuộc tính.</p>
+        <div v-else-if="rightPanelTab === 'data'" class="inspector-content">
+          <div v-if="!currentUser" class="inspector-empty">
+            <p>Đăng nhập để quản lý dữ liệu.</p>
+          </div>
+          <div v-else-if="!activeProject" class="inspector-empty">
+            <p>Chọn project để thêm/xóa dữ liệu.</p>
+          </div>
+          <div v-else class="data-content">
+            <DataGrid
+              title="Areas"
+              :columns="areaColumns"
+              :rows="areas"
+              :default-row="defaultAreaRow"
+              @update:rows="updateAreaRows"
+              @row:add="handleAreaAdd"
+              @row:change="payload => handleAreaChange({ row: payload.row })"
+              @row:remove="handleAreaRemove"
+            />
+            <DataGrid
+              title="Devices"
+              :columns="deviceColumns"
+              :rows="devices"
+              :default-row="defaultDeviceRow"
+              :show-add="canAddDevice"
+              @update:rows="updateDeviceRows"
+              @row:add="handleDeviceAdd"
+              @row:change="payload => handleDeviceChange({ row: payload.row })"
+              @row:remove="handleDeviceRemove"
+            />
+            <DataGrid
+              title="Links"
+              :columns="linkColumns"
+              :rows="links"
+              :default-row="defaultLinkRow"
+              :show-add="canAddLink"
+              @update:rows="updateLinkRows"
+              @row:add="handleLinkAdd"
+              @row:change="payload => handleLinkChange({ row: payload.row })"
+              @row:remove="handleLinkRemove"
+            />
+          </div>
         </div>
 
-        <div v-else class="inspector-content">
-          <div class="inspector-type">
-            {{ selectedObjectType }}
+        <template v-else>
+          <div v-if="!selectedObject" class="inspector-empty">
+            <p>Chọn một đối tượng trên canvas để xem và chỉnh sửa thuộc tính.</p>
           </div>
+
+          <div v-else class="inspector-content">
+            <div class="inspector-type">
+              {{ selectedObjectType }}
+            </div>
 
           <!-- Area Properties -->
           <div v-if="selectedObjectType === 'Area' && selectedDraft" class="inspector-form">
@@ -432,11 +483,12 @@
             </button>
             <button type="button" class="danger" @click="handleSelectedObjectDelete">Xóa</button>
           </div>
-        </div>
+          </div>
 
-        <div v-if="rightPanelTab === 'properties'" class="hint">
-          {{ activeProject ? 'Bảng thuộc tính' : 'Cần đăng nhập và chọn project' }}
-        </div>
+          <div class="hint">
+            {{ activeProject ? 'Bảng thuộc tính' : 'Cần đăng nhập và chọn project' }}
+          </div>
+        </template>
       </aside>
     </section>
   </div>
@@ -445,11 +497,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import CanvasStage from './components/CanvasStage.vue'
+import DataGrid, { type ColumnDef } from './components/DataGrid.vue'
 import { updateArea } from './services/areas'
 import { updateDevice } from './services/devices'
 import { createLink, deleteLink, updateLink } from './services/links'
 import { deviceTypes, linkPurposes } from './composables/canvasConstants'
-import { comparePorts } from './components/canvas/linkRoutingUtils'
+import { comparePorts, extractPortIndex } from './components/canvas/linkRoutingUtils'
 import { useViewport } from './composables/useViewport'
 import { useAuth } from './composables/useAuth'
 import { useProjects } from './composables/useProjects'
@@ -697,6 +750,104 @@ const selectedDeviceName = computed(() => {
 const deviceNameById = computed(() => {
   return new Map(devices.value.map(device => [device.id, device.name]))
 })
+
+const deviceIdByName = computed(() => {
+  return new Map(devices.value.map(device => [device.name, device.id]))
+})
+
+const areaNameOptions = computed(() =>
+  areas.value.map(area => ({ value: area.name, label: area.name }))
+)
+const deviceNameOptions = computed(() =>
+  devices.value.map(device => ({ value: device.name, label: device.name }))
+)
+const deviceTypeOptions = deviceTypes.map(type => ({ value: type, label: type }))
+const linkPurposeOptions = linkPurposes.map(purpose => ({ value: purpose, label: purpose }))
+const linkLineStyleOptions = linkLineStyles.map(style => ({ value: style, label: style }))
+
+const areaColumns: ColumnDef[] = [
+  { key: 'name', label: 'Tên' },
+  { key: 'grid_row', label: 'Hàng', type: 'number', width: '72px' },
+  { key: 'grid_col', label: 'Cột', type: 'number', width: '72px' },
+  { key: 'width', label: 'Rộng', type: 'number', width: '80px' },
+  { key: 'height', label: 'Cao', type: 'number', width: '80px' },
+]
+
+const deviceColumns = computed<ColumnDef[]>(() => [
+  { key: 'name', label: 'Tên' },
+  { key: 'area_name', label: 'Area', type: 'select', options: areaNameOptions.value },
+  { key: 'device_type', label: 'Loại', type: 'select', options: deviceTypeOptions },
+  { key: 'width', label: 'Rộng', type: 'number', width: '80px' },
+  { key: 'height', label: 'Cao', type: 'number', width: '80px' },
+])
+
+const linkColumns = computed<ColumnDef[]>(() => [
+  { key: 'from_device_name', label: 'Nguồn', type: 'select', options: deviceNameOptions.value },
+  { key: 'from_port', label: 'Port nguồn' },
+  { key: 'to_device_name', label: 'Đích', type: 'select', options: deviceNameOptions.value },
+  { key: 'to_port', label: 'Port đích' },
+  { key: 'purpose', label: 'Mục đích', type: 'select', options: linkPurposeOptions },
+  { key: 'line_style', label: 'Kiểu', type: 'select', options: linkLineStyleOptions },
+])
+
+const nextPortForDevice = (deviceId: string, offset = 0) => {
+  let maxIndex = 0
+  links.value.forEach(link => {
+    if (link.from_device_id === deviceId) {
+      const idx = extractPortIndex(link.from_port)
+      if (idx && idx > maxIndex) maxIndex = idx
+    }
+    if (link.to_device_id === deviceId) {
+      const idx = extractPortIndex(link.to_port)
+      if (idx && idx > maxIndex) maxIndex = idx
+    }
+  })
+  const nextIndex = Math.max(1, maxIndex + 1 + offset)
+  return `Gi 0/${nextIndex}`
+}
+
+const defaultAreaRow = computed(() => ({
+  name: `Area ${areas.value.length + 1}`,
+  grid_row: Math.max(1, areas.value.length + 1),
+  grid_col: 1,
+  width: 3,
+  height: 1.5,
+  __temp: true
+}))
+
+const defaultDeviceRow = computed(() => ({
+  name: `Device ${devices.value.length + 1}`,
+  area_name: areas.value[0]?.name || '',
+  device_type: 'Switch',
+  width: 1.2,
+  height: 0.5,
+  __temp: true
+}))
+
+const defaultLinkRow = computed(() => {
+  const fromName = devices.value[0]?.name || ''
+  const toName = devices.value[1]?.name || devices.value[0]?.name || ''
+  const fromId = deviceIdByName.value.get(fromName)
+  const toId = deviceIdByName.value.get(toName)
+  const fromPort = fromId ? nextPortForDevice(fromId) : 'Gi 0/1'
+  const toPort = toId ? nextPortForDevice(toId, fromId === toId ? 1 : 0) : 'Gi 0/2'
+  return {
+    from_device_name: fromName,
+    from_port: fromPort,
+    to_device_name: toName,
+    to_port: toPort,
+    purpose: 'DEFAULT',
+    line_style: 'solid',
+    __temp: true
+  }
+})
+
+const canAddDevice = computed(() => areas.value.length > 0)
+const canAddLink = computed(() => devices.value.length > 1)
+
+const updateAreaRows = (rows: AreaRow[]) => { areas.value = rows }
+const updateDeviceRows = (rows: DeviceRow[]) => { devices.value = rows }
+const updateLinkRows = (rows: LinkRow[]) => { links.value = rows }
 
 const targetDeviceOptions = computed(() => {
   if (!selectedDeviceId.value) return devices.value
@@ -1452,6 +1603,12 @@ onMounted(() => {
 }
 
 .layout-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.data-content {
   display: flex;
   flex-direction: column;
   gap: 16px;

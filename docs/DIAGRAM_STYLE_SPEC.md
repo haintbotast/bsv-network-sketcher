@@ -56,9 +56,9 @@
 
 **Liên kết liên‑area:**
 - Bắt buộc đi qua **Waypoint area** (đuôi `_wp_`), không nối Area‑Area trực tiếp.
-- Link đi qua **anchor** trên biên Area để giảm cắt xuyên.
-- Ưu tiên **corridor cục bộ** giữa 2 Area nếu có **gap sạch** (không bị Area khác chặn); fallback về corridor global ngoài biên Area khi không hợp lệ.
-- **Cho phép tuyến liên‑area/waypoint đi ra ngoài đường bao sơ đồ** khi cần để giảm cắt chéo; viewport/pan phải **tính cả waypoint + link extents** để tránh bị cắt mất đoạn.
+- Link đi qua **anchor trong vùng đệm (pad)** của Area, **ép trái/phải** để giảm cắt xuyên.
+- Liên‑area đi trong **pad trái/phải** của mỗi Area; hành lang chỉ băng qua **khoảng trống giữa Area** khi cần, **không dùng corridor global ngoài biên Area**.
+- **Không cho phép tuyến liên‑area/waypoint đi ra ngoài đường bao sơ đồ**; nếu thiếu chỗ thì tăng `area_padding` hoặc nới layout.
 - **Liên‑area qua waypoint:**  
   - **L1:** giữ **Manhattan (ngang/dọc)**, **không shortcut chéo**; bo góc bằng **lineJoin round**.  
   - **L2/L3:** ưu tiên **any‑angle (Theta\*) + bo góc nhẹ**; nếu không tìm được đường thì fallback hành lang.

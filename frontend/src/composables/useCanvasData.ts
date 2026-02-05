@@ -158,6 +158,9 @@ export function useCanvasData(
       if (index >= 0) areas.value[index] = created
       scheduleAutoLayout(projectId, true)
     } catch (error: any) {
+      if (row.__temp) {
+        areas.value = areas.value.filter(area => area.id !== row.id)
+      }
       setNotice(error?.message || 'Tạo area thất bại.', 'error')
     }
   }
@@ -223,6 +226,9 @@ export function useCanvasData(
       if (index >= 0) devices.value[index] = created
       scheduleAutoLayout(projectId, true)
     } catch (error: any) {
+      if (row.__temp) {
+        devices.value = devices.value.filter(device => device.id !== row.id)
+      }
       setNotice(error?.message || 'Tạo device thất bại.', 'error')
     }
   }
@@ -286,6 +292,9 @@ export function useCanvasData(
       if (index >= 0) links.value[index] = created
       scheduleAutoLayout(projectId, true)
     } catch (error: any) {
+      if (row.__temp) {
+        links.value = links.value.filter(link => link.id !== row.id)
+      }
       setNotice(error?.message || 'Tạo link thất bại.', 'error')
     }
   }

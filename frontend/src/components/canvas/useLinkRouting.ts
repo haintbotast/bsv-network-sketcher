@@ -282,16 +282,28 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     const labelInset = ((props.viewMode || 'L1') === 'L1') ? charWidth : 0
     const adjustedLabelOffset = Math.max(0, labelOffset - labelInset)
     const deviceLabelPadding = 8
-    const deviceLabelHeight = 16
+    const deviceFontSize = 13 * labelScale
+    const deviceCharWidth = deviceFontSize * 0.6
+    const deviceLabelHeight = Math.max(12 * labelScale, deviceFontSize + 3 * labelScale)
     const rectsIntersect = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) => {
       return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
     }
-    const deviceLabelRect = (rect: Rect) => ({
-      x: rect.x + deviceLabelPadding,
-      y: rect.y + deviceLabelPadding,
-      width: Math.max(rect.width - deviceLabelPadding * 2, 0),
-      height: deviceLabelHeight
-    })
+    const deviceNameMap = new Map(props.devices.map(device => [device.id, device.name || '']))
+    const deviceLabelRect = (rect: Rect, deviceId: string) => {
+      const name = deviceNameMap.get(deviceId) || ''
+      if (!name) return null
+      const maxWidth = Math.max(rect.width - deviceLabelPadding * 2, 0)
+      if (maxWidth <= 0) return null
+      const textWidth = Math.max(0, name.length * deviceCharWidth)
+      const width = Math.min(textWidth, maxWidth)
+      if (width <= 0) return null
+      return {
+        x: rect.x + deviceLabelPadding,
+        y: rect.y + deviceLabelPadding,
+        width,
+        height: deviceLabelHeight
+      }
+    }
     const pathCache = new Map<string, { segments: Array<{ ax: number; ay: number; bx: number; by: number; len: number }>; total: number }>()
 
     const rawLabels: Array<{
@@ -402,23 +414,50 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         let safeDistance = path.total > 0
           ? (desiredDistance <= path.total ? desiredDistance : Math.max(path.total * 0.5, 0))
           : 0
+        const side = anchor.side || computeSide(deviceRect, neighbor)
+        const allowedInset = charWidth
+        const minInsetDistance = (side === 'left' || side === 'right')
+          ? Math.max(0, width / 2 - allowedInset)
+          : Math.max(0, labelHeight / 2 - allowedInset)
+        safeDistance = Math.max(safeDistance, minInsetDistance)
         if (path.total > 0) {
-          const labelZone = deviceLabelRect(deviceRect)
-          const step = Math.max(4, labelHeight * 0.6)
-          for (let i = 0; i < 6; i += 1) {
-            const point = resolvePointAlongPath(path, safeDistance, fromStart)
-            if (!point) break
-            const labelRect = {
-              x: point.x - width / 2,
-              y: point.y - labelHeight / 2,
-              width,
-              height: labelHeight
+          const labelZone = deviceLabelRect(deviceRect, deviceId)
+          if (labelZone) {
+            const gap = Math.max(2, 2 * labelScale)
+            let minTextDistance = 0
+            if (side === 'right') {
+              minTextDistance = labelZone.x + labelZone.width + gap + width / 2 - anchor.x
+            } else if (side === 'left') {
+              minTextDistance = anchor.x - labelZone.x + gap + width / 2
+            } else if (side === 'top') {
+              minTextDistance = anchor.y - labelZone.y + gap + labelHeight / 2
+            } else {
+              minTextDistance = labelZone.y + labelZone.height + gap + labelHeight / 2 - anchor.y
             }
-            if (!rectsIntersect(labelRect, labelZone)) break
-            safeDistance = Math.min(path.total, safeDistance + step)
+            safeDistance = Math.max(safeDistance, minTextDistance)
+          }
+          safeDistance = Math.min(path.total, safeDistance)
+        }
+        let pointOnPath = resolvePointAlongPath(path, safeDistance, fromStart)
+        if (path.total > 0) {
+          const labelZone = deviceLabelRect(deviceRect, deviceId)
+          if (labelZone) {
+            const step = Math.max(4, labelHeight * 0.6)
+            for (let i = 0; i < 6 && safeDistance < path.total; i += 1) {
+              const point = resolvePointAlongPath(path, safeDistance, fromStart)
+              if (!point) break
+              const labelRect = {
+                x: point.x - width / 2,
+                y: point.y - labelHeight / 2,
+                width,
+                height: labelHeight
+              }
+              if (!rectsIntersect(labelRect, labelZone)) break
+              safeDistance = Math.min(path.total, safeDistance + step)
+            }
+            pointOnPath = resolvePointAlongPath(path, safeDistance, fromStart)
           }
         }
-        const pointOnPath = resolvePointAlongPath(path, safeDistance, fromStart)
         const cx = pointOnPath ? pointOnPath.x : (fallback.x + width / 2)
         const cy = pointOnPath ? pointOnPath.y : (fallback.y + labelHeight / 2)
         const angle = pointOnPath ? pointOnPath.angle : computeAngle(anchor, neighbor)

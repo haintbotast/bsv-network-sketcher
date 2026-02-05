@@ -281,6 +281,17 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     const charWidth = 6 * labelScale
     const labelInset = ((props.viewMode || 'L1') === 'L1') ? charWidth : 0
     const adjustedLabelOffset = Math.max(0, labelOffset - labelInset)
+    const deviceLabelPadding = 8
+    const deviceLabelHeight = 16
+    const rectsIntersect = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) => {
+      return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
+    }
+    const deviceLabelRect = (rect: Rect) => ({
+      x: rect.x + deviceLabelPadding,
+      y: rect.y + deviceLabelPadding,
+      width: Math.max(rect.width - deviceLabelPadding * 2, 0),
+      height: deviceLabelHeight
+    })
     const pathCache = new Map<string, { segments: Array<{ ax: number; ay: number; bx: number; by: number; len: number }>; total: number }>()
 
     const rawLabels: Array<{
@@ -388,9 +399,25 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         const width = Math.max(text.length * charWidth + labelPadding, minLabelWidth)
         const desiredDistance = adjustedLabelOffset
         const fallback = computePortLabelPlacement(anchor, center, width, labelHeight, adjustedLabelOffset)
-        const safeDistance = path.total > 0
+        let safeDistance = path.total > 0
           ? (desiredDistance <= path.total ? desiredDistance : Math.max(path.total * 0.5, 0))
           : 0
+        if (path.total > 0) {
+          const labelZone = deviceLabelRect(deviceRect)
+          const step = Math.max(4, labelHeight * 0.6)
+          for (let i = 0; i < 6; i += 1) {
+            const point = resolvePointAlongPath(path, safeDistance, fromStart)
+            if (!point) break
+            const labelRect = {
+              x: point.x - width / 2,
+              y: point.y - labelHeight / 2,
+              width,
+              height: labelHeight
+            }
+            if (!rectsIntersect(labelRect, labelZone)) break
+            safeDistance = Math.min(path.total, safeDistance + step)
+          }
+        }
         const pointOnPath = resolvePointAlongPath(path, safeDistance, fromStart)
         const cx = pointOnPath ? pointOnPath.x : (fallback.x + width / 2)
         const cy = pointOnPath ? pointOnPath.y : (fallback.y + labelHeight / 2)

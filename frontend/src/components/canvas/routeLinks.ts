@@ -302,6 +302,15 @@ export function routeLinks(
     }
     return { dx: offset, dy: 0 }
   }
+  const resolveLaneShift = (linkId: string) => {
+    const fromEntry = exitBundleIndex.get(`${linkId}|from`)
+    const toEntry = exitBundleIndex.get(`${linkId}|to`)
+    const entry = (!fromEntry || (toEntry && (toEntry.total ?? 0) > (fromEntry.total ?? 0)))
+      ? toEntry
+      : fromEntry
+    if (!entry || entry.total <= 1 || exitBundleGap <= 0) return 0
+    return (entry.index - (entry.total - 1) / 2) * exitBundleGap
+  }
 
   const occupancy = new Map<string, number>()
   const cache = new Map<string, {
@@ -336,6 +345,7 @@ export function routeLinks(
       const fromExitEntry = exitBundleIndex.get(`${link.id}|from`)
       const toExitEntry = exitBundleIndex.get(`${link.id}|to`)
       const hasExitBundle = (fromExitEntry?.total ?? 0) > 1 || (toExitEntry?.total ?? 0) > 1
+      const laneShift = isL1 ? resolveLaneShift(link.id) : 0
       const bundleOffset = bundle && bundle.total > 1
         ? (bundle.index - (bundle.total - 1) / 2) * ((renderTuning.bundle_gap ?? 0) * scale)
         : 0
@@ -345,7 +355,7 @@ export function routeLinks(
       const areaBundleOffset = areaBundle && areaBundle.total > 1
         ? (areaBundle.index - (areaBundle.total - 1) / 2) * interAreaBundleGap
         : 0
-      const interBundleOffset = areaBundleOffset + bundleOffset * 0.5
+      const interBundleOffset = areaBundleOffset + bundleOffset * 0.5 + laneShift
       const bundleStub = (renderTuning.bundle_stub ?? 0) * scale
       const anchorOffset = ((renderTuning.area_anchor_offset ?? 0) + (renderTuning.area_clearance ?? 0)) * scale
       const baseExitStub = Math.max(renderTuning.bundle_stub ?? 0, renderTuning.area_clearance ?? 0) * scale
@@ -433,8 +443,8 @@ export function routeLinks(
       if (allowAStar && !directAllowed && !routed && grid) {
         const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
         const bundleShift = preferAxis === 'x'
-          ? { x: 0, y: bundleOffset }
-          : { x: bundleOffset, y: 0 }
+          ? { x: 0, y: bundleOffset + laneShift }
+          : { x: bundleOffset + laneShift, y: 0 }
         const offsetFromExit = {
           x: fromExit.x + bundleShift.x,
           y: fromExit.y + bundleShift.y
@@ -632,8 +642,8 @@ export function routeLinks(
         } else if (isL1) {
           const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
           const bundleShift = preferAxis === 'x'
-            ? { x: 0, y: bundleOffset }
-            : { x: bundleOffset, y: 0 }
+            ? { x: 0, y: bundleOffset + laneShift }
+            : { x: bundleOffset + laneShift, y: 0 }
           const fromStart = { x: fromExit.x + bundleShift.x, y: fromExit.y + bundleShift.y }
           const toStart = { x: toExit.x + bundleShift.x, y: toExit.y + bundleShift.y }
 

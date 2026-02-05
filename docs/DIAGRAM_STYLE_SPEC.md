@@ -71,6 +71,7 @@
 - **Stub theo nhãn port (L1):** đoạn link đi ra khỏi thiết bị **tối thiểu bằng bề ngang nhãn port** để nhãn không đè lên biên thiết bị và đường link.
 - **Thứ tự thiết bị (L1 micro):** **Router ở hàng trên**, Firewall **ở hàng dưới Router**, Core/Distro nằm dưới Firewall.
 - **Nhãn port (L1):** nhãn **nằm giữa đường link**, khoảng cách **anchor → tâm nhãn** theo `port_label_offset` **trừ đi 1 ký tự (≈ độ rộng “G”)** để nhãn **đè nhẹ lên device**, **không dịch để tránh va chạm**; nhãn có thể đè lên đường link.
+- **Rebalance port/side (L1):** sức chứa mỗi side tính theo **minSpacing = `bundle_gap` + (`port_label_offset` − 1 ký tự)** để đủ chỗ cho **anchor gap + label clearance**.
 - **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng; nếu **exit bundle > 1** thì **không dùng đường thẳng trực tiếp**, bắt buộc route qua lưới để tách lane.
 - **Waypoint (L1):** khi có waypoint giữa 2 Area, link đi qua **nhiều tọa độ neo** trên waypoint (theo lane index) để **không chồng lên nhau**.
 - **Override thủ công (per-port):** người dùng có thể **cố định side + offset_ratio** cho từng port; `offset_ratio` có thể để `null` để **giữ auto offset** theo side đã chọn. Override **giữ side là ưu tiên cao nhất**, nhưng **có thể tự căn lại tọa độ** để **giữ link thẳng hàng** khi 2 thiết bị cùng hàng/cột và side đã phù hợp.

@@ -153,7 +153,11 @@ export function usePortAnchors(deps: {
 
       // --- Port side capacity rebalancing ---
       // If too many ports assigned to one side, move excess to adjacent sides
-      const minSpacing = renderTuning.value.bundle_gap ?? 22
+      const baseSpacing = renderTuning.value.bundle_gap ?? 22
+      const labelOffset = renderTuning.value.port_label_offset ?? 0
+      const labelInset = 6
+      const effectiveLabelOffset = Math.max(0, labelOffset - labelInset)
+      const minSpacing = baseSpacing + effectiveLabelOffset
       const sideCap = (s: string) => {
         const len = (s === 'left' || s === 'right') ? rect.height : rect.width
         return Math.max(1, Math.floor((len - portEdgeInset * 2) / minSpacing))

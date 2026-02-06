@@ -339,14 +339,17 @@ def compute_layout_l1(
             max_rendered_h = max(max_rendered_h, r_h)
         area_node_width = max_rendered_w + max(0.0, label_extra)
         area_node_height = max_rendered_h + max(0.0, label_extra)
+        # Keep a minimum spacing proportional to rendered node size to avoid overlap after port-band expansion.
+        min_node_spacing = max(0.35, area_node_width * 0.14)
+        min_row_gap = max(0.28, area_node_height * 0.12)
         # Port labels render as band cells inside device — no extra label clearance needed.
         area_micro_config = LayoutConfig(
-            layer_gap=micro_config.layer_gap,
-            node_spacing=micro_config.node_spacing,
+            layer_gap=max(micro_config.layer_gap, area_node_height * 0.2),
+            node_spacing=max(micro_config.node_spacing, min_node_spacing),
             node_width=area_node_width,
             node_height=area_node_height,
             max_nodes_per_row=micro_config.max_nodes_per_row,
-            row_gap=micro_config.row_gap,
+            row_gap=max(micro_config.row_gap, min_row_gap),
             row_stagger=micro_config.row_stagger,
         )
 

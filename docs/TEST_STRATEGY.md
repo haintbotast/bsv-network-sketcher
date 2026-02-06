@@ -17,6 +17,7 @@
 - **port_embedded_render:** L1 port label phải nằm trong object (port band top/bottom), không hiển thị overlay label trên link.
 - **l1_technical_render:** L1 giữ nét kỹ thuật (đường orthogonal, góc vuông rõ, giảm dùng màu nhấn cho link LAN/DEFAULT).
 - **area_compact_render:** L1 hiển thị Area dạng compact theo cụm thiết bị để giảm khoảng trắng nhưng không làm sai dữ liệu area gốc.
+- **peer_control_link_render:** `STACK/HA/HSRP` phải có style hiển thị riêng (màu/nét/lane) và không hòa lẫn với uplink/data.
 - **port_anchor_override:** override anchor per-port **được ưu tiên** và **không bị auto-layout ghi đè**; kiểm tra thêm trường hợp `offset_ratio = null` để giữ auto offset.
 - **uplink_anchor_policy:** L1 auto-anchor phải đặt **uplink ở top** và **non-uplink ở bottom**; chỉ lệch khi có override thủ công.
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
@@ -246,6 +247,8 @@ test.describe('Diagram Editor', () => {
 - [ ] L1 technical render: tuyến L1 giữ orthogonal/góc vuông, không bị bo cong quá mức.
 - [ ] L1 technical render: link LAN/DEFAULT ở L1 dùng màu trung tính, chỉ purpose đặc biệt mới dùng màu nhấn.
 - [ ] Area compact render: khung Area hiển thị co theo cụm thiết bị (giảm khoảng trắng lớn) và không làm thay đổi lưu trữ area trong DB.
+- [ ] Peer-control render: link `STACK/HA/HSRP` dùng màu/nét đúng quy ước và dễ phân biệt với link mặc định.
+- [ ] Peer-control routing: với thiết bị cùng hàng trong nội-area, link `STACK/HA/HSRP` ưu tiên tuyến ngắn, ít giao cắt.
 - [ ] RB-121..RB-122: nhãn không đè lên node/link; port cell/nhãn cổng hợp lệ.
 - [ ] RB-141..RB-143: cảnh báo khoảng cách hiển thị đúng khi vi phạm ngưỡng.
 - [ ] RB-201..RB-202: hướng layout đúng style chung.

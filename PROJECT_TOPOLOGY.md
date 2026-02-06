@@ -74,6 +74,7 @@ UI thao tác → REST API → Service → DB → phản hồi → UI render
 - Render L1 dùng **port band gắn trực tiếp vào object** (top/bottom); kích thước object được nới theo số lượng/độ dài port.
 - Render routing L1 theo phong cách kỹ thuật (orthogonal/góc vuông rõ, ưu tiên màu trung tính cho link LAN/DEFAULT).
 - UI L1 render khung Area theo dạng compact quanh cụm thiết bị để giảm khoảng trắng hiển thị (không đổi dữ liệu Area gốc).
+- Link peer-control (`STACK/HA/HSRP`) dùng lane/style riêng để tách khỏi các luồng uplink/data trong cùng khu vực.
 
 ### 4.2 Luồng xem trước thời gian thực
 ```

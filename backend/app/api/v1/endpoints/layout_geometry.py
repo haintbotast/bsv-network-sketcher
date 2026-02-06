@@ -3,6 +3,7 @@ Geometry and sizing utilities for layout computation.
 """
 
 import math
+import re
 
 from .layout_constants import (
     UNIT_PX,
@@ -108,6 +109,34 @@ def _estimate_band_width_px(ports: list[str]) -> float:
     return PORT_BAND_PADDING_X_PX * 2 + cells_width + gaps_width
 
 
+def _extract_port_index(port_name: str) -> int | None:
+    match = None
+    for m in re.finditer(r"(\d+)", port_name):
+        match = m
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except (TypeError, ValueError):
+        return None
+
+
+def _split_ports_for_bands(ports: list[str]) -> tuple[list[str], list[str]]:
+    """Heuristic split that mirrors frontend policy: uplink-ish -> top, others -> bottom."""
+    top: list[str] = []
+    bottom: list[str] = []
+    for raw in ports:
+        name = (raw or "").strip()
+        if not name:
+            continue
+        idx = _extract_port_index(name)
+        if idx == 1:
+            top.append(name)
+        else:
+            bottom.append(name)
+    return top, bottom
+
+
 def estimate_device_rendered_size(
     body_width_in: float,
     body_height_in: float,
@@ -126,14 +155,17 @@ def estimate_device_rendered_size(
         height_px = max(body_height_px, DEVICE_LABEL_MIN_HEIGHT_PX)
         return width_px / UNIT_PX, height_px / UNIT_PX
 
-    half = math.ceil(len(ports) / 2)
-    side_a = ports[:half]
-    side_b = ports[half:]
+    side_a, side_b = _split_ports_for_bands(ports)
+    if not side_a and not side_b:
+        half = math.ceil(len(ports) / 2)
+        side_a = ports[:half]
+        side_b = ports[half:]
 
     band_a_width = _estimate_band_width_px(side_a)
     band_b_width = _estimate_band_width_px(side_b)
+    band_full_width = _estimate_band_width_px(ports)
 
-    width_px = max(body_width_px, DEVICE_MIN_WIDTH_PX, band_a_width, band_b_width)
+    width_px = max(body_width_px, DEVICE_MIN_WIDTH_PX, band_a_width, band_b_width, band_full_width)
 
     band_height = PORT_CELL_HEIGHT_PX + PORT_BAND_PADDING_Y_PX * 2
     body_rendered_px = max(body_height_px, DEVICE_LABEL_MIN_HEIGHT_PX)

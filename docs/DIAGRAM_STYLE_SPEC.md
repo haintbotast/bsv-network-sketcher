@@ -79,6 +79,7 @@
 - **Rebalance port/side (L1):** sức chứa mỗi band tính theo chiều rộng object và số ô port; khi quá tải chỉ cân lại giữa **top/bottom** để giữ đúng quy ước chuẩn.
 - **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng; offset tối thiểu bằng **max(`bundle_gap`, `grid cell`)** và **tự nhân hệ số theo `total`** (nhiều link → khoảng cách lớn hơn). **Lane shift** được áp **ngay tại anchor (trên cạnh object)** để giữ đường **thẳng ra khỏi thiết bị**; nếu **exit bundle > 1** thì **không dùng đường thẳng trực tiếp**, bắt buộc route qua lưới để tách lane.
 - **Bundle song song (L1):** nếu 2 thiết bị **cùng hàng/cột**, không bị vật cản thì ưu tiên **đường thẳng song song** cho các link bundle (bỏ A\*), để tránh “uốn cong” ngay tại port label.
+- **Peer control links (L1):** `STACK/HA/HSRP` ưu tiên tuyến nội‑area ngắn, tách lane riêng theo loại link để không hòa vào bó uplink/data.
 - **Waypoint (L1):** khi có waypoint giữa 2 Area, link đi qua **nhiều tọa độ neo** trên waypoint (theo lane index) để **không chồng lên nhau**.
 - **Override thủ công (per-port):** người dùng có thể **cố định side + offset_ratio** cho từng port; `offset_ratio` có thể để `null` để **giữ auto offset** theo side đã chọn. Override **giữ side là ưu tiên cao nhất**, nhưng **có thể tự căn lại tọa độ** để **giữ link thẳng hàng** khi 2 thiết bị cùng hàng/cột và side đã phù hợp.
 - **Xác định uplink (L1):** ưu tiên theo quan hệ phân tầng thiết bị (tier thấp nối lên tier cao); nếu không phân biệt được thì fallback theo heuristic `port index = 1`.
@@ -237,6 +238,8 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 | LAN | 39,174,96 | #27ae60 |
 | MGMT | 41,128,185 | #2980b9 |
 | HA | 22,160,133 | #16a085 |
+| HSRP | 155,89,182 | #9b59b6 |
+| STACK / STACKWISE | 45,140,240 | #2d8cf0 |
 | STORAGE | 26,188,156 | #1abc9c |
 | BACKUP | 127,140,141 | #7f8c8d |
 | VPN | 155,89,182 | #9b59b6 |

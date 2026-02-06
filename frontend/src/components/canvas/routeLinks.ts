@@ -36,6 +36,23 @@ const DEBUG_STROKE_L1_DIAGONAL = '#d35400'
 const LABEL_SCALE_MIN = 0.6
 const LABEL_SCALE_MAX = 1.15
 
+type PeerPurposeKind = 'stack' | 'ha' | 'hsrp'
+
+const PEER_PURPOSE_VISUAL: Record<PeerPurposeKind, { stroke: string; dash: number[]; strokeWidth: number; opacity: number }> = {
+  stack: { stroke: '#2d8cf0', dash: [], strokeWidth: 2, opacity: 0.98 },
+  ha: { stroke: '#16a085', dash: [8, 5], strokeWidth: 1.9, opacity: 0.98 },
+  hsrp: { stroke: '#9b59b6', dash: [3, 4], strokeWidth: 1.8, opacity: 0.96 },
+}
+
+function resolvePeerPurposeKind(purpose: string): PeerPurposeKind | null {
+  const key = (purpose || '').trim().toUpperCase()
+  if (!key) return null
+  if (key.includes('STACK')) return 'stack'
+  if (key.includes('HSRP')) return 'hsrp'
+  if (key === 'HA' || key.includes('HIGH-AVAILABILITY') || key.includes('HIGH_AVAILABILITY')) return 'ha'
+  return null
+}
+
 function computeLocalCorridor(
   fromArea: Rect,
   toArea: Rect,
@@ -673,8 +690,46 @@ export function routeLinks(
       const toExitShift = isL1 ? { dx: 0, dy: 0 } : resolveExitShift(`${link.id}|to`)
       const fromExit = { x: fromBase.x + fromExitShift.dx, y: fromBase.y + fromExitShift.dy }
       const toExit = { x: toBase.x + toExitShift.dx, y: toBase.y + toExitShift.dy }
+      const purpose = (link.purpose || '').trim().toUpperCase()
+      const peerPurpose = resolvePeerPurposeKind(purpose)
+      const isPeerControlLink = isL1 && !!peerPurpose && isIntraArea
 
       let routed = false
+
+      if (isPeerControlLink && !routed) {
+        const rowThreshold = Math.max(fromView.height, toView.height) * 0.85
+        const sameRow = Math.abs(fromCenter.y - toCenter.y) <= rowThreshold
+        if (sameRow) {
+          const laneOffset =
+            peerPurpose === 'stack'
+              ? -10 * scale
+              : peerPurpose === 'ha'
+                ? 0
+                : 10 * scale
+          const laneY = (fromCenter.y + toCenter.y) / 2 + laneOffset
+          const peerPath = [
+            fromAnchor,
+            fromBase,
+            fromExit,
+            { x: fromExit.x, y: laneY },
+            { x: toExit.x, y: laneY },
+            toExit,
+            toBase,
+            toAnchor,
+          ]
+          const blocked = peerPath.some((point, idx) => {
+            if (idx === 0) return false
+            const a = peerPath[idx - 1]
+            const b = point
+            return obstacles.some(rect => segmentIntersectsRect(a, b, rect, clearance))
+          })
+          if (!blocked) {
+            points = []
+            peerPath.forEach(point => pushPoint(points, point.x, point.y))
+            routed = true
+          }
+        }
+      }
 
       // Direct diagonal routing when no obstacles block the path
       if (diagonalAllowed && !routed) {
@@ -1070,10 +1125,12 @@ export function routeLinks(
         simplified.forEach(point => pushPoint(points, point.x, point.y))
       }
 
-      const purpose = (link.purpose || '').trim().toUpperCase()
       const neutralL1Purposes = new Set(['', 'DEFAULT', 'LAN'])
       const purposeStroke = resolveLinkPurposeColor(link.purpose)
-      const baseStroke = (isL1 && neutralL1Purposes.has(purpose)) ? '#2b2a28' : purposeStroke
+      const peerVisual = peerPurpose ? PEER_PURPOSE_VISUAL[peerPurpose] : null
+      const baseStroke = peerVisual
+        ? peerVisual.stroke
+        : ((isL1 && neutralL1Purposes.has(purpose)) ? '#2b2a28' : purposeStroke)
       const debugStroke = (() => {
         if (!debugOn) return baseStroke
         if (!isL1) return DEBUG_STROKE_L2
@@ -1081,6 +1138,15 @@ export function routeLinks(
         if (hasSignificantDiagonal(points, minDiagonal)) return DEBUG_STROKE_L1_DIAGONAL
         return baseStroke
       })()
+      const dash = peerVisual
+        ? peerVisual.dash
+        : (link.style === 'dashed' ? [8, 6] : link.style === 'dotted' ? [2, 4] : [])
+      const strokeWidth = peerVisual
+        ? peerVisual.strokeWidth
+        : (isL1 ? 1.35 : 1.5)
+      const opacity = peerVisual
+        ? peerVisual.opacity
+        : (isL1 ? 0.92 : 0.8)
 
       return {
         id: link.id,
@@ -1092,11 +1158,11 @@ export function routeLinks(
         config: {
           points,
           stroke: debugStroke,
-          strokeWidth: isL1 ? 1.35 : 1.5,
+          strokeWidth,
           lineCap: isL1 ? 'butt' : 'round',
           lineJoin: isL1 ? 'miter' : 'round',
-          dash: link.style === 'dashed' ? [8, 6] : link.style === 'dotted' ? [2, 4] : [],
-          opacity: isL1 ? 0.92 : 0.8
+          dash,
+          opacity
         }
       }
     })

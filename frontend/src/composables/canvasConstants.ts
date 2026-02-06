@@ -7,15 +7,15 @@ export const GRID_FALLBACK_Y = 2.5
 
 // Layout tuning: khoảng cách và padding (đơn vị: inch)
 export const DEFAULT_LAYOUT_TUNING: LayoutTuning = {
-  layer_gap: 0.9,         // Khoảng cách giữa các tầng (giảm vì port bands đã tạo phân cách)
-  node_spacing: 0.7,      // Khoảng cách ngang giữa các device
+  layer_gap: 1.1,         // Khoảng cách giữa các tầng
+  node_spacing: 1.0,      // Khoảng cách ngang giữa các device
   port_label_band: 0.0,   // Không cần thêm — port labels nằm trong band cells
   area_gap: 0.9,          // Khoảng cách giữa các area
   area_padding: 0.3,      // Padding bên trong area
   label_band: 0.35,       // Dải cho area label
   max_row_width_base: 12.0,
   max_nodes_per_row: 8,
-  row_gap: 0.5,           // Khoảng cách giữa các hàng trong area
+  row_gap: 0.65,          // Khoảng cách giữa các hàng trong area
   row_stagger: 0.5        // Độ so le hàng (0-1)
 }
 
@@ -33,7 +33,7 @@ export const DEFAULT_RENDER_TUNING: RenderTuning = {
 }
 
 export const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']
-export const linkPurposes = ['DEFAULT', 'WAN', 'INTERNET', 'DMZ', 'LAN', 'MGMT', 'HA', 'STORAGE', 'BACKUP', 'VPN']
+export const linkPurposes = ['DEFAULT', 'WAN', 'INTERNET', 'DMZ', 'LAN', 'MGMT', 'HA', 'HSRP', 'STACK', 'STORAGE', 'BACKUP', 'VPN']
 export const DEFAULT_LINK_COLOR = '#2b2a28'
 export const LINK_PURPOSE_COLORS: Record<string, string> = {
   DEFAULT: DEFAULT_LINK_COLOR,
@@ -43,6 +43,10 @@ export const LINK_PURPOSE_COLORS: Record<string, string> = {
   LAN: '#27ae60',
   MGMT: '#2980b9',
   HA: '#16a085',
+  HSRP: '#9b59b6',
+  STACK: '#2d8cf0',
+  STACKWISE: '#2d8cf0',
+  'STACK-WISE': '#2d8cf0',
   STORAGE: '#1abc9c',
   BACKUP: '#7f8c8d',
   VPN: '#9b59b6',

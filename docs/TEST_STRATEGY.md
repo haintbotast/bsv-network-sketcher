@@ -9,6 +9,7 @@
 
 ### 1.1 Kiểm thử layout (AI Context)
 - **group_by_area:** thiết bị không vượt biên Area; macro/micro layout tách tầng.
+- **grid placement map ưu tiên:** khi dữ liệu có `grid_row/grid_col` tạo thành lưới nhiều hàng và nhiều cột, macro layout phải bám theo placement map.
 - **top‑to‑bottom:** Core/Dist ở hàng trên, Access giữa, Endpoints dưới (ưu tiên cha ở trên con).
 - **_AIR_ spacing:** giữ thẳng cột, không chồng lấn.
 - **same_type_row:** thiết bị cùng loại ưu tiên ở cùng hàng khi `max_nodes_per_row` cho phép.

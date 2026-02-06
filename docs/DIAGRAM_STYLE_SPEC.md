@@ -81,6 +81,7 @@
 
 **Macro layout (Area):**
 - Kích thước Area được **tính lại từ bounding thiết bị** + padding + band nhãn khi auto‑layout toàn dự án (cho phép **co lại** nếu dư thừa).
+- Khi project có **placement map rõ ràng** (`grid_row/grid_col` tạo thành lưới nhiều hàng và nhiều cột), macro layout **ưu tiên bám theo lưới này** để giữ bố cục gần template/PDF chuẩn; vẫn giữ quy tắc top‑to‑bottom.
 - Trong cùng tier, **được phép hoán vị theo kết nối** (barycenter + local swap) để giảm đường vòng liên‑area, nhưng **không đổi thứ tự tier theo trục dọc**.
 - Barycenter có thể chạy **nhiều vòng** để ưu tiên rút ngắn liên‑area khi số lượng Area lớn.
 - Sắp xếp Area theo **11 tiers** (0-10):

@@ -377,6 +377,84 @@ def compute_layout_l1(
             "node_height": area_micro_config.node_height,
         }
 
+    def should_use_grid_macro_positions() -> bool:
+        if layout_scope != "project":
+            return False
+        if len(area_meta) < 2:
+            return False
+        row_values = sorted({int(meta["grid_row"]) for meta in area_meta.values() if meta.get("grid_row") is not None})
+        col_values = sorted({int(meta["grid_col"]) for meta in area_meta.values() if meta.get("grid_col") is not None})
+        if len(row_values) < 2 or len(col_values) < 2:
+            return False
+        row_span = row_values[-1] - row_values[0]
+        col_span = col_values[-1] - col_values[0]
+        # Chỉ bật grid macro khi placement map có phân bố đủ rõ ràng.
+        return row_span >= 1 and col_span >= 1
+
+    def compute_macro_positions_from_grid() -> dict[str, tuple[float, float]]:
+        positions: dict[str, tuple[float, float]] = {}
+        row_values = sorted({int(meta["grid_row"]) for meta in area_meta.values()})
+        col_values = sorted({int(meta["grid_col"]) for meta in area_meta.values()})
+
+        if not row_values or not col_values:
+            return positions
+
+        col_widths: dict[int, float] = {}
+        for col in col_values:
+            ids = [aid for aid, meta in area_meta.items() if int(meta["grid_col"]) == col]
+            if not ids:
+                col_widths[col] = AREA_MIN_WIDTH
+            else:
+                col_widths[col] = max(area_meta[aid]["computed_width"] for aid in ids)
+
+        row_heights: dict[int, float] = {}
+        for row in row_values:
+            ids = [aid for aid, meta in area_meta.items() if int(meta["grid_row"]) == row]
+            if not ids:
+                row_heights[row] = AREA_MIN_HEIGHT
+            else:
+                row_heights[row] = max(area_meta[aid]["computed_height"] for aid in ids)
+
+        col_offsets: dict[int, float] = {}
+        cursor_x = 0.0
+        for col in col_values:
+            col_offsets[col] = cursor_x
+            cursor_x += col_widths[col] + AREA_GAP
+
+        row_offsets: dict[int, float] = {}
+        cursor_y = 0.0
+        for row in row_values:
+            row_offsets[row] = cursor_y
+            cursor_y += row_heights[row] + AREA_GAP
+
+        occupied_cell_counts: dict[tuple[int, int], int] = {}
+        area_ids_sorted = sorted(
+            area_meta.keys(),
+            key=lambda aid: (
+                int(area_meta[aid]["grid_row"]),
+                int(area_meta[aid]["grid_col"]),
+                normalize(area_meta[aid]["name"]),
+            ),
+        )
+
+        for aid in area_ids_sorted:
+            row = int(area_meta[aid]["grid_row"])
+            col = int(area_meta[aid]["grid_col"])
+            cell = (row, col)
+            index_in_cell = occupied_cell_counts.get(cell, 0)
+            occupied_cell_counts[cell] = index_in_cell + 1
+
+            base_x = col_offsets[col]
+            if index_in_cell == 0:
+                x = base_x
+            else:
+                # Cell trùng nhau: dàn ngang nhẹ để tránh chồng lấn.
+                x = base_x + index_in_cell * (area_meta[aid]["computed_width"] + AREA_GAP * 0.5)
+            y = row_offsets[row]
+            positions[aid] = (x, y)
+
+        return positions
+
     area_tiers: dict[int, list[str]] = {}
     for area_id, meta in area_meta.items():
         area_hint = detect_area_tier(meta["name"])
@@ -529,7 +607,11 @@ def compute_layout_l1(
             area_tiers[tier] = refine_tier_by_barycenter(area_tiers[tier], index_map)
             index_map = build_index_map(area_tiers)
 
-    macro_positions = compute_macro_positions(area_tiers)
+    use_grid_macro = should_use_grid_macro_positions()
+    if use_grid_macro:
+        macro_positions = compute_macro_positions_from_grid()
+    else:
+        macro_positions = compute_macro_positions(area_tiers)
 
     area_positions: dict[str, tuple[float, float]] = {}
     if layout_scope == "project":

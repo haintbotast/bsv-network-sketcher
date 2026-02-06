@@ -238,7 +238,7 @@ export function usePortAnchors(deps: {
       for (const side of ['left', 'right', 'top', 'bottom']) {
         const list = buckets[side]
         const cap = sideCap(side)
-        if (list.length <= cap) continue
+        if (list.length <= cap + 1) continue
         // Keep ports most aligned with this side, move the rest
         list.sort((a, b) => sideAlign(side, neighborMap.get(b)) - sideAlign(side, neighborMap.get(a)))
         const excess = list.splice(cap)
@@ -262,12 +262,14 @@ export function usePortAnchors(deps: {
         const count = list.length
         if (!count) return
         list.sort((a, b) => {
+          const byPort = comparePorts(a, b)
+          if (byPort !== 0) return byPort
           const na = neighborMap.get(a)
           const nb = neighborMap.get(b)
           const ay = na ? na.ySum / na.count : rect.y + rect.height / 2
           const by = nb ? nb.ySum / nb.count : rect.y + rect.height / 2
           if (ay !== by) return ay - by
-          return comparePorts(a, b)
+          return 0
         })
         const spacing = (rect.height - portEdgeInset * 2) / (count + 1)
         list.forEach((port, index) => {
@@ -281,12 +283,14 @@ export function usePortAnchors(deps: {
         const count = list.length
         if (!count) return
         list.sort((a, b) => {
+          const byPort = comparePorts(a, b)
+          if (byPort !== 0) return byPort
           const na = neighborMap.get(a)
           const nb = neighborMap.get(b)
           const ax = na ? na.xSum / na.count : rect.x + rect.width / 2
           const bx = nb ? nb.xSum / nb.count : rect.x + rect.width / 2
           if (ax !== bx) return ax - bx
-          return comparePorts(a, b)
+          return 0
         })
         const spacing = (rect.width - portEdgeInset * 2) / (count + 1)
         list.forEach((port, index) => {

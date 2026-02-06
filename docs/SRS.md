@@ -37,6 +37,8 @@
 - Auto-layout theo **2 tầng** (macro Area + micro Device), ưu tiên bố cục top‑to‑bottom.
 - Auto-layout tự động chạy khi **mở project** và sau mọi CRUD topology của project (area/device/link/port-link/anchor override), có debounce để giảm chạy dồn.
 - Auto-layout **không được trigger** bởi thao tác viewport để xem sơ đồ (`pan`, `zoom`, `reset view`).
+- Với project có `grid_row/grid_col` rõ ràng, macro layout phải bám lưới theo **cột căn giữa (center-slot)** để giảm lệch vị trí khi có area quá rộng, giữ bố cục gần PDF chuẩn.
+- Micro layout trong từng Area phải **căn giữa theo hàng thiết bị** khi tách nhiều hàng để tránh dồn lệch trái và giữ đối xứng so với sơ đồ chuẩn.
 - Cho phép chạy lại auto-layout khi người dùng chủ động từ tab **Bố cục**.
 - Nhóm điều khiển viewport/view mode (`zoom/reset view/L1/L2/L3/Sửa vị trí`) hiển thị ở **main navigator panel** để thao tác nhất quán toàn màn hình.
 - Cụm điều khiển viewport/view mode ở main navigator được **canh giữa theo panel** để giảm lệch thị giác khi thao tác.

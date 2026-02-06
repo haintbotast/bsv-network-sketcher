@@ -40,6 +40,7 @@
 **Nguyên tắc chung (bắt buộc):**
 - **Macro (Area):** sắp xếp các Area theo location/tầng; không để thiết bị xuyên Area.
 - **Micro (Device):** mỗi Area là một lưới **top‑to‑bottom** theo thứ tự: **Router/Firewall → Core Switch → Distribution/Access Switch → Server Switch → Server/Storage → Endpoints**.
+- **Micro row alignment:** khi một layer phải xuống nhiều hàng, các hàng phải được **căn giữa theo chiều ngang** trong chính layer đó (không dồn trái cứng).
 - **Hiển thị Area (L1):** UI có thể render Area theo khung **compact theo cụm thiết bị** để giảm khoảng trắng; không thay đổi tọa độ/kích thước Area gốc trong dữ liệu.
 - Cho phép **nhiều hàng trong cùng tầng** và **so‑le nhẹ** để giảm đường vòng liên kết; vẫn giữ hướng top‑down.
 - Ưu tiên **thiết bị cùng loại ở cùng một hàng** nếu kích thước hàng cho phép (ví dụ cụm HA/Sync).
@@ -101,6 +102,7 @@
 **Macro layout (Area):**
 - Kích thước Area được **tính lại từ bounding thiết bị** + padding + band nhãn khi auto‑layout toàn dự án (cho phép **co lại** nếu dư thừa).
 - Khi project có **placement map rõ ràng** (`grid_row/grid_col` tạo thành lưới nhiều hàng và nhiều cột), macro layout **ưu tiên bám theo lưới này** để giữ bố cục gần template/PDF chuẩn; vẫn giữ quy tắc top‑to‑bottom.
+- Với placement map rõ ràng, mỗi cột dùng cơ chế **center-slot** (độ rộng cột đại diện theo trung vị), Area trong cột được căn giữa theo trục cột để giảm méo bố cục khi có area outlier quá rộng.
 - Trong cùng tier, **được phép hoán vị theo kết nối** (barycenter + local swap) để giảm đường vòng liên‑area, nhưng **không đổi thứ tự tier theo trục dọc**.
 - Barycenter có thể chạy **nhiều vòng** để ưu tiên rút ngắn liên‑area khi số lượng Area lớn.
 - Sắp xếp Area theo **11 tiers** (0-10):

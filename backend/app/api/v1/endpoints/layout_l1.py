@@ -406,6 +406,22 @@ def compute_layout_l1(
         # Chỉ bật grid macro khi placement map có phân bố đủ rõ ràng.
         return row_span >= 1 and col_span >= 1
 
+    def percentile(values: list[float], q: float) -> float:
+        """Compute linear-interpolated percentile for stable slot sizing."""
+        if not values:
+            return 0.0
+        ordered = sorted(values)
+        if len(ordered) == 1:
+            return ordered[0]
+        q = max(0.0, min(1.0, q))
+        position = (len(ordered) - 1) * q
+        low = int(position)
+        high = min(low + 1, len(ordered) - 1)
+        if low == high:
+            return ordered[low]
+        ratio = position - low
+        return ordered[low] * (1.0 - ratio) + ordered[high] * ratio
+
     def compute_macro_positions_from_grid() -> dict[str, tuple[float, float]]:
         positions: dict[str, tuple[float, float]] = {}
         row_values = sorted({int(meta["grid_row"]) for meta in area_meta.values()})
@@ -414,13 +430,15 @@ def compute_layout_l1(
         if not row_values or not col_values:
             return positions
 
-        col_widths: dict[int, float] = {}
+        col_slot_widths: dict[int, float] = {}
         for col in col_values:
             ids = [aid for aid, meta in area_meta.items() if int(meta["grid_col"]) == col]
             if not ids:
-                col_widths[col] = AREA_MIN_WIDTH
+                col_slot_widths[col] = AREA_MIN_WIDTH
             else:
-                col_widths[col] = max(area_meta[aid]["computed_width"] for aid in ids)
+                widths = [area_meta[aid]["computed_width"] for aid in ids]
+                # Use median slot width to avoid one dense area pulling the whole column too far away.
+                col_slot_widths[col] = max(AREA_MIN_WIDTH, percentile(widths, 0.5))
 
         row_heights: dict[int, float] = {}
         for row in row_values:
@@ -430,11 +448,12 @@ def compute_layout_l1(
             else:
                 row_heights[row] = max(area_meta[aid]["computed_height"] for aid in ids)
 
-        col_offsets: dict[int, float] = {}
+        col_centers: dict[int, float] = {}
         cursor_x = 0.0
         for col in col_values:
-            col_offsets[col] = cursor_x
-            cursor_x += col_widths[col] + AREA_GAP
+            slot_width = col_slot_widths[col]
+            col_centers[col] = cursor_x + (slot_width / 2.0)
+            cursor_x += slot_width + AREA_GAP
 
         row_offsets: dict[int, float] = {}
         cursor_y = 0.0
@@ -459,17 +478,38 @@ def compute_layout_l1(
             index_in_cell = occupied_cell_counts.get(cell, 0)
             occupied_cell_counts[cell] = index_in_cell + 1
 
-            base_x = col_offsets[col]
-            if index_in_cell == 0:
-                x = base_x
-            else:
-                # Cell trùng nhau: dàn ngang nhẹ để tránh chồng lấn.
-                x = base_x + index_in_cell * (area_meta[aid]["computed_width"] + AREA_GAP * 0.5)
-            # Căn giữa dọc trong row nếu area thấp hơn row height.
+            area_w = area_meta[aid]["computed_width"]
             area_h = area_meta[aid]["computed_height"]
+
+            # Center each area around its grid column center.
+            x = col_centers[col] - (area_w / 2.0)
+            if index_in_cell > 0:
+                # Cell trùng nhau: dàn nhẹ theo đường chéo để tránh chồng lấn tuyệt đối.
+                x += index_in_cell * AREA_GAP * 0.35
+            # Căn giữa dọc trong row nếu area thấp hơn row height.
             y_offset = (row_heights[row] - area_h) / 2 if area_h < row_heights[row] else 0
             y = row_offsets[row] + y_offset
+            if index_in_cell > 0:
+                y += index_in_cell * AREA_GAP * 0.35
             positions[aid] = (x, y)
+
+        # Final pass: prevent overlap between neighboring columns in the same row.
+        row_area_ids: dict[int, list[str]] = {}
+        for aid in positions:
+            row = int(area_meta[aid]["grid_row"])
+            row_area_ids.setdefault(row, []).append(aid)
+
+        for row, ids in row_area_ids.items():
+            ids_sorted = sorted(ids, key=lambda aid: positions[aid][0])
+            min_gap = AREA_GAP * 0.2
+            prev_right = None
+            for aid in ids_sorted:
+                x, y = positions[aid]
+                width = area_meta[aid]["computed_width"]
+                if prev_right is not None and x < prev_right + min_gap:
+                    x = prev_right + min_gap
+                    positions[aid] = (x, y)
+                prev_right = positions[aid][0] + width
 
         return positions
 

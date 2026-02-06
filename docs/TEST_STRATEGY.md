@@ -10,9 +10,11 @@
 ### 1.1 Kiểm thử layout (AI Context)
 - **group_by_area:** thiết bị không vượt biên Area; macro/micro layout tách tầng.
 - **grid placement map ưu tiên:** khi dữ liệu có `grid_row/grid_col` tạo thành lưới nhiều hàng và nhiều cột, macro layout phải bám theo placement map.
+- **grid_center_slot_policy:** macro grid phải căn giữa area theo trục cột và dùng bề rộng cột đại diện (trung vị) để tránh cột bị kéo giãn bởi area outlier.
 - **top‑to‑bottom:** Core/Dist ở hàng trên, Access giữa, Endpoints dưới (ưu tiên cha ở trên con).
 - **_AIR_ spacing:** giữ thẳng cột, không chồng lấn.
 - **same_type_row:** thiết bị cùng loại ưu tiên ở cùng hàng khi `max_nodes_per_row` cho phép.
+- **micro_row_center_policy:** khi 1 layer tách thành nhiều hàng, các hàng phải được căn giữa theo chiều ngang để bố cục cân đối.
 - **port_label_band:** giãn khoảng cách thiết bị có tính đến kích thước nhãn cổng.
 - **port_embedded_render:** L1 port label phải nằm trong object (port band top/bottom), không hiển thị overlay label trên link.
 - **l1_technical_render:** L1 giữ nét kỹ thuật (đường orthogonal, góc vuông rõ, giảm dùng màu nhấn cho link LAN/DEFAULT).
@@ -250,6 +252,8 @@ test.describe('Diagram Editor', () => {
 - [ ] Main navigator panel: cụm `zoom/reset/L1/L2/L3/Sửa vị trí` hiển thị canh giữa panel ở desktop.
 - [ ] Trigger policy: CRUD dồn dập khi đang chạy auto-layout chỉ tạo thêm 1 lượt chạy bù sau cùng.
 - [ ] Trigger policy: auto-run chỉ báo lỗi, không báo success.
+- [ ] Grid center-slot: cột chứa area rất rộng không được kéo lệch toàn bộ cột; area nhỏ trong cùng cột vẫn căn giữa theo cột.
+- [ ] Micro row center: layer nhiều hàng phải căn giữa, hàng ngắn không dồn trái cứng.
 - [ ] Manual position edit: bật chế độ sửa vị trí, kéo‑thả `Area/Device` và thả chuột sẽ lưu `position_x/position_y` thành công.
 - [ ] Manual position edit: thao tác kéo‑thả chỉnh vị trí không phát sinh request `/auto-layout`.
 - [ ] Manual position edit: khi tắt chế độ sửa vị trí, kéo chuột trên object không thay đổi tọa độ lưu DB.

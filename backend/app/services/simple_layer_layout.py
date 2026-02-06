@@ -464,12 +464,24 @@ def simple_layer_layout(devices: list, links: list, config: LayoutConfig) -> Lay
             max_nodes_per_row = len(ordered_devices)
 
         rows = split_rows_by_type(ordered_devices, max_nodes_per_row)
+        row_widths = [
+            (len(row_devices) * node_width) + max(0, len(row_devices) - 1) * node_spacing
+            for row_devices in rows
+        ]
+        max_row_width = max(row_widths) if row_widths else node_width
 
         row_step_x = node_width + node_spacing
         for row_idx, row_devices in enumerate(rows):
             row_y = current_y + row_idx * (node_height + row_gap)
-            offset_x = row_step_x * row_stagger if row_idx % 2 == 1 else 0.0
-            current_x = offset_x
+            row_width = row_widths[row_idx]
+            center_offset_x = max(0.0, (max_row_width - row_width) / 2.0)
+
+            stagger_offset = 0.0
+            if len(rows) > 1 and row_stagger > 0:
+                stagger_delta = row_step_x * row_stagger * 0.5
+                stagger_offset = stagger_delta if row_idx % 2 == 1 else -stagger_delta
+
+            current_x = center_offset_x + stagger_offset
             for device in row_devices:
                 device_layouts.append({
                     "id": device.id,

@@ -56,6 +56,7 @@
 - Cho phép **chỉnh anchor port thủ công** (side + offset_ratio) để tinh chỉnh đường kết nối; `offset_ratio` có thể để `null` để giữ **auto offset**.
 - Cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port** ngay trong bảng thuộc tính thiết bị, có kiểm tra trùng và port đã dùng.
 - Auto-layout tự chạy khi mở project và sau CRUD topology; thao tác viewport (`pan/zoom/reset view`) không làm thay đổi layout.
+- Khi có placement map `grid_row/grid_col`, macro layout phải bám lưới theo cơ chế **cột center-slot** để giữ area gần bố cục PDF chuẩn dù có area rộng bất thường.
 - Cho phép bật chế độ chỉnh vị trí thủ công để kéo‑thả `Area/Device`; vị trí được lưu ngay sau drag‑end và không bị auto-layout tự động ghi đè ngay lập tức.
 - Cụm điều khiển chính (`zoom/reset/L1/L2/L3/Sửa vị trí`) cần nằm ở main navigator panel và **canh giữa theo panel**; khi drag object phải có gióng/snap để căn chỉnh nhanh theo object liên quan.
 - Tọa độ chỉnh tay cần theo bộ mốc chuẩn X/Y (step mặc định 0.25 đv) để vận hành dễ kiểm soát và đồng nhất giữa người dùng.
@@ -64,6 +65,7 @@
 - Nhãn port trong L1 phải là **thành phần của object** (không là nhãn nổi trên link); kích thước object co giãn theo số lượng/độ dài port để giữ bố cục rõ ràng như PDF chuẩn.
 - L1 phải ưu tiên phong cách kỹ thuật dễ đọc: đường orthogonal/góc vuông rõ và giảm màu nhấn cho kết nối LAN/DEFAULT.
 - L1 routing phải tránh xuyên object không liên quan và giữ khoảng cách rẽ đầu tiên đủ xa port band để sơ đồ dày vẫn đọc được.
+- Micro layout trong từng Area cần căn giữa các hàng thiết bị khi xuống nhiều hàng để bố cục object cân đối và chuyên nghiệp hơn.
 - UI L1 cần hiển thị khung Area theo dạng compact bám cụm thiết bị (giảm khoảng trắng lớn) nhưng không làm đổi dữ liệu Area gốc.
 - Kết nối peer-control (`STACK/HA/HSRP`) cần được thể hiện riêng bằng màu/nét/lane để đội vận hành nhận biết nhanh trong sơ đồ dày; tab **Bố cục** cần có khối khai báo nhanh và legend màu/nét/chú giải cho nhóm kết nối này.
 - Bảo vệ dữ liệu dự án (phân quyền theo project, kiểm soát upload/download).

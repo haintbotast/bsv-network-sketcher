@@ -38,10 +38,10 @@ class SimpleLayerLayoutTests(unittest.TestCase):
 
         result = simple_layer_layout(devices, links, config)
         layer0 = sorted([d for d in result.devices if d["layer"] == 0], key=lambda d: d["x"])
-        layer1 = sorted([d for d in result.devices if d["layer"] == 1], key=lambda d: d["x"])
+        layer_switch = sorted([d for d in result.devices if d["layer"] == 3], key=lambda d: d["x"])
 
         self.assertEqual([d["id"] for d in layer0], ["A", "B"])
-        self.assertEqual([d["id"] for d in layer1], ["D", "C"])
+        self.assertEqual([d["id"] for d in layer_switch], ["D", "C"])
         self.assertGreaterEqual(result.stats["total_crossings"], 0)
 
     def test_group_same_type_on_row_when_possible(self) -> None:
@@ -91,8 +91,32 @@ class SimpleLayerLayoutTests(unittest.TestCase):
         )
 
         result = simple_layer_layout(devices, [], config)
-        layer = sorted([d for d in result.devices if d["layer"] == 1], key=lambda d: d["x"])
-        self.assertEqual([d["id"] for d in layer], ["C1", "C2", "D1", "D2"])
+        layer_core = sorted([d for d in result.devices if d["layer"] == 2], key=lambda d: d["x"])
+        layer_dist = sorted([d for d in result.devices if d["layer"] == 3], key=lambda d: d["x"])
+        self.assertEqual([d["id"] for d in layer_core], ["C1", "C2"])
+        self.assertEqual([d["id"] for d in layer_dist], ["D1", "D2"])
+
+    def test_rows_are_centered_when_split(self) -> None:
+        devices = [
+            DummyDevice("S1", "Server"),
+            DummyDevice("S2", "Server"),
+            DummyDevice("S3", "Server"),
+        ]
+        config = LayoutConfig(
+            layer_gap=1.0,
+            node_spacing=0.5,
+            node_width=1.0,
+            node_height=1.0,
+            max_nodes_per_row=2,
+            row_gap=0.2,
+            row_stagger=0.0,
+        )
+
+        result = simple_layer_layout(devices, [], config)
+        second_row = [d for d in result.devices if round(d["y"], 3) == 1.2]
+        self.assertEqual(len(second_row), 1)
+        # Row 2 has one device; it must be centered under row 1 (x = 0.75 with config above).
+        self.assertAlmostEqual(second_row[0]["x"], 0.75, places=3)
 
 
 if __name__ == "__main__":

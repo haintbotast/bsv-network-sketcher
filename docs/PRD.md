@@ -39,6 +39,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-14:** Cho phép người dùng **chỉnh thủ công anchor của port** (side + offset_ratio, cho phép `offset_ratio = null` để giữ auto offset) và **giữ override khi chạy lại auto-layout**.
 - **FR-15:** Cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port** ngay trong bảng thuộc tính thiết bị, có kiểm tra trùng và port đã dùng.
 - **FR-16:** Auto-layout tự chạy khi mở project và sau CRUD topology; thao tác viewport (`pan/zoom/reset view`) không được trigger auto-layout.
+- **FR-16A:** Với project có `grid_row/grid_col` rõ ràng, macro layout phải bám lưới theo cơ chế **center-slot theo cột** để giữ area gần bố cục PDF chuẩn dù có area outlier rất rộng.
 - **FR-17:** L1 port anchor mặc định theo chuẩn: **uplink gắn top**, **non-uplink gắn bottom**; override thủ công là ưu tiên cao nhất.
 - **FR-17A:** Ở L1, endpoint link phải bám đúng ô port; tách lane/bundle chỉ bắt đầu sau đoạn stub rời port (không lane-shift trực tiếp tại anchor).
 - **FR-18:** Trong L1, nhãn port phải hiển thị như **một phần của object** (port band top/bottom) và kích thước object tự nới theo số lượng/độ dài port để khớp sơ đồ chuẩn.
@@ -50,6 +51,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-24:** Hệ tọa độ thủ công phải dùng **mốc chuẩn X/Y** (step mặc định 0.25 đv); thao tác drag hoặc nhập tay đều được chuẩn hóa về mốc này.
 - **FR-25:** Tab **Bố cục** phải có thành phần **khai báo nhanh peer-control** (`HA/STACK/HSRP`) và hiển thị **legend màu/nét/chú giải** để vận hành nhận biết đúng loại kết nối.
 - **FR-26:** L1 routing phải giữ khoảng cách an toàn với object (không xuyên device/area không liên quan), đồng thời bảo đảm điểm rẽ đầu tiên không dính sát port band ở sơ đồ mật độ cao.
+- **FR-27:** Micro layout trong Area phải **căn giữa các hàng thiết bị** khi layer tách nhiều hàng để tránh dồn trái và tăng độ đối xứng với sơ đồ chuẩn.
 
 ## 5. Yêu cầu phi chức năng (NFR)
 

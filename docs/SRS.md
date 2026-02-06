@@ -51,6 +51,8 @@
 - Kích thước object L1 phải **co giãn theo số lượng port và độ dài nhãn port** để giữ rõ ràng theo sơ đồ chuẩn PDF.
 - Khoảng cách giữa thiết bị trong auto-layout **tính cả phần mở rộng theo port band** để tránh chồng lấn.
 - Render L1 ưu tiên kiểu kỹ thuật: đường orthogonal/góc vuông rõ, giảm dùng màu nhấn cho link LAN/DEFAULT để hạn chế rối.
+- L1 routing phải **không xuyên qua object khác** (device/area không liên quan); nếu tuyến chuẩn hóa gây va chạm thì phải fallback sang tuyến orthogonal tránh vật cản.
+- Điểm rẽ đầu tiên của link phải có khoảng cách tối thiểu đủ lớn so với port band để tránh dính sát nhãn port ở sơ đồ dày.
 - Với L1, khung Area hiển thị có thể ở dạng **compact theo cụm thiết bị** để giảm khoảng trắng; không thay đổi dữ liệu Area gốc.
 - Các link peer-control (`STACK/HA/HSRP`) phải có quy ước hiển thị riêng (màu/nét/lane) để tách khỏi uplink/data links và dễ truy vết.
 - Cho phép người dùng **override anchor per-port** bằng `side + offset_ratio` (cho phép `offset_ratio = null` để giữ auto offset); override **được lưu DB** và **không bị auto-layout ghi đè**.

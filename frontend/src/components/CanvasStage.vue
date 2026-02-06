@@ -1250,14 +1250,14 @@ function collectRelatedRects(context: DragObjectContext) {
 
 const DEFAULT_RENDER_TUNING = {
   port_edge_inset: 6,
-  port_label_offset: 12,
-  bundle_gap: 28,
-  bundle_stub: 28,
-  area_clearance: 30,
+  port_label_offset: 18,
+  bundle_gap: 34,
+  bundle_stub: 42,
+  area_clearance: 36,
   area_anchor_offset: 26,
   label_gap_x: 8,
   label_gap_y: 6,
-  corridor_gap: 56
+  corridor_gap: 64
 }
 const renderTuning = computed(() => ({
   ...DEFAULT_RENDER_TUNING,

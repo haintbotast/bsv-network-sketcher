@@ -63,6 +63,7 @@
 - Endpoint của link L1 phải bám đúng ô port trên object; lane separation chỉ áp dụng sau đoạn stub rời port để tránh lệch điểm nối so với nhãn port.
 - Nhãn port trong L1 phải là **thành phần của object** (không là nhãn nổi trên link); kích thước object co giãn theo số lượng/độ dài port để giữ bố cục rõ ràng như PDF chuẩn.
 - L1 phải ưu tiên phong cách kỹ thuật dễ đọc: đường orthogonal/góc vuông rõ và giảm màu nhấn cho kết nối LAN/DEFAULT.
+- L1 routing phải tránh xuyên object không liên quan và giữ khoảng cách rẽ đầu tiên đủ xa port band để sơ đồ dày vẫn đọc được.
 - UI L1 cần hiển thị khung Area theo dạng compact bám cụm thiết bị (giảm khoảng trắng lớn) nhưng không làm đổi dữ liệu Area gốc.
 - Kết nối peer-control (`STACK/HA/HSRP`) cần được thể hiện riêng bằng màu/nét/lane để đội vận hành nhận biết nhanh trong sơ đồ dày; tab **Bố cục** cần có khối khai báo nhanh và legend màu/nét/chú giải cho nhóm kết nối này.
 - Bảo vệ dữ liệu dự án (phân quyền theo project, kiểm soát upload/download).

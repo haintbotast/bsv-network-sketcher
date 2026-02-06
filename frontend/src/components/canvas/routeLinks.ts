@@ -556,7 +556,6 @@ export function routeLinks(
         ? (areaBundle.index - (areaBundle.total - 1) / 2) * interAreaBundleGap
         : 0
       const interBundleOffset = areaBundleOffset + bundleOffset * 0.5
-      const bundleStub = (renderTuning.bundle_stub ?? 0) * scale
       const anchorOffset = ((renderTuning.area_anchor_offset ?? 0) + (renderTuning.area_clearance ?? 0)) * scale
       const baseExitStub = Math.max(renderTuning.bundle_stub ?? 0, renderTuning.area_clearance ?? 0) * scale
 
@@ -618,6 +617,7 @@ export function routeLinks(
       const labelInset = Math.max(2, Math.round(6 * labelScale))
       const labelOffset = (renderTuning.port_label_offset ?? 0) * labelScale
       const baseLabelDistance = Math.max(0, labelOffset - labelInset)
+      const minPortTurnDistance = Math.max(28 * scale, labelOffset + 22 * scale)
       const fromLabelWidth = meta.fromLabelWidth ?? 0
       const toLabelWidth = meta.toLabelWidth ?? 0
       const fromLabelStub = isL1View && fromLabelWidth > 0
@@ -626,8 +626,8 @@ export function routeLinks(
       const toLabelStub = isL1View && toLabelWidth > 0
         ? baseLabelDistance + toLabelWidth / 2 + LABEL_STUB_PADDING
         : 0
-      const fromStubDistance = Math.max(baseExitStub, fromLabelStub)
-      const toStubDistance = Math.max(baseExitStub, toLabelStub)
+      const fromStubDistance = Math.max(baseExitStub, fromLabelStub, minPortTurnDistance)
+      const toStubDistance = Math.max(baseExitStub, toLabelStub, minPortTurnDistance)
       const fromBase = offsetFromAnchor(fromAnchor, fromStubDistance)
       const toBase = offsetFromAnchor(toAnchor, toStubDistance)
       const fromExitShift = resolveExitShift(`${link.id}|from`)
@@ -1060,17 +1060,36 @@ export function routeLinks(
       }
 
       if (isL1 && points.length >= 4) {
-        const pathPoints: Array<{ x: number; y: number }> = []
+        const rawPathPoints: Array<{ x: number; y: number }> = []
         for (let i = 0; i + 1 < points.length; i += 2) {
-          pathPoints.push({ x: points[i], y: points[i + 1] })
+          rawPathPoints.push({ x: points[i], y: points[i + 1] })
+        }
+        const isPathBlocked = (path: Array<{ x: number; y: number }>) => {
+          return path.some((point, idx) => {
+            if (idx === 0) return false
+            const prev = path[idx - 1]
+            return obstacles.some(rect => segmentIntersectsRect(prev, point, rect, clearance))
+          })
         }
         const primaryAxis: 'x' | 'y' = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y)
           ? 'x'
           : 'y'
-        const orth = orthogonalizePath(pathPoints, primaryAxis)
-        const simplified = simplifyOrthogonalPath(orth)
+        const orth = orthogonalizePath(rawPathPoints, primaryAxis)
+        const simplifiedOrth = simplifyOrthogonalPath(orth)
+        const simplifiedRaw = simplifyOrthogonalPath(rawPathPoints)
+        const orthBlocked = isPathBlocked(simplifiedOrth)
+        let finalPath = orthBlocked ? simplifiedRaw : simplifiedOrth
+        if (isPathBlocked(finalPath)) {
+          const emergency = connectOrthogonal(fromExit, toExit, obstacles, clearance, primaryAxis)
+          if (emergency && emergency.length) {
+            const assembled: Array<{ x: number; y: number }> = [fromAnchor, fromBase, fromExit]
+            appendPoints(assembled, emergency)
+            appendPoints(assembled, [toExit, toBase, toAnchor])
+            finalPath = simplifyOrthogonalPath(assembled)
+          }
+        }
         points = []
-        simplified.forEach(point => pushPoint(points, point.x, point.y))
+        finalPath.forEach(point => pushPoint(points, point.x, point.y))
       }
 
       const neutralL1Purposes = new Set(['', 'DEFAULT', 'LAN'])

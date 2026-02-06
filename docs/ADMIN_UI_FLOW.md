@@ -34,6 +34,11 @@
 - `validation` rule cơ bản + `validation.layout_checks`
 - `export` default format + include metadata
 
+**Profile khuyến nghị cho sơ đồ dày link (L1):**
+- Tăng `layout_tuning.row_gap` (>= 0.9) để giảm chèn giữa các hàng thiết bị.
+- Tăng `render_tuning.bundle_stub` và `render_tuning.port_label_offset` để điểm rẽ đầu tiên rời xa port band.
+- Tăng `render_tuning.area_clearance` và `render_tuning.corridor_gap` để giảm tuyến xuyên vùng object khi mật độ cao.
+
 **Lịch sử cấu hình:**
 - Bảng `version`, `created_at`, `created_by`, `note`
 - Nút **Restore** (xác nhận + audit log)

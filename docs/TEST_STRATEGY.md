@@ -22,6 +22,8 @@
 - **uplink_anchor_policy:** L1 auto-anchor phải đặt **uplink ở top** và **non-uplink ở bottom**; chỉ lệch khi có override thủ công.
 - **endpoint_anchor_alignment_policy:** endpoint của link L1 phải bám đúng anchor ô port (không dời anchor để tách lane).
 - **l1_auto_side_stability_policy:** auto-pass L1 không tự ép `left/right`; side tự động chỉ dùng `top/bottom` khi không có override thủ công.
+- **l1_no_object_crossing_policy:** tuyến L1 sau chuẩn hóa orthogonal không được xuyên qua device/area không liên quan.
+- **port_turn_clearance_policy:** điểm rẽ đầu tiên của link L1 phải cách port band đủ xa để không dính nhãn port.
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
 - **main_navigator_center_policy:** cụm điều khiển viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) hiển thị canh giữa trong main navigator panel.
 - **manual_position_edit_policy:** khi bật chế độ sửa vị trí, kéo‑thả `Area/Device` phải lưu `position_x/position_y` về DB ở `drag-end` và không trigger `/auto-layout`.
@@ -258,8 +260,11 @@ test.describe('Diagram Editor', () => {
 - [ ] Uplink anchor policy: override thủ công (`side + offset_ratio`) phải giữ ưu tiên cao nhất.
 - [ ] Endpoint anchor alignment: endpoint link L1 trùng anchor port-cell tương ứng (sai số render <= 1px), lane separation bắt đầu sau stub.
 - [ ] L1 auto-side stability: khi không có override thủ công, auto anchor không phát sinh side `left/right`.
+- [ ] L1 no-object crossing: link sau chuẩn hóa orthogonal không xuyên device/area không liên quan trong các cụm dày.
+- [ ] Port turn clearance: điểm rẽ đầu tiên không dính sát port band/label ở scale 1x (đạt khoảng cách tối thiểu theo profile tuning).
 - [ ] Port embedded render: port label hiển thị trong object theo dải top/bottom, không còn nhãn port nổi trên link ở view L1.
 - [ ] Port embedded render: object tự nới rộng/nới cao theo số lượng và độ dài port để không đè chữ.
+- [ ] Dense row spacing: với cụm nhiều uplink giữa 2 hàng thiết bị, auto-layout phải tăng khoảng cách hàng đủ để giảm chèn/đè link.
 - [ ] L1 technical render: tuyến L1 giữ orthogonal/góc vuông, không bị bo cong quá mức.
 - [ ] L1 technical render: link LAN/DEFAULT ở L1 dùng màu trung tính, chỉ purpose đặc biệt mới dùng màu nhấn.
 - [ ] Area compact render: khung Area hiển thị co theo cụm thiết bị (giảm khoảng trắng lớn) và không làm thay đổi lưu trữ area trong DB.

@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-30  
+> **Cập nhật:** 2026-02-06  
 > **Mục tiêu:** Chuẩn hóa cấu hình preset/layout/validation cho hệ thống, tránh hardcode.
 
 ---
@@ -17,27 +17,27 @@
     "allowed_modes": ["standard"]
   },
   "layout_tuning": {
-    "layer_gap": 1.5,
-    "node_spacing": 0.8,
-    "port_label_band": 0.2,
-    "area_gap": 1.1,
-    "area_padding": 0.35,
-    "label_band": 0.5,
+    "layer_gap": 1.25,
+    "node_spacing": 1.1,
+    "port_label_band": 0.0,
+    "area_gap": 0.9,
+    "area_padding": 0.3,
+    "label_band": 0.35,
     "max_row_width_base": 12.0,
     "max_nodes_per_row": 8,
-    "row_gap": 0.5,
+    "row_gap": 0.9,
     "row_stagger": 0.5
   },
   "render_tuning": {
     "port_edge_inset": 6,
-    "port_label_offset": 12,
-    "bundle_gap": 18,
-    "bundle_stub": 18,
-    "area_clearance": 18,
-    "area_anchor_offset": 18,
+    "port_label_offset": 18,
+    "bundle_gap": 34,
+    "bundle_stub": 42,
+    "area_clearance": 36,
+    "area_anchor_offset": 26,
     "label_gap_x": 8,
     "label_gap_y": 6,
-    "corridor_gap": 40
+    "corridor_gap": 64
   },
   "style": {
     "themes": ["default", "contrast", "light", "dark"],

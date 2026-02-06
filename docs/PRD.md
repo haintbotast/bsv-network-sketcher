@@ -49,6 +49,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-23:** Nhóm điều khiển `zoom/reset/L1/L2/L3/Sửa vị trí` đặt ở **main navigator panel**, hiển thị **canh giữa theo panel**; khi drag object trong chế độ sửa vị trí phải có **đường gióng/snap alignment** theo object liên quan.
 - **FR-24:** Hệ tọa độ thủ công phải dùng **mốc chuẩn X/Y** (step mặc định 0.25 đv); thao tác drag hoặc nhập tay đều được chuẩn hóa về mốc này.
 - **FR-25:** Tab **Bố cục** phải có thành phần **khai báo nhanh peer-control** (`HA/STACK/HSRP`) và hiển thị **legend màu/nét/chú giải** để vận hành nhận biết đúng loại kết nối.
+- **FR-26:** L1 routing phải giữ khoảng cách an toàn với object (không xuyên device/area không liên quan), đồng thời bảo đảm điểm rẽ đầu tiên không dính sát port band ở sơ đồ mật độ cao.
 
 ## 5. Yêu cầu phi chức năng (NFR)
 

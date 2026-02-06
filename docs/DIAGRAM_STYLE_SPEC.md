@@ -74,11 +74,13 @@
 - Routing link ưu tiên **tránh vật cản** (area/device/**port cell**) và **giảm chồng lấn**:  
 - **L1:** giữ **orthogonal**; nếu không bị cản thì đường thẳng ngắn nhất, nếu bị cản thì **A\*** theo lưới và **không tạo đoạn chéo**.  
 - **L2/L3:** có thể dùng **any‑angle (Theta\*)** để ưu tiên đường chéo và **bo góc nhẹ**.
+- Sau bước chuẩn hóa orthogonal, nếu tuyến mới cắt qua object thì phải fallback sang tuyến orthogonal tránh vật cản (ưu tiên tuyến trước đó nếu an toàn hơn).
 - **Lưới routing (A\*):** kích thước ô lưới **tự tăng** theo kích thước sơ đồ để **giới hạn số node**, tránh vô hiệu hóa A\* ở sơ đồ lớn.
 - **Anchor port tối ưu 2‑pass:** pass 1 định tuyến để lấy hướng/điểm tham chiếu, pass 2 sắp xếp lại anchor theo side + thứ tự để giãn cách hợp lý và bám tuyến ngắn nhất.
 - **Pair alignment:** với nhiều link giữa 2 thiết bị kề nhau, anchor được **xếp đồng bộ theo thứ tự port phía đối diện** để giảm chéo.
 - **Same-row alignment:** link giữa **2 thiết bị cùng hàng/cùng cột** sẽ ưu tiên **canh thẳng anchor + ô port** (ngang hoặc dọc). Chỉ áp dụng khi **đường thẳng không bị vật cản**; nếu bị cản thì giữ routing tránh vật cản.
 - **Stub theo port band (L1):** đoạn link đi ra khỏi thiết bị phải đủ dài để tách rõ khỏi biên object/ô port và tránh gãy góc ngay sát mép thiết bị.
+- **Port turn clearance (L1):** điểm rẽ đầu tiên phải có khoảng cách đủ xa port band (khuyến nghị >= 28px ở scale 1x; có thể tăng theo mật độ bundle).
 - **Thứ tự thiết bị (L1 micro):** **Router ở hàng trên**, Firewall **ở hàng dưới Router**, Core/Distro nằm dưới Firewall.
 - **Nhãn port (L1):** nhãn là **thành phần của object** (ô port trong dải top/bottom), không hiển thị dạng nhãn nổi trên link.
 - **Quy ước side tự động (L1):** mặc định chỉ dùng **top/bottom** cho anchor port:

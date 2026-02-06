@@ -9,29 +9,29 @@ export const POSITION_STANDARD_DECIMALS = 2
 
 // Layout tuning: khoảng cách và padding (đơn vị: inch)
 export const DEFAULT_LAYOUT_TUNING: LayoutTuning = {
-  layer_gap: 1.1,         // Khoảng cách giữa các tầng
-  node_spacing: 1.0,      // Khoảng cách ngang giữa các device
+  layer_gap: 1.25,        // Khoảng cách giữa các tầng
+  node_spacing: 1.1,      // Khoảng cách ngang giữa các device
   port_label_band: 0.0,   // Không cần thêm — port labels nằm trong band cells
   area_gap: 0.9,          // Khoảng cách giữa các area
   area_padding: 0.3,      // Padding bên trong area
   label_band: 0.35,       // Dải cho area label
   max_row_width_base: 12.0,
   max_nodes_per_row: 8,
-  row_gap: 0.65,          // Khoảng cách giữa các hàng trong area
+  row_gap: 0.9,           // Khoảng cách giữa các hàng trong area
   row_stagger: 0.5        // Độ so le hàng (0-1)
 }
 
 // Render tuning: vẽ links và labels (đơn vị: px)
 export const DEFAULT_RENDER_TUNING: RenderTuning = {
   port_edge_inset: 6,       // Khoảng cách port từ cạnh device
-  port_label_offset: 14,    // Offset port label từ anchor
-  bundle_gap: 28,           // Khoảng cách giữa các link trong bundle
-  bundle_stub: 28,          // Độ dài stub khi tách bundle
-  area_clearance: 30,       // Khoảng cách tránh cạnh area
+  port_label_offset: 18,    // Offset port label từ anchor
+  bundle_gap: 34,           // Khoảng cách giữa các link trong bundle
+  bundle_stub: 42,          // Độ dài stub khi tách bundle
+  area_clearance: 36,       // Khoảng cách tránh cạnh area
   area_anchor_offset: 26,   // Offset điểm neo từ cạnh area
   label_gap_x: 8,           // Gap label theo chiều ngang
   label_gap_y: 6,           // Gap label theo chiều dọc
-  corridor_gap: 56          // Khoảng cách corridor bên ngoài bounds
+  corridor_gap: 64          // Khoảng cách corridor bên ngoài bounds
 }
 
 export const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']

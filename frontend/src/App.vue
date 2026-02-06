@@ -247,11 +247,11 @@
             <div class="form-row">
               <div class="form-group">
                 <label>Tọa độ X (đv)</label>
-                <input type="number" step="0.1" v-model.number="selectedDraft.position_x" @change="handleSelectedObjectChange" />
+                <input type="number" :step="POSITION_STANDARD_STEP_UNITS" v-model.number="selectedDraft.position_x" @change="handleSelectedObjectChange" />
               </div>
               <div class="form-group">
                 <label>Tọa độ Y (đv)</label>
-                <input type="number" step="0.1" v-model.number="selectedDraft.position_y" @change="handleSelectedObjectChange" />
+                <input type="number" :step="POSITION_STANDARD_STEP_UNITS" v-model.number="selectedDraft.position_y" @change="handleSelectedObjectChange" />
               </div>
             </div>
             <div class="form-row">
@@ -287,11 +287,11 @@
             <div class="form-row">
               <div class="form-group">
                 <label>X (đv)</label>
-                <input type="number" step="0.1" v-model.number="selectedDraft.position_x" @change="handleSelectedObjectChange" />
+                <input type="number" :step="POSITION_STANDARD_STEP_UNITS" v-model.number="selectedDraft.position_x" @change="handleSelectedObjectChange" />
               </div>
               <div class="form-group">
                 <label>Y (đv)</label>
-                <input type="number" step="0.1" v-model.number="selectedDraft.position_y" @change="handleSelectedObjectChange" />
+                <input type="number" :step="POSITION_STANDARD_STEP_UNITS" v-model.number="selectedDraft.position_y" @change="handleSelectedObjectChange" />
               </div>
             </div>
             <div class="form-row">
@@ -498,7 +498,13 @@ import DataGrid, { type ColumnDef } from './components/DataGrid.vue'
 import { updateArea } from './services/areas'
 import { updateDevice } from './services/devices'
 import { createLink, deleteLink, updateLink } from './services/links'
-import { UNIT_PX, deviceTypes, linkPurposes } from './composables/canvasConstants'
+import {
+  UNIT_PX,
+  POSITION_STANDARD_STEP_UNITS,
+  snapUnitsToStandard,
+  deviceTypes,
+  linkPurposes,
+} from './composables/canvasConstants'
 import { comparePorts, extractPortIndex } from './components/canvas/linkRoutingUtils'
 import { useViewport } from './composables/useViewport'
 import { useAuth } from './composables/useAuth'
@@ -606,11 +612,15 @@ function togglePositionEditMode() {
   positionEditEnabled.value = !positionEditEnabled.value
 }
 
+function normalizePositionUnits(value: number) {
+  return snapUnitsToStandard(value)
+}
+
 async function handleCanvasObjectPositionChange(payload: { id: string; type: 'device' | 'area'; x: number; y: number }) {
   if (!selectedProjectId.value) return
   if (!Number.isFinite(payload.x) || !Number.isFinite(payload.y)) return
-  const positionX = Number((payload.x / UNIT_PX).toFixed(2))
-  const positionY = Number((payload.y / UNIT_PX).toFixed(2))
+  const positionX = normalizePositionUnits(payload.x / UNIT_PX)
+  const positionY = normalizePositionUnits(payload.y / UNIT_PX)
   const key = `${payload.type}:${payload.id}`
   const seq = (positionSaveSeq.get(key) || 0) + 1
   positionSaveSeq.set(key, seq)
@@ -1256,12 +1266,14 @@ async function saveSelectedObject() {
   try {
     let updated: AreaRow | DeviceRow | LinkRow | null = null
     if (objectType === 'Area') {
+      const normalizedPositionX = normalizePositionUnits(Number(selectedDraft.value.position_x || 0))
+      const normalizedPositionY = normalizePositionUnits(Number(selectedDraft.value.position_y || 0))
       updated = await updateArea(projectId as string, selectedDraft.value.id, {
         name: selectedDraft.value.name,
         grid_row: selectedDraft.value.grid_row,
         grid_col: selectedDraft.value.grid_col,
-        position_x: selectedDraft.value.position_x,
-        position_y: selectedDraft.value.position_y,
+        position_x: normalizedPositionX,
+        position_y: normalizedPositionY,
         width: selectedDraft.value.width,
         height: selectedDraft.value.height,
         style: selectedDraft.value.style || undefined
@@ -1269,12 +1281,14 @@ async function saveSelectedObject() {
       const index = areas.value.findIndex(area => area.id === selectedDraft.value.id)
       if (index >= 0 && updated) areas.value[index] = updated as AreaRow
     } else if (objectType === 'Device') {
+      const normalizedPositionX = normalizePositionUnits(Number(selectedDraft.value.position_x || 0))
+      const normalizedPositionY = normalizePositionUnits(Number(selectedDraft.value.position_y || 0))
       updated = await updateDevice(projectId as string, selectedDraft.value.id, {
         name: selectedDraft.value.name,
         area_name: selectedDraft.value.area_name || undefined,
         device_type: selectedDraft.value.device_type,
-        position_x: selectedDraft.value.position_x,
-        position_y: selectedDraft.value.position_y,
+        position_x: normalizedPositionX,
+        position_y: normalizedPositionY,
         width: selectedDraft.value.width,
         height: selectedDraft.value.height,
         color_rgb: selectedDraft.value.color_rgb || undefined

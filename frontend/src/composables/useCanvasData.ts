@@ -9,6 +9,7 @@ import {
   UNIT_PX,
   GRID_FALLBACK_X,
   GRID_FALLBACK_Y,
+  snapUnitsToStandard,
   defaultAreaStyle,
   rgbToHex,
 } from './canvasConstants'
@@ -375,19 +376,21 @@ export function useCanvasData(
     const projectId = selectedProjectId.value
     const index = areas.value.findIndex(area => area.id === areaId)
     if (index < 0) return
+    const normalizedX = snapUnitsToStandard(positionX)
+    const normalizedY = snapUnitsToStandard(positionY)
 
     const previous = areas.value[index]
     const optimistic: AreaRow = {
       ...previous,
-      position_x: positionX,
-      position_y: positionY,
+      position_x: normalizedX,
+      position_y: normalizedY,
     }
     areas.value[index] = optimistic
 
     try {
       const updated = await updateArea(projectId, areaId, {
-        position_x: positionX,
-        position_y: positionY,
+        position_x: normalizedX,
+        position_y: normalizedY,
       })
       const nextIndex = areas.value.findIndex(area => area.id === areaId)
       if (nextIndex >= 0) {
@@ -408,19 +411,21 @@ export function useCanvasData(
     const projectId = selectedProjectId.value
     const index = devices.value.findIndex(device => device.id === deviceId)
     if (index < 0) return
+    const normalizedX = snapUnitsToStandard(positionX)
+    const normalizedY = snapUnitsToStandard(positionY)
 
     const previous = devices.value[index]
     const optimistic: DeviceRow = {
       ...previous,
-      position_x: positionX,
-      position_y: positionY,
+      position_x: normalizedX,
+      position_y: normalizedY,
     }
     devices.value[index] = optimistic
 
     try {
       const updated = await updateDevice(projectId, deviceId, {
-        position_x: positionX,
-        position_y: positionY,
+        position_x: normalizedX,
+        position_y: normalizedY,
       })
       const nextIndex = devices.value.findIndex(device => device.id === deviceId)
       if (nextIndex >= 0) {

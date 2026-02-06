@@ -4,6 +4,8 @@ import type { LayoutTuning, RenderTuning } from '../services/adminConfig'
 export const UNIT_PX = 120
 export const GRID_FALLBACK_X = 4
 export const GRID_FALLBACK_Y = 2.5
+export const POSITION_STANDARD_STEP_UNITS = 0.25
+export const POSITION_STANDARD_DECIMALS = 2
 
 // Layout tuning: khoảng cách và padding (đơn vị: inch)
 export const DEFAULT_LAYOUT_TUNING: LayoutTuning = {
@@ -69,4 +71,10 @@ export const defaultAreaStyle: AreaStyle = {
 
 export function rgbToHex(rgb: number[]) {
   return `#${rgb.map(c => c.toString(16).padStart(2, '0')).join('')}`
+}
+
+export function snapUnitsToStandard(value: number, step = POSITION_STANDARD_STEP_UNITS) {
+  if (!Number.isFinite(value) || !Number.isFinite(step) || step <= 0) return value
+  const snapped = Math.round(value / step) * step
+  return Number(snapped.toFixed(POSITION_STANDARD_DECIMALS))
 }

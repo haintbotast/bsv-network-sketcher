@@ -42,6 +42,7 @@
 - Cho phép bật chế độ **Sửa vị trí** để kéo‑thả trực tiếp `Area/Device` trên canvas; vị trí mới được lưu vào DB tại thời điểm thả chuột.
 - Luồng kéo‑thả chỉnh vị trí thủ công **không trigger auto-layout** để tránh ghi đè bố cục người dùng vừa tinh chỉnh.
 - Khi kéo‑thả trong chế độ sửa vị trí, UI hiển thị **đường gióng căn chỉnh** và hỗ trợ **snap nhẹ** theo object liên quan (device cùng area hoặc area cùng cấp).
+- Tọa độ `position_x/position_y` phải được chuẩn hóa theo **bảng vị trí chuẩn X/Y** với bước mặc định **0.25 đv** để tránh số lẻ khó kiểm soát.
 - Với L1, điểm nối port tự động phải theo quy ước: **uplink ở cạnh trên (top)**, **kết nối không phải uplink ở cạnh dưới (bottom)**; chỉ cho phép lệch quy ước khi có **override thủ công**.
 - Với L1, **nhãn port là một phần của object** (port band trên/dưới), không render nhãn nổi giữa đường link.
 - Kích thước object L1 phải **co giãn theo số lượng port và độ dài nhãn port** để giữ rõ ràng theo sơ đồ chuẩn PDF.

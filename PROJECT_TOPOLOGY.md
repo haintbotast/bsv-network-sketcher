@@ -72,6 +72,7 @@ UI thao tác → REST API → Service → DB → phản hồi → UI render
 - Thao tác viewport (`pan/zoom/reset view`) chỉ đổi góc nhìn trên client, **không** trigger auto-layout.
 - Kéo‑thả thủ công `Area/Device` (khi bật chế độ sửa vị trí) lưu trực tiếp `position_x/position_y` về DB tại `drag-end` và không trigger auto-layout.
 - Control viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) tập trung ở main navigator panel; khi drag object có guide + snap alignment theo object liên quan để chỉnh tay nhanh.
+- Tọa độ thủ công được chuẩn hóa theo mốc chuẩn X/Y (step 0.25 đv) trước khi lưu DB để đồng nhất dữ liệu.
 - Quy ước anchor L1: uplink đi ra từ **cạnh trên** object, non-uplink đi ra từ **cạnh dưới** object; override thủ công được ưu tiên.
 - Render L1 dùng **port band gắn trực tiếp vào object** (top/bottom); kích thước object được nới theo số lượng/độ dài port.
 - Render routing L1 theo phong cách kỹ thuật (orthogonal/góc vuông rõ, ưu tiên màu trung tính cho link LAN/DEFAULT).

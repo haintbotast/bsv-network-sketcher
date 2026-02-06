@@ -55,6 +55,7 @@
 - Trigger auto-layout chỉ đến từ **mở project** và CRUD dữ liệu topology; thao tác viewport (`pan/zoom/reset view`) chỉ đổi góc nhìn và **không được phép** kích auto-layout.
 - **Kéo‑thả object thủ công:** chỉ có hiệu lực khi bật chế độ **Sửa vị trí**; áp dụng cho `Area/Device`, lưu `position_x/position_y` tại `drag-end`, và không kích hoạt auto-layout từ chính thao tác kéo‑thả này.
 - **Align guide khi drag:** trong chế độ sửa vị trí, UI hiển thị đường gióng ngang/dọc và snap nhẹ theo object liên quan (device cùng area hoặc area cùng cấp) để chỉnh tay chính xác.
+- **Mốc tọa độ chuẩn:** X/Y thủ công dùng step mặc định **0.25 đv**; drag và nhập tay đều chuẩn hóa về mốc này để tránh số lẻ rời rạc.
 
 **Liên kết liên‑area:**
 - Bắt buộc đi qua **Waypoint area** (đuôi `_wp_`), không nối Area‑Area trực tiếp.

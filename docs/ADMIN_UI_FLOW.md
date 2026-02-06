@@ -15,7 +15,7 @@
 3) Điều chỉnh nhóm **Bố cục tổng thể** hoặc **Đường nối & nhãn**
 4) Dùng cụm điều khiển ở **main navigator panel** (`zoom/reset/L1/L2/L3/Sửa vị trí`) để chuyển chế độ xem/chỉnh
 5) (Tuỳ chọn) Bấm **Chạy lại auto-layout** để áp dụng lại bố cục
-6) (Tuỳ chọn) Bật **Sửa vị trí** trên canvas để kéo‑thả `Area/Device` và lưu tọa độ thủ công (có guide/snap alignment)
+6) (Tuỳ chọn) Bật **Sửa vị trí** trên canvas để kéo‑thả `Area/Device` và lưu tọa độ thủ công (có guide/snap alignment, tọa độ chuẩn theo step 0.25 đv)
 7) Sửa giá trị → **Validate** → **Save**
 8) Hiển thị diff + audit log entry
 9) Lưu **config version** mới và cho phép khôi phục

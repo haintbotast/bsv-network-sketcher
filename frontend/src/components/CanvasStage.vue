@@ -129,10 +129,11 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AreaModel, DeviceModel, LinkModel, Viewport, ViewMode, L2AssignmentRecord, L3AddressRecord } from '../models/types'
 import type { PortAnchorOverrideMap, Rect } from './canvas/linkRoutingTypes'
-import { getVisibleBounds, logicalRectToView, viewToLogical } from '../utils/viewport'
+import { getVisibleBounds, logicalRectToView, logicalToView, viewToLogical } from '../utils/viewport'
 import { useLinkRouting } from './canvas/useLinkRouting'
 import { comparePorts } from './canvas/linkRoutingUtils'
 import { buildDeviceTierMap, resolveAutoPortSide } from './canvas/portSidePolicy'
+import { POSITION_STANDARD_STEP_UNITS, UNIT_PX } from '../composables/canvasConstants'
 
 const props = defineProps<{
   areas: AreaModel[]
@@ -283,6 +284,7 @@ const AREA_DISPLAY_MIN_WIDTH = 200
 const AREA_DISPLAY_MIN_HEIGHT = 130
 const DRAG_SNAP_THRESHOLD_PX = 10
 const GUIDE_STROKE = '#d66c3b'
+const POSITION_STANDARD_STEP_PX = POSITION_STANDARD_STEP_UNITS * UNIT_PX
 
 const areaViewMap = computed(() => {
   const map = new Map<string, { x: number; y: number; width: number; height: number }>()
@@ -1197,6 +1199,31 @@ function resolveAlignmentMatch(
   return best
 }
 
+function resolveStandardPositionMatch(
+  value: number,
+  axis: 'x' | 'y',
+  threshold: number
+): AlignmentMatch | null {
+  const offset = axis === 'x' ? layoutViewport.value.offsetX : layoutViewport.value.offsetY
+  const logicalValue = viewToLogical(value, layoutViewport.value.scale, offset)
+  const snappedLogical = Math.round(logicalValue / POSITION_STANDARD_STEP_PX) * POSITION_STANDARD_STEP_PX
+  const snappedView = logicalToView(snappedLogical, layoutViewport.value.scale, offset)
+  const delta = snappedView - value
+  if (Math.abs(delta) > threshold) return null
+  return {
+    axis,
+    delta,
+    lineCoord: snappedView,
+  }
+}
+
+function pickBestSnap(primary: AlignmentMatch | null, secondary: AlignmentMatch | null) {
+  if (primary && secondary) {
+    return Math.abs(primary.delta) <= Math.abs(secondary.delta) ? primary : secondary
+  }
+  return primary || secondary
+}
+
 function collectRelatedRects(context: DragObjectContext) {
   if (context.type === 'area') {
     const rects: Rect[] = []
@@ -1480,15 +1507,19 @@ function onObjectDragMove(event: any, id: string, type: 'device' | 'area') {
 
   const matchX = resolveAlignmentMatch(sourceXValues, targetXValues, threshold, 'x')
   const matchY = resolveAlignmentMatch(sourceYValues, targetYValues, threshold, 'y')
+  const standardMatchX = resolveStandardPositionMatch(rawX, 'x', threshold)
+  const standardMatchY = resolveStandardPositionMatch(rawY, 'y', threshold)
+  const finalMatchX = pickBestSnap(matchX, standardMatchX)
+  const finalMatchY = pickBestSnap(matchY, standardMatchY)
 
-  const snappedX = matchX ? rawX + matchX.delta : rawX
-  const snappedY = matchY ? rawY + matchY.delta : rawY
+  const snappedX = finalMatchX ? rawX + finalMatchX.delta : rawX
+  const snappedY = finalMatchY ? rawY + finalMatchY.delta : rawY
   if (snappedX !== rawX) target.x(snappedX)
   if (snappedY !== rawY) target.y(snappedY)
 
   activeGuideCoords.value = {
-    x: matchX?.lineCoord ?? null,
-    y: matchY?.lineCoord ?? null,
+    x: finalMatchX?.lineCoord ?? null,
+    y: finalMatchY?.lineCoord ?? null,
   }
 }
 
@@ -1506,11 +1537,17 @@ function onObjectDragEnd(event: any, id: string, type: 'device' | 'area') {
 
   const logicalX = viewToLogical(x, layoutViewport.value.scale, layoutViewport.value.offsetX)
   const logicalY = viewToLogical(y, layoutViewport.value.scale, layoutViewport.value.offsetY)
+  const snappedLogicalX = Math.round(logicalX / POSITION_STANDARD_STEP_PX) * POSITION_STANDARD_STEP_PX
+  const snappedLogicalY = Math.round(logicalY / POSITION_STANDARD_STEP_PX) * POSITION_STANDARD_STEP_PX
+  const snappedViewX = logicalToView(snappedLogicalX, layoutViewport.value.scale, layoutViewport.value.offsetX)
+  const snappedViewY = logicalToView(snappedLogicalY, layoutViewport.value.scale, layoutViewport.value.offsetY)
+  if (Math.abs(snappedViewX - x) > 0.01) target.x(snappedViewX)
+  if (Math.abs(snappedViewY - y) > 0.01) target.y(snappedViewY)
   emit('object:position-change', {
     id,
     type,
-    x: Number(logicalX.toFixed(2)),
-    y: Number(logicalY.toFixed(2)),
+    x: Number(snappedLogicalX.toFixed(2)),
+    y: Number(snappedLogicalY.toFixed(2)),
   })
 }
 

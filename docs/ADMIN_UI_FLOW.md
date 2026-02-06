@@ -14,12 +14,14 @@
 2) Thực hiện CRUD topology (area/device/link/port-link/anchor override) → hệ thống tự chạy lại auto-layout (debounce).
 3) Điều chỉnh nhóm **Bố cục tổng thể** hoặc **Đường nối & nhãn**
 4) (Tuỳ chọn) Bấm **Chạy lại auto-layout** để áp dụng lại bố cục
-5) Sửa giá trị → **Validate** → **Save**
-6) Hiển thị diff + audit log entry
-7) Lưu **config version** mới và cho phép khôi phục
+5) (Tuỳ chọn) Bật **Sửa vị trí** trên canvas để kéo‑thả `Area/Device` và lưu tọa độ thủ công
+6) Sửa giá trị → **Validate** → **Save**
+7) Hiển thị diff + audit log entry
+8) Lưu **config version** mới và cho phép khôi phục
 
 **Ngoại lệ bắt buộc:**
 - Thao tác viewport để xem sơ đồ (`pan`, `zoom`, `reset view`) **không được trigger auto-layout**.
+- Kéo‑thả chỉnh vị trí thủ công (`Area/Device`) **không được trigger auto-layout**.
 
 **Hiển thị tối thiểu:**
 - `layout.default_mode`, `layout.allowed_modes` (cố định `standard`)

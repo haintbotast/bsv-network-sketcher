@@ -370,6 +370,72 @@ export function useCanvasData(
     handleDeviceChange({ row: device })
   }
 
+  async function saveAreaPosition(areaId: string, positionX: number, positionY: number) {
+    if (!selectedProjectId.value) return
+    const projectId = selectedProjectId.value
+    const index = areas.value.findIndex(area => area.id === areaId)
+    if (index < 0) return
+
+    const previous = areas.value[index]
+    const optimistic: AreaRow = {
+      ...previous,
+      position_x: positionX,
+      position_y: positionY,
+    }
+    areas.value[index] = optimistic
+
+    try {
+      const updated = await updateArea(projectId, areaId, {
+        position_x: positionX,
+        position_y: positionY,
+      })
+      const nextIndex = areas.value.findIndex(area => area.id === areaId)
+      if (nextIndex >= 0) {
+        areas.value[nextIndex] = {
+          ...(areas.value[nextIndex].__temp ? { __temp: true } : {}),
+          ...updated,
+        }
+      }
+    } catch (error) {
+      const nextIndex = areas.value.findIndex(area => area.id === areaId)
+      if (nextIndex >= 0) areas.value[nextIndex] = previous
+      throw error
+    }
+  }
+
+  async function saveDevicePosition(deviceId: string, positionX: number, positionY: number) {
+    if (!selectedProjectId.value) return
+    const projectId = selectedProjectId.value
+    const index = devices.value.findIndex(device => device.id === deviceId)
+    if (index < 0) return
+
+    const previous = devices.value[index]
+    const optimistic: DeviceRow = {
+      ...previous,
+      position_x: positionX,
+      position_y: positionY,
+    }
+    devices.value[index] = optimistic
+
+    try {
+      const updated = await updateDevice(projectId, deviceId, {
+        position_x: positionX,
+        position_y: positionY,
+      })
+      const nextIndex = devices.value.findIndex(device => device.id === deviceId)
+      if (nextIndex >= 0) {
+        devices.value[nextIndex] = {
+          ...(devices.value[nextIndex].__temp ? { __temp: true } : {}),
+          ...updated,
+        }
+      }
+    } catch (error) {
+      const nextIndex = devices.value.findIndex(device => device.id === deviceId)
+      if (nextIndex >= 0) devices.value[nextIndex] = previous
+      throw error
+    }
+  }
+
   return {
     areas,
     devices,
@@ -392,5 +458,7 @@ export function useCanvasData(
     upsertAnchorOverride,
     removeAnchorOverride,
     assignDeviceArea,
+    saveAreaPosition,
+    saveDevicePosition,
   }
 }

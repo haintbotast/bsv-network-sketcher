@@ -69,6 +69,9 @@
           <button type="button" @click="handleZoomIn">Zoom +</button>
           <button type="button" @click="handleZoomOut">Zoom -</button>
           <button type="button" class="ghost" @click="handleResetViewport">Reset view</button>
+          <button type="button" :class="{ active: positionEditEnabled }" @click="togglePositionEditMode">
+            {{ positionEditEnabled ? 'Khóa vị trí' : 'Sửa vị trí' }}
+          </button>
           <span class="toolbar-divider"></span>
           <button type="button" :class="{ active: viewMode === 'L1' }" @click="setViewMode('L1')">[L1]</button>
           <button type="button" :class="{ active: viewMode === 'L2' }" @click="setViewMode('L2')">[L2]</button>
@@ -87,12 +90,14 @@
           :viewport="viewportState"
           :selected-id="selectedId"
           :view-mode="viewMode"
+          :position-edit-enabled="positionEditEnabled"
           :l2-assignments="l2Assignments"
           :l3-addresses="l3Addresses"
           :port-anchor-overrides="portAnchorOverrideMap"
           :render-tuning="renderTuning"
           @select="handleSelect"
           @update:viewport="handleViewportUpdate"
+          @object:position-change="handleCanvasObjectPositionChange"
         />
       </main>
 
@@ -491,7 +496,7 @@ import DataGrid, { type ColumnDef } from './components/DataGrid.vue'
 import { updateArea } from './services/areas'
 import { updateDevice } from './services/devices'
 import { createLink, deleteLink, updateLink } from './services/links'
-import { deviceTypes, linkPurposes } from './composables/canvasConstants'
+import { UNIT_PX, deviceTypes, linkPurposes } from './composables/canvasConstants'
 import { comparePorts, extractPortIndex } from './components/canvas/linkRoutingUtils'
 import { useViewport } from './composables/useViewport'
 import { useAuth } from './composables/useAuth'
@@ -549,6 +554,8 @@ const {
   handleLinkAdd, handleLinkChange, handleLinkRemove,
   upsertAnchorOverride, removeAnchorOverride,
   assignDeviceArea,
+  saveAreaPosition,
+  saveDevicePosition,
 } = canvasData
 
 const selectedId = ref<string | null>(null)
@@ -558,6 +565,8 @@ const selectedSavePending = ref(false)
 let syncingDraft = false
 
 const anchorDrafts = ref<Record<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number; autoOffset: boolean }>>({})
+const positionEditEnabled = ref(false)
+const positionSaveSeq = new Map<string, number>()
 
 
 // Viewport state (from composable)
@@ -589,6 +598,38 @@ function handleZoomOut() {
 
 function handleResetViewport() {
   resetViewport()
+}
+
+function togglePositionEditMode() {
+  positionEditEnabled.value = !positionEditEnabled.value
+}
+
+async function handleCanvasObjectPositionChange(payload: { id: string; type: 'device' | 'area'; x: number; y: number }) {
+  if (!selectedProjectId.value) return
+  if (!Number.isFinite(payload.x) || !Number.isFinite(payload.y)) return
+  const positionX = Number((payload.x / UNIT_PX).toFixed(2))
+  const positionY = Number((payload.y / UNIT_PX).toFixed(2))
+  const key = `${payload.type}:${payload.id}`
+  const seq = (positionSaveSeq.get(key) || 0) + 1
+  positionSaveSeq.set(key, seq)
+
+  try {
+    if (payload.type === 'area') {
+      await saveAreaPosition(payload.id, positionX, positionY)
+    } else {
+      await saveDevicePosition(payload.id, positionX, positionY)
+    }
+
+    if (positionSaveSeq.get(key) !== seq) return
+    if (selectedId.value === payload.id && selectedDraft.value && !selectedDraftDirty.value) {
+      selectedDraft.value.position_x = positionX
+      selectedDraft.value.position_y = positionY
+    }
+  } catch (error: any) {
+    if (positionSaveSeq.get(key) === seq) {
+      setNotice(error?.message || 'Lưu vị trí thủ công thất bại.', 'error')
+    }
+  }
 }
 
 // View mode - _selectedAreaNameRef synced via watch after selectedAreaName is defined
@@ -1174,6 +1215,8 @@ function handleLogin() {
 function handleLogout() {
   authLogout({
     onLogout: () => {
+      positionEditEnabled.value = false
+      positionSaveSeq.clear()
       resetLayoutConfig()
       projects.value = []
       selectedProjectId.value = null
@@ -1285,6 +1328,8 @@ async function handleSelectedObjectDelete() {
 
 watch(selectedProjectId, async (projectId) => {
   resetViewModeData()
+  positionEditEnabled.value = false
+  positionSaveSeq.clear()
 
   if (projectId) {
     await loadProjectData(projectId)

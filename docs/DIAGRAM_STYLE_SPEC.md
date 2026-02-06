@@ -53,6 +53,7 @@
 - **Khi pan/drag:** UI có thể **tạm ẩn nhãn port/L2/L3** để tối ưu hiệu năng; nhãn hiển thị lại khi dừng kéo.
 - **Khi zoom:** UI ưu tiên **scale nhanh** và **không tái tính toán** trong lúc zoom; chỉ tính lại khi dữ liệu/layout đổi.
 - Trigger auto-layout chỉ đến từ **mở project** và CRUD dữ liệu topology; thao tác viewport (`pan/zoom/reset view`) chỉ đổi góc nhìn và **không được phép** kích auto-layout.
+- **Kéo‑thả object thủ công:** chỉ có hiệu lực khi bật chế độ **Sửa vị trí**; áp dụng cho `Area/Device`, lưu `position_x/position_y` tại `drag-end`, và không kích hoạt auto-layout từ chính thao tác kéo‑thả này.
 
 **Liên kết liên‑area:**
 - Bắt buộc đi qua **Waypoint area** (đuôi `_wp_`), không nối Area‑Area trực tiếp.

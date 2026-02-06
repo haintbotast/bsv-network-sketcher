@@ -25,6 +25,8 @@
           :key="area.id"
           :config="area.group"
           @click="() => emitSelect(area.id, 'area')"
+          @dragstart="onObjectDragStart"
+          @dragend="event => onObjectDragEnd(event, area.id, 'area')"
         >
           <v-rect :config="area.rect" />
         </v-group>
@@ -52,6 +54,8 @@
           :key="device.id"
           :config="device.group"
           @click="() => emitSelect(device.id, 'device')"
+          @dragstart="onObjectDragStart"
+          @dragend="event => onObjectDragEnd(event, device.id, 'device')"
         >
           <v-rect :config="device.bodyRect" />
           <v-group
@@ -118,7 +122,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AreaModel, DeviceModel, LinkModel, Viewport, ViewMode, L2AssignmentRecord, L3AddressRecord } from '../models/types'
 import type { PortAnchorOverrideMap } from './canvas/linkRoutingTypes'
-import { getVisibleBounds, logicalRectToView } from '../utils/viewport'
+import { getVisibleBounds, logicalRectToView, viewToLogical } from '../utils/viewport'
 import { useLinkRouting } from './canvas/useLinkRouting'
 import { comparePorts } from './canvas/linkRoutingUtils'
 import { buildDeviceTierMap, resolveAutoPortSide } from './canvas/portSidePolicy'
@@ -128,6 +132,7 @@ const props = defineProps<{
   devices: DeviceModel[]
   links: LinkModel[]
   viewport: Viewport
+  positionEditEnabled?: boolean
   selectedId?: string | null
   viewMode?: ViewMode
   l2Assignments?: L2AssignmentRecord[]
@@ -169,6 +174,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'update:viewport', value: Viewport): void
   (event: 'select', payload: { id: string; type: 'device' | 'area' }): void
+  (event: 'object:position-change', payload: { id: string; type: 'device' | 'area'; x: number; y: number }): void
 }>()
 
 const containerRef = ref<HTMLDivElement | null>(null)
@@ -293,6 +299,10 @@ const areaDisplayMap = computed(() => {
   return map
 })
 
+const areaRenderMap = computed(() => {
+  return props.positionEditEnabled ? areaViewMap.value : areaDisplayMap.value
+})
+
 const areaById = computed(() => {
   const map = new Map<string, AreaModel>()
   props.areas.forEach(area => map.set(area.id, area))
@@ -351,15 +361,15 @@ const visibleAreas = computed(() => {
   }
 
   const visible = props.areas
-    .filter(area => areaDisplayMap.value.has(area.id))
+    .filter(area => areaRenderMap.value.has(area.id))
     .sort((a, b) => {
-      const rectA = areaDisplayMap.value.get(a.id)
-      const rectB = areaDisplayMap.value.get(b.id)
+      const rectA = areaRenderMap.value.get(a.id)
+      const rectB = areaRenderMap.value.get(b.id)
       if (!rectA || !rectB) return 0
       return rectB.width * rectB.height - rectA.width * rectA.height
     })
     .map(area => {
-      const rect = areaDisplayMap.value.get(area.id)!
+      const rect = areaRenderMap.value.get(area.id)!
       const parts = area.name.split(' - ')
       const zone = parts.slice(1).join(' - ')
       const children = childAreasByParent.value.get(area.id) || []
@@ -396,6 +406,7 @@ const visibleAreas = computed(() => {
         group: {
           x: rect.x,
           y: rect.y,
+          draggable: !!props.positionEditEnabled,
           clipX: 0,
           clipY: 0,
           clipWidth: rect.width,
@@ -915,6 +926,7 @@ const visibleDevices = computed(() => {
         group: {
           x: rect.x,
           y: rect.y,
+          draggable: !!props.positionEditEnabled,
           clipX: 0,
           clipY: 0,
           clipWidth: rect.width,
@@ -1309,6 +1321,33 @@ function onPointerDown(event: any) {
   panBaseOffset.value = { x: props.viewport.offsetX, y: props.viewport.offsetY }
   panTranslation.value = { x: 0, y: 0 }
   pendingTranslation.value = null
+}
+
+function onObjectDragStart() {
+  if (!props.positionEditEnabled) return
+  isPanning.value = false
+  panStartPointer.value = null
+  panBaseOffset.value = null
+  panTranslation.value = { x: 0, y: 0 }
+  pendingTranslation.value = null
+}
+
+function onObjectDragEnd(event: any, id: string, type: 'device' | 'area') {
+  if (!props.positionEditEnabled) return
+  const target = event?.target
+  if (!target || typeof target.x !== 'function' || typeof target.y !== 'function') return
+  const x = Number(target.x())
+  const y = Number(target.y())
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return
+
+  const logicalX = viewToLogical(x, layoutViewport.value.scale, layoutViewport.value.offsetX)
+  const logicalY = viewToLogical(y, layoutViewport.value.scale, layoutViewport.value.offsetY)
+  emit('object:position-change', {
+    id,
+    type,
+    x: Number(logicalX.toFixed(2)),
+    y: Number(logicalY.toFixed(2)),
+  })
 }
 
 function onPointerMove(event: any) {

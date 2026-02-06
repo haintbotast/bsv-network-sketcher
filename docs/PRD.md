@@ -44,6 +44,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-19:** Render L1 theo phong cách kỹ thuật: ưu tiên đường orthogonal/góc vuông rõ và dùng màu trung tính cho link LAN/DEFAULT để giảm rối.
 - **FR-20:** Khung Area ở L1 được phép hiển thị dạng compact theo cụm thiết bị để giảm khoảng trắng, nhưng không thay đổi dữ liệu Area lưu trong DB.
 - **FR-21:** Link `STACK/HA/HSRP` trong L1 phải có style chuyên biệt (màu/nét/lane) và được tách hiển thị khỏi nhóm uplink/data.
+- **FR-22:** Cho phép bật chế độ **Sửa vị trí** để kéo‑thả trực tiếp `Area/Device` trên canvas; lưu `position_x/position_y` ngay khi thả và **không trigger auto-layout** từ thao tác này.
 
 ## 5. Yêu cầu phi chức năng (NFR)
 

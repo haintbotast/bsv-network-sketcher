@@ -7,14 +7,21 @@ import {
   computeAreaAnchor,
 } from './linkRoutingUtils'
 import { resolveLinkPurposeColor } from '../../composables/canvasConstants'
-import { addOccupancy, connectOrthogonal, routeAnyAnglePath, routeOrthogonalPath, smoothAnyAnglePath } from '../../utils/link_routing'
+import {
+  addOccupancy,
+  connectOrthogonal,
+  routeAnyAnglePath,
+  routeOrthogonalPath,
+  smoothAnyAnglePath,
+  type GridSpec,
+} from '../../utils/link_routing'
 
 export type RouteLinksParams = {
   isL1View: boolean
   scale: number
   clearance: number
   minSegment: number
-  grid: { cols: number; rows: number; minX: number; minY: number; cellSize: number } | null
+  grid: GridSpec | null
   allowAStar: boolean
   areaRects: AreaRectEntry[]
   deviceRects: DeviceRectEntry[]
@@ -341,24 +348,8 @@ export function routeLinks(
     debugRouteMode,
   } = ctx
   const debugOn = !!debugRouteMode
-
-  const laneAxisByPair = new Map<string, 'x' | 'y'>()
   const getPairKey = (fromArea: string, toArea: string) =>
     fromArea < toArea ? `${fromArea}|${toArea}` : `${toArea}|${fromArea}`
-
-  const resolveLaneAxis = (fromAreaId: string, toAreaId: string) => {
-    const key = getPairKey(fromAreaId, toAreaId)
-    const cached = laneAxisByPair.get(key)
-    if (cached) return cached
-    const fromCenter = areaCenters.get(fromAreaId)
-    const toCenter = areaCenters.get(toAreaId)
-    if (!fromCenter || !toCenter) return 'y'
-    const dx = toCenter.x - fromCenter.x
-    const dy = toCenter.y - fromCenter.y
-    const axis = Math.abs(dx) >= Math.abs(dy) ? 'y' : 'x'
-    laneAxisByPair.set(key, axis)
-    return axis
-  }
 
   const appendPoints = (arr: { x: number; y: number }[], points: { x: number; y: number }[]) => {
     points.forEach(point => {
@@ -471,7 +462,7 @@ export function routeLinks(
 
   const exitBundleGapBase = (renderTuning.bundle_gap ?? 0) * scale
   const labelGapBase = (renderTuning.port_label_offset ?? 0) * scale
-  const gridCell = grid?.cellSize ?? 0
+  const gridCell = grid?.size ?? 0
   const exitBundleGap = exitBundleGapBase > 0
     ? Math.max(6, exitBundleGapBase, labelGapBase, gridCell)
     : 0
@@ -777,7 +768,7 @@ export function routeLinks(
         }
       }
 
-      // Use direct any-angle routing for all links (waypoint logic disabled)
+      // Ưu tiên A*/orthogonal cho L1; non-L1 dùng any-angle.
       if (allowAStar && !directAllowed && !routed && grid) {
         const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
         const bundleShift = preferAxis === 'x'
@@ -792,26 +783,17 @@ export function routeLinks(
           y: toExit.y + bundleShift.y
         }
 
-        // Convert grid format to GridSpec
-        const gridSpec = {
-          originX: grid.minX,
-          originY: grid.minY,
-          size: grid.cellSize,
-          cols: grid.cols,
-          rows: grid.rows
-        }
-
         const routeOrthogonal = (start: { x: number; y: number }, end: { x: number; y: number }) => {
           return routeOrthogonalPath({
             start,
             end,
             obstacles,
             clearance,
-            grid: gridSpec,
+            grid,
             occupancy,
             preferAxis,
-            turnPenalty: gridSpec.size * 1.2,
-            congestionPenalty: gridSpec.size * 80
+            turnPenalty: grid.size * 1.2,
+            congestionPenalty: grid.size * 80
           })
         }
 
@@ -865,7 +847,7 @@ export function routeLinks(
             end: offsetToExit,
             obstacles,
             clearance,
-            grid: gridSpec,
+            grid,
             occupancy,
             preferAxis
           })
@@ -887,7 +869,7 @@ export function routeLinks(
 
       if (!routed) {
         if (fromAreaId && toAreaId && fromAreaId !== toAreaId && fromArea && toArea) {
-          // Waypoint routing disabled - use corridor fallback directly
+          // Fallback corridor khi chưa có route an toàn qua A*/waypoint.
           const localCorridor = computeLocalCorridor(
             fromArea,
             toArea,

@@ -164,7 +164,6 @@ export function drawPolylineWithJumps(
     }
 
     const isHorizontal = Math.abs(y2 - y1) < 0.5
-    const segLen = Math.hypot(x2 - x1, y2 - y1)
 
     // Lọc crossings quá gần endpoint hoặc quá gần nhau
     const filtered: Crossing[] = []

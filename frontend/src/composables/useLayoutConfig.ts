@@ -4,7 +4,6 @@ import type { AdminConfig } from '../services/adminConfig'
 import { DEFAULT_LAYOUT_TUNING, DEFAULT_RENDER_TUNING } from './canvasConstants'
 
 export function useLayoutConfig(
-  setNotice: (msg: string, type: 'info' | 'success' | 'error') => void,
   currentUser: { value: any },
 ) {
   const adminConfig = ref<AdminConfig>({})

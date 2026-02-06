@@ -3,9 +3,6 @@ import type { Viewport } from '../../models/types'
 import { buildGridSpec } from '../../utils/link_routing'
 import { computeCrossings, drawPolylineWithJumps } from '../../utils/line_crossings'
 import type { Crossing } from '../../utils/line_crossings'
-
-// Re-export types for backward compatibility
-export type { Rect } from './linkRoutingTypes'
 import type { Rect, RenderLink, UseLinkRoutingParams, PortAnchorOverrideMap } from './linkRoutingTypes'
 
 import { clamp, computeSide, computePortLabelPlacement } from './linkRoutingUtils'
@@ -175,7 +172,6 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       deviceAreaMap: daMap,
       devicePortOrder: dpOrder,
       devicePortList: dpList,
-      linkBundleIndex: lbIndex,
       renderTuning: tuning,
       layoutScale: layoutViewport.value.scale,
       isL1View,

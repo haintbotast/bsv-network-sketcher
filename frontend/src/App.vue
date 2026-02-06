@@ -603,7 +603,7 @@ const {
   layoutTuning,
   renderTuning,
   loadAdminConfig,
-} = useLayoutConfig(setNotice, currentUser)
+} = useLayoutConfig(currentUser)
 
 const {
   projects,

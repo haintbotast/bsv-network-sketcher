@@ -9,7 +9,6 @@ export type BuildLinkMetaDataParams = {
   deviceAreaMap: Map<string, string>
   devicePortOrder: Map<string, Map<string, number>>
   devicePortList: Map<string, string[]>
-  linkBundleIndex: Map<string, { index: number; total: number }>
   renderTuning: RenderTuning
   layoutScale: number
   isL1View: boolean
@@ -34,7 +33,7 @@ export function buildLinkMetaData(
 ) {
   const {
     links, deviceViewMap, areaViewMap, deviceAreaMap,
-    devicePortOrder, devicePortList, linkBundleIndex,
+    devicePortOrder, devicePortList,
     renderTuning, layoutScale, isL1View,
     resolvePortAnchorWithOverrides, areaCenters,
   } = params

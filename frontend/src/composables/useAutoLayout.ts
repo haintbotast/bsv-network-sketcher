@@ -1,7 +1,40 @@
-import { ref, type Ref, type ComputedRef } from 'vue'
+import { onBeforeUnmount, ref, type Ref, type ComputedRef } from 'vue'
 import { autoLayout, invalidateLayoutCache } from '../services/layout'
 import { DEFAULT_LAYOUT_TUNING } from './canvasConstants'
 import type { AreaRow, DeviceRow } from './useCanvasData'
+
+export type AutoLayoutReason =
+  | 'project-open'
+  | 'area-crud'
+  | 'device-crud'
+  | 'link-crud'
+  | 'port-link-crud'
+  | 'anchor-crud'
+  | 'manual'
+
+export type ScheduleAutoLayoutOptions = {
+  reason: AutoLayoutReason | string
+  force?: boolean
+}
+
+type AutoLayoutRequest = {
+  reason: AutoLayoutReason
+  force: boolean
+}
+
+const AUTO_LAYOUT_REASONS = new Set<AutoLayoutReason>([
+  'project-open',
+  'area-crud',
+  'device-crud',
+  'link-crud',
+  'port-link-crud',
+  'anchor-crud',
+  'manual',
+])
+
+function isAutoLayoutReason(value: string): value is AutoLayoutReason {
+  return AUTO_LAYOUT_REASONS.has(value as AutoLayoutReason)
+}
 
 export function useAutoLayout(deps: {
   areas: Ref<AreaRow[]>
@@ -14,8 +47,10 @@ export function useAutoLayout(deps: {
 }) {
   const autoLayoutAutoApplying = ref(false)
   const autoLayoutManualApplying = ref(false)
-  const autoLayoutAutoAppliedProjects = new Set<string>()
-  let autoLayoutTimer: number | null = null
+  const autoLayoutRunningProjects = new Set<string>()
+  const autoLayoutDebounceTimers = new Map<string, number>()
+  const autoLayoutLatestRequests = new Map<string, AutoLayoutRequest>()
+  const autoLayoutPendingReruns = new Map<string, AutoLayoutRequest>()
 
   function computeAutoLayoutTuning() {
     const tuning = deps.layoutTuning.value
@@ -24,58 +59,85 @@ export function useAutoLayout(deps: {
     return { layer_gap, node_spacing }
   }
 
-  function hasStoredLayout() {
-    const epsilon = 0.0001
-    const deviceHasLayout = deps.devices.value.some(device =>
-      Math.abs(device.position_x ?? 0) > epsilon || Math.abs(device.position_y ?? 0) > epsilon
-    )
-    const areaHasLayout = deps.areas.value.some(area =>
-      Math.abs(area.position_x ?? 0) > epsilon || Math.abs(area.position_y ?? 0) > epsilon
-    )
-    return deviceHasLayout || areaHasLayout
+  function clearDebounceTimer(projectId: string) {
+    const timer = autoLayoutDebounceTimers.get(projectId)
+    if (!timer) return
+    window.clearTimeout(timer)
+    autoLayoutDebounceTimers.delete(projectId)
   }
 
-  function scheduleAutoLayout(projectId: string, force = false) {
-    if (autoLayoutTimer) window.clearTimeout(autoLayoutTimer)
-    autoLayoutTimer = window.setTimeout(() => {
-      autoLayoutTimer = null
-      runAutoLayoutAuto(projectId, force)
-    }, 800)
-  }
-
-  async function runAutoLayoutAuto(projectId: string, force = false) {
-    if (autoLayoutAutoApplying.value) return
-    if (!force && autoLayoutAutoAppliedProjects.has(projectId)) return
-    if (!deps.devices.value.length) return
-    if (!force && hasStoredLayout()) {
-      autoLayoutAutoAppliedProjects.add(projectId)
-      return
-    }
+  async function executeAutoLayout(projectId: string, _request: AutoLayoutRequest) {
+    if (!deps.devices.value.length) return false
 
     const hasAreas = deps.areas.value.length > 0
-    if (!hasAreas && !deps.links.value.length) return
+    if (!hasAreas && !deps.links.value.length) return false
 
+    const tuning = computeAutoLayoutTuning()
+    await autoLayout(projectId, {
+      layer_gap: tuning.layer_gap,
+      node_spacing: tuning.node_spacing,
+      apply_to_db: true,
+      group_by_area: hasAreas,
+      layout_scope: 'project',
+      anchor_routing: true,
+      overview_mode: 'l1-only',
+      normalize_topology: false
+    })
+    await deps.loadProjectData(projectId)
+    await invalidateLayoutCache(projectId)
+    return true
+  }
+
+  async function flushAutoLayout(projectId: string) {
+    const request = autoLayoutLatestRequests.get(projectId)
+    if (!request) return
+
+    if (autoLayoutRunningProjects.has(projectId)) {
+      autoLayoutPendingReruns.set(projectId, request)
+      return
+    }
+    autoLayoutLatestRequests.delete(projectId)
+    autoLayoutRunningProjects.add(projectId)
     autoLayoutAutoApplying.value = true
+
     try {
-      const tuning = computeAutoLayoutTuning()
-      await autoLayout(projectId, {
-        layer_gap: tuning.layer_gap,
-        node_spacing: tuning.node_spacing,
-        apply_to_db: true,
-        group_by_area: hasAreas,
-        layout_scope: 'project',
-        anchor_routing: true,
-        overview_mode: 'l1-only',
-        normalize_topology: false
-      })
-      autoLayoutAutoAppliedProjects.add(projectId)
-      await deps.loadProjectData(projectId)
-      await invalidateLayoutCache(projectId)
-      deps.setNotice('Auto-layout đã được áp dụng tự động.', 'success')
-    } catch (error: any) {
-      deps.setNotice(error?.message || 'Auto-layout tự động thất bại.', 'error')
+      await runAutoLayoutAuto(projectId, request)
     } finally {
-      autoLayoutAutoApplying.value = false
+      autoLayoutRunningProjects.delete(projectId)
+      autoLayoutAutoApplying.value = autoLayoutRunningProjects.size > 0
+    }
+
+    const rerunRequest = autoLayoutPendingReruns.get(projectId) || autoLayoutLatestRequests.get(projectId)
+    if (!rerunRequest) return
+
+    autoLayoutPendingReruns.delete(projectId)
+    autoLayoutLatestRequests.set(projectId, rerunRequest)
+    void flushAutoLayout(projectId)
+  }
+
+  function scheduleAutoLayout(projectId: string, options: ScheduleAutoLayoutOptions) {
+    if (!isAutoLayoutReason(options.reason)) return
+
+    const request: AutoLayoutRequest = {
+      reason: options.reason,
+      force: options.force ?? false,
+    }
+    autoLayoutLatestRequests.set(projectId, request)
+    clearDebounceTimer(projectId)
+
+    const timer = window.setTimeout(() => {
+      autoLayoutDebounceTimers.delete(projectId)
+      void flushAutoLayout(projectId)
+    }, 800)
+    autoLayoutDebounceTimers.set(projectId, timer)
+  }
+
+  async function runAutoLayoutAuto(projectId: string, request: AutoLayoutRequest) {
+    try {
+      await executeAutoLayout(projectId, request)
+    } catch (error: any) {
+      const suffix = request.force ? '' : ` (${request.reason})`
+      deps.setNotice(error?.message || `Auto-layout tự động thất bại${suffix}.`, 'error')
     }
   }
 
@@ -88,23 +150,9 @@ export function useAutoLayout(deps: {
 
     autoLayoutManualApplying.value = true
     const projectId = deps.activeProject.value.id
-    const hasAreas = deps.areas.value.length > 0
     try {
-      const tuning = computeAutoLayoutTuning()
-      await autoLayout(projectId, {
-        layer_gap: tuning.layer_gap,
-        node_spacing: tuning.node_spacing,
-        apply_to_db: true,
-        group_by_area: hasAreas,
-        layout_scope: 'project',
-        anchor_routing: true,
-        overview_mode: 'l1-only',
-        normalize_topology: false
-      })
-      autoLayoutAutoAppliedProjects.add(projectId)
-      await deps.loadProjectData(projectId)
-      await invalidateLayoutCache(projectId)
-      deps.setNotice('Đã chạy lại auto-layout.', 'success')
+      const applied = await executeAutoLayout(projectId, { force: true, reason: 'manual' })
+      if (applied) deps.setNotice('Đã chạy lại auto-layout.', 'success')
     } catch (error: any) {
       deps.setNotice(error?.message || 'Chạy lại auto-layout thất bại.', 'error')
     } finally {
@@ -112,11 +160,18 @@ export function useAutoLayout(deps: {
     }
   }
 
+  onBeforeUnmount(() => {
+    autoLayoutDebounceTimers.forEach(timer => window.clearTimeout(timer))
+    autoLayoutDebounceTimers.clear()
+    autoLayoutLatestRequests.clear()
+    autoLayoutPendingReruns.clear()
+    autoLayoutRunningProjects.clear()
+  })
+
   return {
     autoLayoutAutoApplying,
     autoLayoutManualApplying,
     scheduleAutoLayout,
-    runAutoLayoutAuto,
     runAutoLayoutManual,
   }
 }

@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-30  
+> **Cập nhật:** 2026-02-06  
 > **Mục tiêu:** Gợi ý luồng UI cho trang quản trị cấu hình và lịch sử phiên bản topology.
 
 ---
@@ -10,12 +10,16 @@
 ## 1. Trang quản trị cấu hình (Admin Config)
 
 **Luồng đề xuất:**
-1) Mở project và chọn tab **Bố cục** trong panel phải (cạnh **Thuộc tính**)
-2) Điều chỉnh nhóm **Bố cục tổng thể** hoặc **Đường nối & nhãn**
-3) (Tuỳ chọn) Bấm **Chạy lại auto-layout** để áp dụng lại bố cục
-4) Sửa giá trị → **Validate** → **Save**
-5) Hiển thị diff + audit log entry
-6) Lưu **config version** mới và cho phép khôi phục
+1) Mở project và chọn tab **Bố cục** trong panel phải (cạnh **Thuộc tính**) → hệ thống tự chạy auto-layout một lượt.
+2) Thực hiện CRUD topology (area/device/link/port-link/anchor override) → hệ thống tự chạy lại auto-layout (debounce).
+3) Điều chỉnh nhóm **Bố cục tổng thể** hoặc **Đường nối & nhãn**
+4) (Tuỳ chọn) Bấm **Chạy lại auto-layout** để áp dụng lại bố cục
+5) Sửa giá trị → **Validate** → **Save**
+6) Hiển thị diff + audit log entry
+7) Lưu **config version** mới và cho phép khôi phục
+
+**Ngoại lệ bắt buộc:**
+- Thao tác viewport để xem sơ đồ (`pan`, `zoom`, `reset view`) **không được trigger auto-layout**.
 
 **Hiển thị tối thiểu:**
 - `layout.default_mode`, `layout.allowed_modes` (cố định `standard`)

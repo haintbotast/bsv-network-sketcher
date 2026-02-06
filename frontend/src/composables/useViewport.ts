@@ -18,6 +18,7 @@ export function useViewport() {
     offsetY: viewport.offsetY
   }))
 
+  // Viewport interaction không được trigger auto-layout, chỉ cập nhật trạng thái hiển thị.
   function updateViewport(value: Viewport) {
     viewport.offsetX = value.offsetX
     viewport.offsetY = value.offsetY

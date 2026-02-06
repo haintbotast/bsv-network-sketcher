@@ -20,7 +20,10 @@ export type LinkRow = LinkRecord & { __temp?: boolean }
 export function useCanvasData(
   selectedProjectId: { value: string | null },
   setNotice: (msg: string, type: 'info' | 'success' | 'error') => void,
-  scheduleAutoLayout: (projectId: string, force: boolean) => void,
+  scheduleAutoLayout: (
+    projectId: string,
+    options: { force?: boolean; reason: 'area-crud' | 'device-crud' | 'link-crud' }
+  ) => void,
 ) {
   const areas = ref<AreaRow[]>([])
   const devices = ref<DeviceRow[]>([])
@@ -156,7 +159,7 @@ export function useCanvasData(
       })
       const index = areas.value.findIndex(area => area.id === row.id)
       if (index >= 0) areas.value[index] = created
-      scheduleAutoLayout(projectId, true)
+      scheduleAutoLayout(projectId, { force: true, reason: 'area-crud' })
     } catch (error: any) {
       if (row.__temp) {
         areas.value = areas.value.filter(area => area.id !== row.id)
@@ -183,6 +186,7 @@ export function useCanvasData(
         })
         const index = areas.value.findIndex(area => area.id === payload.row.id)
         if (index >= 0) areas.value[index] = updated
+        scheduleAutoLayout(projectId, { force: true, reason: 'area-crud' })
       } catch (error: any) {
         setNotice(error?.message || 'Cập nhật area thất bại.', 'error')
       }
@@ -195,7 +199,7 @@ export function useCanvasData(
     if (row.__temp) return
     try {
       await deleteArea(projectId, row.id)
-      scheduleAutoLayout(projectId, true)
+      scheduleAutoLayout(projectId, { force: true, reason: 'area-crud' })
     } catch (error: any) {
       setNotice(error?.message || 'Xóa area thất bại.', 'error')
     }
@@ -224,7 +228,7 @@ export function useCanvasData(
       })
       const index = devices.value.findIndex(device => device.id === row.id)
       if (index >= 0) devices.value[index] = created
-      scheduleAutoLayout(projectId, true)
+      scheduleAutoLayout(projectId, { force: true, reason: 'device-crud' })
     } catch (error: any) {
       if (row.__temp) {
         devices.value = devices.value.filter(device => device.id !== row.id)
@@ -251,6 +255,7 @@ export function useCanvasData(
         })
         const index = devices.value.findIndex(device => device.id === payload.row.id)
         if (index >= 0) devices.value[index] = updated
+        scheduleAutoLayout(projectId, { force: true, reason: 'device-crud' })
       } catch (error: any) {
         setNotice(error?.message || 'Cập nhật device thất bại.', 'error')
       }
@@ -263,7 +268,7 @@ export function useCanvasData(
     if (row.__temp) return
     try {
       await deleteDevice(projectId, row.id)
-      scheduleAutoLayout(projectId, true)
+      scheduleAutoLayout(projectId, { force: true, reason: 'device-crud' })
     } catch (error: any) {
       setNotice(error?.message || 'Xóa device thất bại.', 'error')
     }
@@ -290,7 +295,7 @@ export function useCanvasData(
       })
       const index = links.value.findIndex(link => link.id === row.id)
       if (index >= 0) links.value[index] = created
-      scheduleAutoLayout(projectId, true)
+      scheduleAutoLayout(projectId, { force: true, reason: 'link-crud' })
     } catch (error: any) {
       if (row.__temp) {
         links.value = links.value.filter(link => link.id !== row.id)
@@ -315,6 +320,7 @@ export function useCanvasData(
         })
         const index = links.value.findIndex(link => link.id === payload.row.id)
         if (index >= 0) links.value[index] = updated
+        scheduleAutoLayout(projectId, { force: true, reason: 'link-crud' })
       } catch (error: any) {
         setNotice(error?.message || 'Cập nhật link thất bại.', 'error')
       }
@@ -327,7 +333,7 @@ export function useCanvasData(
     if (row.__temp) return
     try {
       await deleteLink(projectId, row.id)
-      scheduleAutoLayout(projectId, true)
+      scheduleAutoLayout(projectId, { force: true, reason: 'link-crud' })
     } catch (error: any) {
       setNotice(error?.message || 'Xóa link thất bại.', 'error')
     }

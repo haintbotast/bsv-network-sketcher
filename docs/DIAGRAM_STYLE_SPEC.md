@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-04  
+> **Cập nhật:** 2026-02-06  
 > **Mục tiêu:** Chuẩn hóa hình khối, nét vẽ, màu sắc, chữ và nền cho toàn hệ thống (UI + Konva + export).
 
 ---
@@ -51,6 +51,7 @@
 - **L2/L3:** chỉ hiển thị nhãn L2/L3 trong view tương ứng; có **band nhãn** để không chồng lên thiết bị.
 - **Khi pan/drag:** UI có thể **tạm ẩn nhãn port/L2/L3** để tối ưu hiệu năng; nhãn hiển thị lại khi dừng kéo.
 - **Khi zoom:** UI ưu tiên **scale nhanh** và **không tái tính toán** trong lúc zoom; chỉ tính lại khi dữ liệu/layout đổi.
+- Trigger auto-layout chỉ đến từ **mở project** và CRUD dữ liệu topology; thao tác viewport (`pan/zoom/reset view`) chỉ đổi góc nhìn và **không được phép** kích auto-layout.
 
 **Liên kết liên‑area:**
 - Bắt buộc đi qua **Waypoint area** (đuôi `_wp_`), không nối Area‑Area trực tiếp.

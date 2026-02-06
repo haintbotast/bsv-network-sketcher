@@ -66,9 +66,9 @@
 
       <main class="canvas">
         <div class="canvas-toolbar">
-          <button type="button" @click="zoomIn">Zoom +</button>
-          <button type="button" @click="zoomOut">Zoom -</button>
-          <button type="button" class="ghost" @click="resetViewport">Reset view</button>
+          <button type="button" @click="handleZoomIn">Zoom +</button>
+          <button type="button" @click="handleZoomOut">Zoom -</button>
+          <button type="button" class="ghost" @click="handleResetViewport">Reset view</button>
           <span class="toolbar-divider"></span>
           <button type="button" :class="{ active: viewMode === 'L1' }" @click="setViewMode('L1')">[L1]</button>
           <button type="button" :class="{ active: viewMode === 'L2' }" @click="setViewMode('L2')">[L2]</button>
@@ -79,6 +79,7 @@
             {{ showRightPanel ? 'Ẩn panel' : 'Hiện panel' }}
           </button>
         </div>
+        <!-- Viewport interaction không được trigger auto-layout. -->
         <CanvasStage
           :areas="canvasAreas"
           :devices="canvasDevices"
@@ -91,7 +92,7 @@
           :port-anchor-overrides="portAnchorOverrideMap"
           :render-tuning="renderTuning"
           @select="handleSelect"
-          @update:viewport="updateViewport"
+          @update:viewport="handleViewportUpdate"
         />
       </main>
 
@@ -498,8 +499,10 @@ import { useProjects } from './composables/useProjects'
 import { useCanvasData } from './composables/useCanvasData'
 import type { AreaRow, DeviceRow, LinkRow } from './composables/useCanvasData'
 import { useAutoLayout } from './composables/useAutoLayout'
+import type { ScheduleAutoLayoutOptions } from './composables/useAutoLayout'
 import { useViewMode } from './composables/useViewMode'
 import { useLayoutConfig } from './composables/useLayoutConfig'
+import type { Viewport } from './models/types'
 
 const {
   statusText,
@@ -534,7 +537,7 @@ const {
 const canvasData = useCanvasData(
   selectedProjectId,
   setNotice,
-  (projectId, force) => scheduleAutoLayout(projectId, force),
+  (projectId: string, options: ScheduleAutoLayoutOptions) => scheduleAutoLayout(projectId, options),
 )
 const {
   areas, devices, links,
@@ -570,6 +573,23 @@ const {
   resetViewport,
   toggleRightPanel,
 } = useViewport()
+
+// Viewport interaction không được trigger auto-layout, chỉ cập nhật trạng thái hiển thị.
+function handleViewportUpdate(value: Viewport) {
+  updateViewport(value)
+}
+
+function handleZoomIn() {
+  zoomIn()
+}
+
+function handleZoomOut() {
+  zoomOut()
+}
+
+function handleResetViewport() {
+  resetViewport()
+}
 
 // View mode - _selectedAreaNameRef synced via watch after selectedAreaName is defined
 const _selectedAreaNameRef = ref<string | null>(null)
@@ -689,6 +709,7 @@ async function saveAnchorOverride(port: string) {
       side: draft.side,
       offset_ratio: draft.autoOffset ? null : draft.offsetRatio
     })
+    scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'anchor-crud' })
     setNotice('Đã lưu override anchor.', 'success')
   } catch (error: any) {
     setNotice(error?.message || 'Lưu override anchor thất bại.', 'error')
@@ -701,6 +722,7 @@ async function clearAnchorOverride(port: string) {
   try {
     await removeAnchorOverride(selectedProjectId.value, deviceId, port)
     anchorDrafts.value[port] = { side: 'right', offsetRatio: 0.5, autoOffset: true }
+    scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'anchor-crud' })
     setNotice('Đã xóa override anchor.', 'success')
   } catch (error: any) {
     setNotice(error?.message || 'Xóa override anchor thất bại.', 'error')
@@ -1014,7 +1036,7 @@ async function savePortLink(entry: { linkId: string; direction: PortLinkDirectio
     const updated = await updateLink(selectedProjectId.value, entry.linkId, payload)
     const index = links.value.findIndex(link => link.id === updated.id)
     if (index >= 0) links.value[index] = updated
-    scheduleAutoLayout(selectedProjectId.value, true)
+    scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'port-link-crud' })
     setNotice('Đã cập nhật link.', 'success')
   } catch (error: any) {
     setNotice(error?.message || 'Cập nhật link thất bại.', 'error')
@@ -1027,7 +1049,7 @@ async function removePortLink(entry: { linkId: string }) {
   try {
     await deleteLink(selectedProjectId.value, entry.linkId)
     links.value = links.value.filter(link => link.id !== entry.linkId)
-    scheduleAutoLayout(selectedProjectId.value, true)
+    scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'port-link-crud' })
     setNotice('Đã xóa link.', 'success')
   } catch (error: any) {
     setNotice(error?.message || 'Xóa link thất bại.', 'error')
@@ -1064,7 +1086,7 @@ async function createPortLink() {
       line_style: draft.lineStyle || 'solid'
     })
     links.value.push(created)
-    scheduleAutoLayout(selectedProjectId.value, true)
+    scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'port-link-crud' })
     newLinkDraft.value = {
       port: '',
       targetDeviceId: null,
@@ -1227,6 +1249,12 @@ async function saveSelectedObject() {
       if (index >= 0 && updated) links.value[index] = updated as LinkRow
     }
     if (updated) {
+      const reasonByType = {
+        Area: 'area-crud',
+        Device: 'device-crud',
+        Link: 'link-crud',
+      } as const
+      scheduleAutoLayout(projectId, { force: true, reason: reasonByType[objectType as 'Area' | 'Device' | 'Link'] })
       selectedDraft.value = cloneRow(updated)
       selectedDraftDirty.value = false
       setNotice('Đã lưu thay đổi.', 'success')
@@ -1260,7 +1288,7 @@ watch(selectedProjectId, async (projectId) => {
 
   if (projectId) {
     await loadProjectData(projectId)
-    scheduleAutoLayout(projectId)
+    scheduleAutoLayout(projectId, { force: true, reason: 'project-open' })
   } else {
     areas.value = []
     devices.value = []

@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-03  
+> **Cập nhật:** 2026-02-06  
 > **Trạng thái:** Tài liệu kiến trúc vận hành  
 > **Nguyên tắc:** Dự án web tham chiếu Network Sketcher gốc (logic), **không triển khai CLI**; ưu tiên đúng logic và UX tối giản nhưng dùng được ngay.
 
@@ -68,6 +68,8 @@ Service Layer (Project/Diagram/Export/Import/Auth)
 ```
 UI thao tác → REST API → Service → DB → phản hồi → UI render
 ```
+- Auto-layout tự chạy khi mở project và sau CRUD topology (area/device/link/port-link/anchor override).
+- Thao tác viewport (`pan/zoom/reset view`) chỉ đổi góc nhìn trên client, **không** trigger auto-layout.
 
 ### 4.2 Luồng xem trước thời gian thực
 ```

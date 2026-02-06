@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-03  
+> **Cập nhật:** 2026-02-06  
 > **Phạm vi:** Ứng dụng web Network Sketcher (port từ repo gốc)  
 > **Nguyên tắc:** Tối giản, chính xác tuyệt đối, UX tiện dụng, **không triển khai CLI**.
 
@@ -55,6 +55,7 @@
 - Ràng buộc kết nối L1 theo tầng (Access/Distribution/Server) để đảm bảo đúng logic vật lý.
 - Cho phép **chỉnh anchor port thủ công** (side + offset_ratio) để tinh chỉnh đường kết nối; `offset_ratio` có thể để `null` để giữ **auto offset**.
 - Cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port** ngay trong bảng thuộc tính thiết bị, có kiểm tra trùng và port đã dùng.
+- Auto-layout tự chạy khi mở project và sau CRUD topology; thao tác viewport (`pan/zoom/reset view`) không làm thay đổi layout.
 - Bảo vệ dữ liệu dự án (phân quyền theo project, kiểm soát upload/download).
 - Cho phép quản trị preset/layout/validation qua trang cấu hình (không hardcode).
 

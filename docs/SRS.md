@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-03  
+> **Cập nhật:** 2026-02-06  
 > **Mục tiêu:** Đặc tả yêu cầu kỹ thuật để triển khai web app theo style chung (chuẩn nội bộ).
 
 ---
@@ -35,7 +35,9 @@
 - Sơ đồ L1/L2/L3 hiển thị và chỉnh sửa.
 - Đồng bộ dữ liệu L1→L2→L3 theo quy tắc logic chuẩn (validation chặt chẽ).
 - Auto-layout theo **2 tầng** (macro Area + micro Device), ưu tiên bố cục top‑to‑bottom.
-- Auto-layout tự động **chỉ chạy khi project chưa có tọa độ layout** (device/area position trống hoặc 0); nếu đã có layout thì **không tự chạy lại**. Cho phép chạy lại khi người dùng chủ động.
+- Auto-layout tự động chạy khi **mở project** và sau mọi CRUD topology của project (area/device/link/port-link/anchor override), có debounce để giảm chạy dồn.
+- Auto-layout **không được trigger** bởi thao tác viewport để xem sơ đồ (`pan`, `zoom`, `reset view`).
+- Cho phép chạy lại auto-layout khi người dùng chủ động từ tab **Bố cục**.
 - Khoảng cách giữa thiết bị trong auto-layout **tính cả vùng nhãn port (Interface Tag)** để tránh chồng lấn.
 - Cho phép người dùng **override anchor per-port** bằng `side + offset_ratio` (cho phép `offset_ratio = null` để giữ auto offset); override **được lưu DB** và **không bị auto-layout ghi đè**.
 - Bảng thuộc tính thiết bị cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port**, áp dụng kiểm tra **trùng link** và **port đã dùng** trước khi lưu.

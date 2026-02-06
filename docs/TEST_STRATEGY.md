@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.1
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-02-03  
+> **Cập nhật:** 2026-02-06  
 > **Mục tiêu:** Quy định chiến lược kiểm thử và golden files.
 
 ## 1. Kiểm thử backend
@@ -15,6 +15,7 @@
 - **same_type_row:** thiết bị cùng loại ưu tiên ở cùng hàng khi `max_nodes_per_row` cho phép.
 - **port_label_band:** giãn khoảng cách thiết bị có tính đến kích thước nhãn cổng.
 - **port_anchor_override:** override anchor per-port **được ưu tiên** và **không bị auto-layout ghi đè**; kiểm tra thêm trường hợp `offset_ratio = null` để giữ auto offset.
+- **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
 - **link_update_validation:** cập nhật link phải chặn **trùng link** và **port đã dùng** (kể cả khi chỉ đổi đầu còn lại).
 - **inter‑area:** link khác Area bắt buộc qua Waypoint area (`_wp_`).
 
@@ -228,6 +229,11 @@ test.describe('Diagram Editor', () => {
 - [ ] RB-101..RB-104: không chồng lấn; device nằm trong area; link không xuyên node.
 - [ ] L1 routing: khi đường thẳng bị cản bởi area/device, link phải bẻ hướng để tránh vật cản.
 - [ ] L1 routing: liên‑area/waypoint có thể đi ngoài đường bao sơ đồ; pan/viewport vẫn nhìn thấy đầy đủ đoạn link.
+- [ ] Trigger policy: mở project chạy auto-layout đúng 1 lượt.
+- [ ] Trigger policy: CRUD area/device/link/port-link/anchor đều trigger auto-layout.
+- [ ] Trigger policy: pan/zoom/reset view không phát sinh request `/auto-layout`.
+- [ ] Trigger policy: CRUD dồn dập khi đang chạy auto-layout chỉ tạo thêm 1 lượt chạy bù sau cùng.
+- [ ] Trigger policy: auto-run chỉ báo lỗi, không báo success.
 - [ ] RB-121..RB-122: nhãn không đè lên node/link; interface tag hợp lệ.
 - [ ] RB-141..RB-143: cảnh báo khoảng cách hiển thị đúng khi vi phạm ngưỡng.
 - [ ] RB-201..RB-202: hướng layout đúng style chung.

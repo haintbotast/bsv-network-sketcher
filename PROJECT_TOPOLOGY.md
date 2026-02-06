@@ -73,6 +73,7 @@ UI thao tác → REST API → Service → DB → phản hồi → UI render
 - Quy ước anchor L1: uplink đi ra từ **cạnh trên** object, non-uplink đi ra từ **cạnh dưới** object; override thủ công được ưu tiên.
 - Render L1 dùng **port band gắn trực tiếp vào object** (top/bottom); kích thước object được nới theo số lượng/độ dài port.
 - Render routing L1 theo phong cách kỹ thuật (orthogonal/góc vuông rõ, ưu tiên màu trung tính cho link LAN/DEFAULT).
+- UI L1 render khung Area theo dạng compact quanh cụm thiết bị để giảm khoảng trắng hiển thị (không đổi dữ liệu Area gốc).
 
 ### 4.2 Luồng xem trước thời gian thực
 ```

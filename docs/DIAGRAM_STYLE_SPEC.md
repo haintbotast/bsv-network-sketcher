@@ -40,6 +40,7 @@
 **Nguyên tắc chung (bắt buộc):**
 - **Macro (Area):** sắp xếp các Area theo location/tầng; không để thiết bị xuyên Area.
 - **Micro (Device):** mỗi Area là một lưới **top‑to‑bottom** theo thứ tự: **Router/Firewall → Core Switch → Distribution/Access Switch → Server Switch → Server/Storage → Endpoints**.
+- **Hiển thị Area (L1):** UI có thể render Area theo khung **compact theo cụm thiết bị** để giảm khoảng trắng; không thay đổi tọa độ/kích thước Area gốc trong dữ liệu.
 - Cho phép **nhiều hàng trong cùng tầng** và **so‑le nhẹ** để giảm đường vòng liên kết; vẫn giữ hướng top‑down.
 - Ưu tiên **thiết bị cùng loại ở cùng một hàng** nếu kích thước hàng cho phép (ví dụ cụm HA/Sync).
 - Ưu tiên **gom nhóm thiết bị có cùng prefix tên** (ví dụ `HN-SW-CORE-xx`, `HN-SW-DIST-xx`) để các thiết bị liên quan đứng gần nhau.
@@ -138,7 +139,7 @@
 
 | Đối tượng | Shape | Ghi chú |
 |----------|-------|--------|
-| Area | Rectangle bo góc nhẹ | Nền xám nhạt, label góc trên trái, **viền mảnh rõ**, không đổ bóng |
+| Area | Rectangle bo góc nhẹ | Nền trong suốt, label góc trên trái, **viền mảnh rõ**, không đổ bóng |
 | Device | Rectangle (ưu tiên góc vuông khi có port band) | Màu theo loại thiết bị, có viền rõ để tách thân thiết bị và dải port |
 | Waypoint | Diamond hoặc Circle | Không hiện label khi zoom out |
 | Link | Line | **L1 ưu tiên Manhattan (ngang/dọc)** theo tuyến tối ưu tránh vật cản, **không shortcut chéo**, **lineJoin miter/lineCap butt** để rõ nét kỹ thuật; **LAN/DEFAULT ở L1 dùng màu trung tính** để giảm rối. **L2/L3 ưu tiên any‑angle (Theta\*) + bo góc nhẹ**; màu theo purpose; nét liền/đứt |
@@ -272,7 +273,7 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 
 | Đối tượng | Nền |
 |----------|-----|
-| Area | #F0F0F0 |
+| Area | Transparent |
 | Port Cell (L1) | #FFFFFF |
 | Canvas | #FFFFFF |
 

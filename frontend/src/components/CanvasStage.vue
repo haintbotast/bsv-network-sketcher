@@ -208,6 +208,12 @@ const TEXT_PADDING = 10
 const SUB_ZONES = new Set(['Department', 'Projects', 'IT'])
 const LABEL_GAP_MAIN = 22
 const LABEL_GAP_SUB = 18
+const FONT_FAMILY = 'Calibri'
+const AREA_DISPLAY_PAD_X = 24
+const AREA_DISPLAY_PAD_Y = 18
+const AREA_DISPLAY_LABEL_BAND = 22
+const AREA_DISPLAY_MIN_WIDTH = 200
+const AREA_DISPLAY_MIN_HEIGHT = 130
 
 const areaViewMap = computed(() => {
   const map = new Map<string, { x: number; y: number; width: number; height: number }>()
@@ -215,6 +221,75 @@ const areaViewMap = computed(() => {
     const rect = logicalRectToView(area, layoutViewport.value)
     map.set(area.id, rect)
   })
+  return map
+})
+
+const areaDisplayMap = computed(() => {
+  const map = new Map<string, { x: number; y: number; width: number; height: number }>()
+  const boundsByArea = new Map<string, { minX: number; minY: number; maxX: number; maxY: number }>()
+
+  props.devices.forEach(device => {
+    const areaId = device.areaId
+    if (!areaId) return
+    const autoCoords = props.autoLayoutCoords?.get(device.id)
+    const source = autoCoords
+      ? { ...device, x: autoCoords.x * 120, y: autoCoords.y * 120 }
+      : device
+    const rect = logicalRectToView(source, layoutViewport.value)
+    const current = boundsByArea.get(areaId)
+    if (!current) {
+      boundsByArea.set(areaId, {
+        minX: rect.x,
+        minY: rect.y,
+        maxX: rect.x + rect.width,
+        maxY: rect.y + rect.height,
+      })
+      return
+    }
+    current.minX = Math.min(current.minX, rect.x)
+    current.minY = Math.min(current.minY, rect.y)
+    current.maxX = Math.max(current.maxX, rect.x + rect.width)
+    current.maxY = Math.max(current.maxY, rect.y + rect.height)
+  })
+
+  const fitInBase = (base: { x: number; y: number; width: number; height: number }, target: { x: number; y: number; width: number; height: number }) => {
+    const minW = Math.min(AREA_DISPLAY_MIN_WIDTH, base.width)
+    const minH = Math.min(AREA_DISPLAY_MIN_HEIGHT, base.height)
+    let x = target.x
+    let y = target.y
+    let width = Math.max(minW, target.width)
+    let height = Math.max(minH, target.height)
+
+    if (width > base.width) width = base.width
+    if (height > base.height) height = base.height
+    if (x < base.x) x = base.x
+    if (y < base.y) y = base.y
+    if (x + width > base.x + base.width) x = base.x + base.width - width
+    if (y + height > base.y + base.height) y = base.y + base.height - height
+    return { x, y, width, height }
+  }
+
+  props.areas.forEach(area => {
+    const base = areaViewMap.value.get(area.id)
+    if (!base) return
+    if (area.name.endsWith('_wp_')) {
+      map.set(area.id, base)
+      return
+    }
+    const bounds = boundsByArea.get(area.id)
+    if (!bounds) {
+      map.set(area.id, base)
+      return
+    }
+    const compact = fitInBase(base, {
+      x: bounds.minX - AREA_DISPLAY_PAD_X,
+      y: bounds.minY - AREA_DISPLAY_PAD_Y - AREA_DISPLAY_LABEL_BAND,
+      width: (bounds.maxX - bounds.minX) + AREA_DISPLAY_PAD_X * 2,
+      height: (bounds.maxY - bounds.minY) + AREA_DISPLAY_PAD_Y * 2 + AREA_DISPLAY_LABEL_BAND,
+    })
+    map.set(area.id, compact)
+  })
+
   return map
 })
 
@@ -245,12 +320,12 @@ const childAreasByParent = computed(() => {
   const areaList = [...props.areas]
 
   areaList.forEach(area => {
-    const rect = areaViewMap.value.get(area.id)
+    const rect = areaDisplayMap.value.get(area.id)
     if (!rect) return
 
     areaList.forEach(potentialParent => {
       if (potentialParent.id === area.id) return
-      const parentRect = areaViewMap.value.get(potentialParent.id)
+      const parentRect = areaDisplayMap.value.get(potentialParent.id)
       if (!parentRect) return
 
       const isInside = rect.x >= parentRect.x &&
@@ -276,15 +351,15 @@ const visibleAreas = computed(() => {
   }
 
   const visible = props.areas
-    .filter(area => areaViewMap.value.has(area.id))
+    .filter(area => areaDisplayMap.value.has(area.id))
     .sort((a, b) => {
-      const rectA = areaViewMap.value.get(a.id)
-      const rectB = areaViewMap.value.get(b.id)
+      const rectA = areaDisplayMap.value.get(a.id)
+      const rectB = areaDisplayMap.value.get(b.id)
       if (!rectA || !rectB) return 0
       return rectB.width * rectB.height - rectA.width * rectA.height
     })
     .map(area => {
-      const rect = areaViewMap.value.get(area.id)!
+      const rect = areaDisplayMap.value.get(area.id)!
       const parts = area.name.split(' - ')
       const zone = parts.slice(1).join(' - ')
       const children = childAreasByParent.value.get(area.id) || []
@@ -313,7 +388,7 @@ const visibleAreas = computed(() => {
       // L1 view: areas fully visible with clear borders (NS gốc style)
       // Waypoint areas: nhỏ, mờ, viền nét đứt
       const areaOpacity = isWaypoint ? 0.25 : 1
-      const areaFill = isWaypoint ? '#fbfbfb' : '#f2f2f2'
+      const areaFill = isWaypoint ? '#fbfbfb' : 'rgba(255,255,255,0)'
 
       const isSelected = props.selectedId === area.id
       return {
@@ -349,6 +424,7 @@ const visibleAreas = computed(() => {
           width: Math.max(rect.width - TEXT_PADDING * 2, 0),
           text: isWaypoint ? '' : area.name,
           fontSize,
+          fontFamily: FONT_FAMILY,
           fill: '#3f3a33',
           opacity: 1.0,
           wrap: 'none',
@@ -410,6 +486,7 @@ const visibleVlanGroups = computed(() => {
         y: viewRect.y + 10,
         text: group.name,
         fontSize: 14,
+        fontFamily: FONT_FAMILY,
         fill: '#1976d2',
         fontStyle: 'bold'
       }
@@ -456,6 +533,7 @@ const visibleSubnetGroups = computed(() => {
         y: viewRect.y + 10,
         text: group.name,
         fontSize: 14,
+        fontFamily: FONT_FAMILY,
         fill: '#7b1fa2',
         fontStyle: 'bold'
       }
@@ -670,6 +748,7 @@ const buildPortCells = (
         height: Math.max(DEVICE_PORT_CELL_HEIGHT - 2, 1),
         text: portName,
         fontSize: DEVICE_PORT_FONT_SIZE,
+        fontFamily: FONT_FAMILY,
         fill: '#2b2a28',
         align: 'center',
         verticalAlign: 'middle'
@@ -864,6 +943,7 @@ const visibleDevices = computed(() => {
           width: Math.max(rect.width - 16, 0),
           text: device.name,
           fontSize: DEVICE_LABEL_FONT_SIZE,
+          fontFamily: FONT_FAMILY,
           fill: '#1f1f1f',
           wrap: 'none',
           align: 'center',
@@ -908,7 +988,7 @@ const areaBounds = computed(() => {
   let maxX = 0
   let maxY = 0
   let hasBounds = false
-  areaViewMap.value.forEach((rect, id) => {
+  areaDisplayMap.value.forEach((rect, id) => {
     if (wpIds.has(id)) return
     if (!hasBounds) {
       minX = rect.x
@@ -1035,7 +1115,7 @@ const { visibleLinks, visibleLinkShapes } = useLinkRouting({
   layoutViewport,
   renderTuning,
   deviceViewMap,
-  areaViewMap,
+  areaViewMap: areaDisplayMap,
   deviceAreaMap,
   areaBounds,
   isPanning
@@ -1120,7 +1200,7 @@ const l2Labels = computed(() => {
       id: `l2-${deviceId}`,
       group: { x: deviceRect.x, y: deviceRect.y + deviceRect.height + 2 },
       bg: { x: 0, y: 0, width: labelWidth, height: 16, fill: '#e8f4e8', cornerRadius: 4 },
-      text: { x: 4, y: 2, text, fontSize: 10, fill: '#2d5a2d' }
+      text: { x: 4, y: 2, text, fontSize: 10, fontFamily: FONT_FAMILY, fill: '#2d5a2d' }
     })
   })
 
@@ -1164,7 +1244,7 @@ const l3Labels = computed(() => {
       id: `l3-${deviceId}`,
       group: { x: deviceRect.x, y: deviceRect.y + yOffset },
       bg: { x: 0, y: 0, width: labelWidth, height: 16, fill: '#e8e8f4', cornerRadius: 4 },
-      text: { x: 4, y: 2, text, fontSize: 10, fill: '#2d2d5a' }
+      text: { x: 4, y: 2, text, fontSize: 10, fontFamily: FONT_FAMILY, fill: '#2d2d5a' }
     })
   })
 

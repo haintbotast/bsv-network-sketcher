@@ -43,6 +43,7 @@
 - Kích thước object L1 phải **co giãn theo số lượng port và độ dài nhãn port** để giữ rõ ràng theo sơ đồ chuẩn PDF.
 - Khoảng cách giữa thiết bị trong auto-layout **tính cả phần mở rộng theo port band** để tránh chồng lấn.
 - Render L1 ưu tiên kiểu kỹ thuật: đường orthogonal/góc vuông rõ, giảm dùng màu nhấn cho link LAN/DEFAULT để hạn chế rối.
+- Với L1, khung Area hiển thị có thể ở dạng **compact theo cụm thiết bị** để giảm khoảng trắng; không thay đổi dữ liệu Area gốc.
 - Cho phép người dùng **override anchor per-port** bằng `side + offset_ratio` (cho phép `offset_ratio = null` để giữ auto offset); override **được lưu DB** và **không bị auto-layout ghi đè**.
 - Bảng thuộc tính thiết bị cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port**, áp dụng kiểm tra **trùng link** và **port đã dùng** trước khi lưu.
 - Overview (nếu bật) chỉ L1/flow; L2/L3 chỉ hiển thị ở view riêng.  

@@ -1,72 +1,104 @@
 """
-Unit tests for device auto-sizing logic.
+Tests cho port-band-aware device sizing (layout_geometry).
 """
 
+import math
 import unittest
 
-from app.services.device_sizing import compute_device_size, BASE_WIDTH, BASE_HEIGHT, TALL_HEIGHT
+from app.api.v1.endpoints.layout_geometry import (
+    _estimate_band_width_px,
+    estimate_device_rendered_size,
+)
+from app.api.v1.endpoints.layout_constants import (
+    UNIT_PX,
+    PORT_CELL_MIN_WIDTH_PX,
+    PORT_CELL_HEIGHT_PX,
+    PORT_CELL_GAP_PX,
+    PORT_BAND_PADDING_X_PX,
+    PORT_BAND_PADDING_Y_PX,
+    PORT_FONT_SIZE_PX,
+    PORT_CELL_TEXT_PADDING_PX,
+    DEVICE_LABEL_MIN_HEIGHT_PX,
+    DEVICE_MIN_WIDTH_PX,
+)
 
 
-class DeviceSizingTests(unittest.TestCase):
-    def test_zero_ports(self):
-        """Device with 0 ports should have base dimensions."""
-        width, height = compute_device_size(0)
-        self.assertEqual(width, BASE_WIDTH)
-        self.assertEqual(height, BASE_HEIGHT)
+class TestEstimateBandWidthPx(unittest.TestCase):
+    def test_empty_ports(self):
+        self.assertEqual(_estimate_band_width_px([]), 0.0)
 
-    def test_small_port_count(self):
-        """Device with 8 ports should increase width moderately."""
-        width, height = compute_device_size(8)
-        # 8 ports * 0.03 = 0.24 inch increase
-        # Expected: 1.2 + 0.24 = 1.44
-        self.assertGreater(width, BASE_WIDTH)
-        self.assertLess(width, 2.0)
-        self.assertEqual(height, BASE_HEIGHT)  # Height stays base for <24 ports
+    def test_single_short_port(self):
+        # "Gi1" → 3 chars → ceil(3*6.2+10) = ceil(28.6) = 29 < 30 → min 30
+        result = _estimate_band_width_px(["Gi1"])
+        expected = PORT_BAND_PADDING_X_PX * 2 + PORT_CELL_MIN_WIDTH_PX
+        self.assertAlmostEqual(result, expected)
 
-    def test_medium_port_count(self):
-        """Device with 24 ports should increase width significantly."""
-        width, height = compute_device_size(24)
-        # 24 ports * 0.03 = 0.72 inch increase
-        # Expected: 1.2 + 0.72 = 1.92
-        self.assertGreater(width, 1.5)
-        self.assertLess(width, 2.5)
-        self.assertEqual(height, BASE_HEIGHT)  # Height at threshold
+    def test_single_long_port(self):
+        # "Ge0/0/1" → 7 chars → ceil(7*6.2+10) = ceil(53.4) = 54
+        char_width = PORT_FONT_SIZE_PX * 0.62
+        cell_w = max(PORT_CELL_MIN_WIDTH_PX, math.ceil(7 * char_width + PORT_CELL_TEXT_PADDING_PX))
+        result = _estimate_band_width_px(["Ge0/0/1"])
+        expected = PORT_BAND_PADDING_X_PX * 2 + cell_w
+        self.assertAlmostEqual(result, expected)
 
-    def test_high_port_count(self):
-        """Device with 48 ports should hit max width and increase height."""
-        width, height = compute_device_size(48)
-        # 48 ports * 0.03 = 1.44 inch increase
-        # Raw: 1.2 + 1.44 = 2.64, but clamped to 3.6 max
-        self.assertGreater(width, 2.0)
-        self.assertLessEqual(width, 3.6)  # Clamped to max
-        self.assertEqual(height, TALL_HEIGHT)  # Height increased for >24 ports
+    def test_multiple_ports(self):
+        ports = ["Gi1", "Gi2", "Gi3"]
+        result = _estimate_band_width_px(ports)
+        cells = PORT_CELL_MIN_WIDTH_PX * 3
+        gaps = PORT_CELL_GAP_PX * 2
+        expected = PORT_BAND_PADDING_X_PX * 2 + cells + gaps
+        self.assertAlmostEqual(result, expected)
 
-    def test_very_high_port_count(self):
-        """Device with 96 ports should hit max width and tall height."""
-        width, height = compute_device_size(96)
-        # 96 ports * 0.03 = 2.88 inch increase
-        # Raw: 1.2 + 2.88 = 4.08, but clamped to 3.6 max
-        self.assertEqual(width, 3.6)  # Max width
-        self.assertEqual(height, TALL_HEIGHT)  # Tall height for high density
 
-    def test_width_progression(self):
-        """Width should increase monotonically with port count (until max)."""
-        width_8, _ = compute_device_size(8)
-        width_16, _ = compute_device_size(16)
-        width_24, _ = compute_device_size(24)
+class TestEstimateDeviceRenderedSize(unittest.TestCase):
+    def test_no_ports(self):
+        w, h = estimate_device_rendered_size(1.2, 0.8, [])
+        self.assertAlmostEqual(w, max(1.2 * UNIT_PX, DEVICE_MIN_WIDTH_PX) / UNIT_PX)
+        self.assertAlmostEqual(h, max(0.8 * UNIT_PX, DEVICE_LABEL_MIN_HEIGHT_PX) / UNIT_PX)
 
-        self.assertGreater(width_16, width_8)
-        self.assertGreater(width_24, width_16)
+    def test_single_port_top_band_only(self):
+        w, h = estimate_device_rendered_size(1.2, 0.8, ["Gi1"])
+        # 1 port → ceil(1/2)=1 on side_a, 0 on side_b → top band only
+        band_h = PORT_CELL_HEIGHT_PX + PORT_BAND_PADDING_Y_PX * 2
+        body_px = max(0.8 * UNIT_PX, DEVICE_LABEL_MIN_HEIGHT_PX)
+        expected_h = (band_h + body_px) / UNIT_PX
+        self.assertAlmostEqual(h, expected_h)
 
-    def test_height_threshold(self):
-        """Height should increase only above 24 ports."""
-        _, height_23 = compute_device_size(23)
-        _, height_24 = compute_device_size(24)
-        _, height_25 = compute_device_size(25)
+    def test_two_ports_both_bands(self):
+        w, h = estimate_device_rendered_size(1.2, 0.8, ["Gi1", "Gi2"])
+        band_h = PORT_CELL_HEIGHT_PX + PORT_BAND_PADDING_Y_PX * 2
+        body_px = max(0.8 * UNIT_PX, DEVICE_LABEL_MIN_HEIGHT_PX)
+        expected_h = (band_h + body_px + band_h) / UNIT_PX
+        self.assertAlmostEqual(h, expected_h)
 
-        self.assertEqual(height_23, BASE_HEIGHT)
-        self.assertEqual(height_24, BASE_HEIGHT)  # Exactly at threshold
-        self.assertEqual(height_25, TALL_HEIGHT)  # Above threshold
+    def test_many_ports_width_expands(self):
+        ports = [f"Ge0/0/{i}" for i in range(10)]
+        w, h = estimate_device_rendered_size(1.2, 0.8, ports)
+        self.assertGreater(w, 1.2)
+
+    def test_six_ports_symmetric(self):
+        ports = ["Gi1", "Gi2", "Gi3", "Gi4", "Gi5", "Gi6"]
+        w, h = estimate_device_rendered_size(1.2, 0.8, ports)
+        band_h = PORT_CELL_HEIGHT_PX + PORT_BAND_PADDING_Y_PX * 2
+        body_px = max(0.8 * UNIT_PX, DEVICE_LABEL_MIN_HEIGHT_PX)
+        expected_h = (band_h + body_px + band_h) / UNIT_PX
+        self.assertAlmostEqual(h, expected_h)
+        self.assertGreaterEqual(w, 1.2)
+
+    def test_twelve_long_ports(self):
+        ports = [f"GigabitEthernet0/0/{i}" for i in range(12)]
+        w, h = estimate_device_rendered_size(1.2, 0.8, ports)
+        self.assertGreater(w, 2.0)
+        band_h = PORT_CELL_HEIGHT_PX + PORT_BAND_PADDING_Y_PX * 2
+        body_px = max(0.8 * UNIT_PX, DEVICE_LABEL_MIN_HEIGHT_PX)
+        expected_h = (band_h + body_px + band_h) / UNIT_PX
+        self.assertAlmostEqual(h, expected_h)
+
+    def test_height_always_greater_with_ports(self):
+        """Device with ports should always be taller than without."""
+        _, h_no_ports = estimate_device_rendered_size(1.2, 0.8, [])
+        _, h_with_ports = estimate_device_rendered_size(1.2, 0.8, ["Gi1", "Gi2"])
+        self.assertGreater(h_with_ports, h_no_ports)
 
 
 if __name__ == "__main__":

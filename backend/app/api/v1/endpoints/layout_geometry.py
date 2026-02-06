@@ -2,12 +2,23 @@
 Geometry and sizing utilities for layout computation.
 """
 
+import math
+
 from .layout_constants import (
     UNIT_PX,
     LABEL_CHAR_WIDTH_PX,
     LABEL_PADDING_PX,
     LABEL_MIN_WIDTH_PX,
     LABEL_HEIGHT_PX,
+    PORT_CELL_MIN_WIDTH_PX,
+    PORT_CELL_HEIGHT_PX,
+    PORT_CELL_GAP_PX,
+    PORT_BAND_PADDING_X_PX,
+    PORT_BAND_PADDING_Y_PX,
+    PORT_FONT_SIZE_PX,
+    PORT_CELL_TEXT_PADDING_PX,
+    DEVICE_LABEL_MIN_HEIGHT_PX,
+    DEVICE_MIN_WIDTH_PX,
 )
 
 
@@ -82,3 +93,52 @@ def estimate_label_clearance(ports_by_device: dict[str, set[str]], render_tuning
     label_height_px = LABEL_HEIGHT_PX + label_gap_y + label_offset * 2
 
     return label_width_px / UNIT_PX, label_height_px / UNIT_PX
+
+
+def _estimate_band_width_px(ports: list[str]) -> float:
+    """Estimate port band width in pixels — mirrors frontend estimateBandWidth()."""
+    if not ports:
+        return 0.0
+    char_width = PORT_FONT_SIZE_PX * 0.62
+    cells_width = sum(
+        max(PORT_CELL_MIN_WIDTH_PX, math.ceil(len(p.strip()) * char_width + PORT_CELL_TEXT_PADDING_PX))
+        for p in ports
+    )
+    gaps_width = PORT_CELL_GAP_PX * max(len(ports) - 1, 0)
+    return PORT_BAND_PADDING_X_PX * 2 + cells_width + gaps_width
+
+
+def estimate_device_rendered_size(
+    body_width_in: float,
+    body_height_in: float,
+    ports: list[str],
+) -> tuple[float, float]:
+    """Estimate rendered device size matching frontend expandDeviceRectForPorts().
+
+    Splits ports 50/50 (ceil) between top/bottom bands as heuristic.
+    Returns (width, height) in inches.
+    """
+    body_width_px = body_width_in * UNIT_PX
+    body_height_px = body_height_in * UNIT_PX
+
+    if not ports:
+        width_px = max(body_width_px, DEVICE_MIN_WIDTH_PX)
+        height_px = max(body_height_px, DEVICE_LABEL_MIN_HEIGHT_PX)
+        return width_px / UNIT_PX, height_px / UNIT_PX
+
+    half = math.ceil(len(ports) / 2)
+    side_a = ports[:half]
+    side_b = ports[half:]
+
+    band_a_width = _estimate_band_width_px(side_a)
+    band_b_width = _estimate_band_width_px(side_b)
+
+    width_px = max(body_width_px, DEVICE_MIN_WIDTH_PX, band_a_width, band_b_width)
+
+    band_height = PORT_CELL_HEIGHT_PX + PORT_BAND_PADDING_Y_PX * 2
+    body_rendered_px = max(body_height_px, DEVICE_LABEL_MIN_HEIGHT_PX)
+    top_band_h = band_height if side_a else 0
+    bottom_band_h = band_height if side_b else 0
+    height_px = top_band_h + body_rendered_px + bottom_band_h
+
+    return width_px / UNIT_PX, height_px / UNIT_PX

@@ -9,7 +9,13 @@ from app.services.simple_layer_layout import simple_layer_layout
 from app.schemas.layout import DeviceLayout, AreaLayout, LayoutStats
 
 from .layout_constants import DEFAULT_DEVICE_WIDTH, DEFAULT_DEVICE_HEIGHT, normalize_text
-from .layout_geometry import effective_node_size, collect_device_ports, estimate_label_clearance
+from .layout_geometry import (
+    effective_node_size,
+    collect_device_ports,
+    estimate_label_clearance,
+    estimate_device_rendered_size,
+    safe_dim,
+)
 from .device_classifier import is_distribution_switch
 
 
@@ -322,13 +328,18 @@ def compute_layout_l1(
         ports_by_device = collect_device_ports(area_port_links)
         label_clearance_x, label_clearance_y = estimate_label_clearance(ports_by_device, render_cfg)
 
-        area_node_width, area_node_height = effective_node_size(
-            area_devices,
-            DEFAULT_DEVICE_WIDTH,
-            DEFAULT_DEVICE_HEIGHT,
-            extra_width=label_extra,
-            extra_height=label_extra,
-        )
+        # Compute max rendered size accounting for frontend port band expansion
+        max_rendered_w = DEFAULT_DEVICE_WIDTH
+        max_rendered_h = DEFAULT_DEVICE_HEIGHT
+        for device in area_devices:
+            body_w = safe_dim(getattr(device, "width", None), DEFAULT_DEVICE_WIDTH)
+            body_h = safe_dim(getattr(device, "height", None), DEFAULT_DEVICE_HEIGHT)
+            device_ports = sorted(ports_by_device.get(device.id, set()))
+            r_w, r_h = estimate_device_rendered_size(body_w, body_h, device_ports)
+            max_rendered_w = max(max_rendered_w, r_w)
+            max_rendered_h = max(max_rendered_h, r_h)
+        area_node_width = max_rendered_w + max(0.0, label_extra)
+        area_node_height = max_rendered_h + max(0.0, label_extra)
         area_micro_config = LayoutConfig(
             layer_gap=micro_config.layer_gap + label_clearance_y,
             node_spacing=micro_config.node_spacing + label_clearance_x,

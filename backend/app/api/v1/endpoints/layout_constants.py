@@ -39,6 +39,17 @@ LABEL_HEIGHT_PX = 16.0
 DEFAULT_DEVICE_WIDTH = 1.2
 DEFAULT_DEVICE_HEIGHT = 0.8
 
+# Port band dimensions – mirror frontend CanvasStage.vue constants
+PORT_CELL_MIN_WIDTH_PX = 30.0
+PORT_CELL_HEIGHT_PX = 18.0
+PORT_CELL_GAP_PX = 2.0
+PORT_BAND_PADDING_X_PX = 6.0
+PORT_BAND_PADDING_Y_PX = 4.0
+PORT_FONT_SIZE_PX = 10.0
+PORT_CELL_TEXT_PADDING_PX = 10.0
+DEVICE_LABEL_MIN_HEIGHT_PX = 30.0
+DEVICE_MIN_WIDTH_PX = 96.0
+
 
 def normalize_text(text: str | None) -> str:
     """Normalize text for classification (lowercase, strip)."""

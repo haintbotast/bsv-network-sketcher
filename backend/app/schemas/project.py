@@ -19,7 +19,7 @@ class ProjectCreate(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=1000)
-    layout_mode: str = Field("cisco", pattern="^(cisco|iso|custom)$")
+    layout_mode: str = Field("standard", pattern="^(standard)$")
 
 
 class ProjectUpdate(BaseModel):
@@ -27,7 +27,7 @@ class ProjectUpdate(BaseModel):
 
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=1000)
-    layout_mode: Optional[str] = Field(None, pattern="^(cisco|iso|custom)$")
+    layout_mode: Optional[str] = Field(None, pattern="^(standard)$")
 
 
 class ProjectResponse(BaseModel):
@@ -37,7 +37,7 @@ class ProjectResponse(BaseModel):
     name: str
     description: Optional[str] = None
     owner_id: str
-    layout_mode: str = "cisco"
+    layout_mode: str = "standard"
     created_at: datetime
     updated_at: datetime
     stats: Optional[ProjectStats] = None

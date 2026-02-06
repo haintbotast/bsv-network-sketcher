@@ -44,7 +44,7 @@ POST   /projects/{id}/versions/{version_id}/restore
 ```
 
 **Trường cấu hình project (gợi ý):**
-- `layout_mode`: `cisco` | `iso` | `custom` (mặc định: `cisco`)
+- `layout_mode`: `standard` (mặc định, cố định)
 
 ---
 

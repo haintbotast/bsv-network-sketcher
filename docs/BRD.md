@@ -11,7 +11,7 @@
 ## 1. Mục tiêu kinh doanh
 
 - Thay thế hoàn toàn quy trình tạo sơ đồ từ Network Sketcher CLI/GUI bằng web app nội bộ.
-- Bảo đảm **đầu ra theo chuẩn layout network phổ biến** (Cisco/ISO/custom); NS gốc chỉ là tham chiếu logic.
+- Bảo đảm **đầu ra theo một style chung** (chuẩn nội bộ); NS gốc chỉ là tham chiếu logic.
 - Giảm thời gian thao tác và sai sót nhờ UI/UX trực quan.
 
 ## 2. Bối cảnh hiện tại
@@ -44,13 +44,13 @@
 - Thư viện template dữ liệu chuẩn để áp dụng nhanh cho project.
 - (Tùy chọn) Hỗ trợ nhập từ Excel/CSV khi cần đối soát hoặc chuyển đổi dữ liệu cũ.
 - Tạo/sửa sơ đồ trực quan L1/L2/L3 trong UI.
-- Xuất PPTX/Excel theo **layout mode đã chọn**.
+- Xuất PPTX/Excel theo **style chung**.
 - Quản lý dự án và lịch sử xuất.
 - Quản lý phiên bản topology (tạo snapshot, xem lại, khôi phục).
 - Export/preview có thông tin phiên bản để truy vết.
 - Lưu vết thay đổi (audit log) cho thao tác quan trọng.
 - Hệ màu, hình vẽ, nét vẽ thống nhất giữa UI và export theo **Style Spec**.
-- Có **layout mode chọn** (Cisco/ISO/custom) + preset; **Flexible** có kiểm soát khi cần.
+- Có **style chung + preset**; **Flexible** có kiểm soát khi cần.
 - Validation logic L1→L2→L3 chặt chẽ hơn.
 - Ràng buộc kết nối L1 theo tầng (Access/Distribution/Server) để đảm bảo đúng logic vật lý.
 - Cho phép **chỉnh anchor port thủ công** (side + offset_ratio) để tinh chỉnh đường kết nối; `offset_ratio` có thể để `null` để giữ **auto offset**.
@@ -60,7 +60,7 @@
 
 ## 7. KPI/tiêu chí thành công
 
-- Đầu ra đúng chuẩn layout đã chọn (golden files theo mode hoặc rule-based).
+- Đầu ra đúng chuẩn style chung (golden files hoặc rule-based).
 - 100% nghiệp vụ lõi thực thi qua UI (không cần CLI).
 - Người dùng hoàn tất quy trình tạo sơ đồ trong ≤ 3 bước chính.
 - Có thể khôi phục phiên bản topology trước đó trong ≤ 2 thao tác.
@@ -73,7 +73,7 @@
 
 ## 9. Rủi ro chính
 
-- Sai khác bố cục xuất PPTX so với layout mode đã chọn.
+- Sai khác bố cục xuất PPTX so với style chung.
 - Sai lệch logic nhập liệu do mapping không đầy đủ.
 - UX phức tạp nếu không tối giản luồng thao tác.
 

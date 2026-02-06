@@ -37,21 +37,11 @@
             <select v-model="selectedProjectId" class="select">
               <option :value="null">-- Chọn project --</option>
               <option v-for="project in projects" :key="project.id" :value="project.id">
-                {{ project.name }} ({{ project.layout_mode }})
+                {{ project.name }}
               </option>
-            </select>
-            <select v-if="activeProject" v-model="layoutModeSelection" class="select">
-              <option value="cisco">Cisco</option>
-              <option value="iso">ISO</option>
-              <option value="custom">Custom</option>
             </select>
             <div class="divider"></div>
             <input v-model="projectForm.name" type="text" placeholder="Tên project" class="input" />
-            <select v-model="projectForm.layoutMode" class="select">
-              <option value="cisco">Cisco</option>
-              <option value="iso">ISO</option>
-              <option value="custom">Custom</option>
-            </select>
             <input v-model="projectForm.description" type="text" placeholder="Mô tả (tuỳ chọn)" class="input" />
             <button type="button" class="primary" @click="handleCreateProject">Tạo project</button>
           </div>
@@ -94,7 +84,6 @@
           :devices="canvasDevices"
           :links="canvasLinks"
           :viewport="viewportState"
-          :layout-mode="layoutMode"
           :selected-id="selectedId"
           :view-mode="viewMode"
           :l2-assignments="l2Assignments"
@@ -537,12 +526,8 @@ const {
   selectedProjectId,
   projectForm,
   activeProject,
-  layoutMode,
-  layoutModeSelection,
-  layoutModeUpdating,
   loadProjects,
   handleCreateProject,
-  handleLayoutModeChange,
 } = useProjects(setNotice)
 
 // useCanvasData needs scheduleAutoLayout which is defined later - use forwarding wrapper
@@ -1275,22 +1260,12 @@ watch(selectedProjectId, async (projectId) => {
 
   if (projectId) {
     await loadProjectData(projectId)
-    const project = projects.value.find(item => item.id === projectId)
-    if (project) {
-      layoutModeSelection.value = project.layout_mode
-    }
     scheduleAutoLayout(projectId)
   } else {
     areas.value = []
     devices.value = []
     links.value = []
   }
-})
-
-watch(layoutModeSelection, async (value) => {
-  await handleLayoutModeChange(value, (projectId) => {
-    scheduleAutoLayout(projectId, true)
-  })
 })
 
 onMounted(() => {

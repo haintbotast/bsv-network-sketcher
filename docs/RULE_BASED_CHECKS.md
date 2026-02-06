@@ -15,7 +15,7 @@
 
 ---
 
-## 2. Thông số mặc định (nếu layout mode không khai báo)
+## 2. Thông số mặc định (theo style chung)
 
 | Tham số | Giá trị mặc định | Ghi chú |
 |---|---|---|
@@ -26,7 +26,7 @@
 | `overlap_epsilon` | 0.01 inch | Ngưỡng coi như chồng lấn do sai số float |
 | `min_link_segment` | 0.10 inch | Độ dài tối thiểu của một đoạn link |
 
-**Nguồn override:** preset theo layout mode hoặc cấu hình admin (xem `docs/ADMIN_CONFIG_SCHEMA.md`).
+**Nguồn override:** preset theo style chung hoặc cấu hình admin (xem `docs/ADMIN_CONFIG_SCHEMA.md`).
 
 ### 2.1 Khuyến nghị tinh chỉnh (khi cần)
 
@@ -82,10 +82,10 @@
 
 ---
 
-## 5. Quy tắc nhất quán với layout mode (WARN)
+## 5. Quy tắc nhất quán với style chung (WARN)
 
-- **RB-201:** Hướng bố cục tuân theo layout mode đã chọn (cisco/iso/custom).
-- **RB-202:** Nếu `custom` thiếu tham số bố cục, fallback ISO và sinh WARN.
+- **RB-201:** Hướng bố cục tuân theo style chung.
+- **RB-202:** Không dùng layout mode tuỳ biến; nếu có dữ liệu legacy thì chuẩn hoá về style chung.
 - **RB-203:** Bố cục thiết bị trong Area tuân theo top‑to‑bottom tier (Core/Dist → Access → Endpoints).
 - **RB-204:** Overview (nếu bật) chỉ hiển thị L1/flow (không render nhãn L2/L3).
 - **RB-205:** Nếu có **Area Data Center**, các thiết bị Edge/Security/DMZ/Core/Distribution phải nằm trong area này (cảnh báo nếu nằm ngoài).

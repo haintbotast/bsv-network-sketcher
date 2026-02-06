@@ -17,7 +17,7 @@
     "name": "Default Template",
     "description": "Template chuẩn",
     "created_at": "2026-01-23T00:00:00Z",
-    "layout_mode": "cisco"
+    "layout_mode": "standard"
   },
   "areas": [],
   "devices": [],
@@ -39,7 +39,7 @@
 - `description` (string)
 - `created_at` (date-time)
 - `author` (string)
-- `layout_mode` (cisco | iso | custom, optional; nếu có sẽ gợi ý layout cho project)
+- `layout_mode` (standard, optional; nếu có sẽ gợi ý style chung cho project)
 
 ### 2.1 Areas
 - `name` (string, unique, required)
@@ -257,8 +257,8 @@
         },
         "layout_mode": {
           "type": "string",
-          "enum": ["cisco", "iso", "custom"],
-          "description": "Gợi ý layout cho project"
+          "enum": ["standard"],
+          "description": "Gợi ý style chung cho project"
         }
       }
     },

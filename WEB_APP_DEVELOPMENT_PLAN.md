@@ -11,13 +11,13 @@
 ## 1. Mục tiêu & tiêu chí thành công
 
 - Xây dựng web app vẽ sơ đồ mạng (tham chiếu Network Sketcher về logic).
-- Layout/output **theo chuẩn layout network phổ biến** với chế độ lựa chọn (Cisco-style / ISO/IEC generic / custom).
+- Layout/output **theo một style chung** (chuẩn nội bộ), **không có chế độ lựa chọn**.
 - UX tối giản, thao tác nhanh, lỗi hiển thị rõ.
 - Cho phép lưu vết phiên bản topology và cấu hình preset qua trang quản trị.
 
 **Tiêu chí thành công:**
 - Tạo L1/L2/L3 từ dữ liệu nhập trực tiếp hoặc template chuẩn (Excel/CSV tùy chọn).
-- Xuất PPTX/Excel theo **layout mode đã chọn** và quy chuẩn style.
+- Xuất PPTX/Excel theo **style chung** và quy chuẩn style.
 - Hỗ trợ 1000+ thiết bị/project (ưu tiên đúng logic, hiệu năng chấp nhận thấp hơn).
 
 ---
@@ -29,7 +29,7 @@
 - Multi-user nội bộ (~5 đồng thời), hạ tầng single host.
 
 **Nguyên tắc cốt lõi:**
-- **Layout mode có thể chọn** (Cisco-style / ISO/IEC generic / custom) và tuân theo `docs/DIAGRAM_STYLE_SPEC.md`.
+- **Chỉ một style chung** và tuân theo `docs/DIAGRAM_STYLE_SPEC.md`.
 - Nhập liệu **template-first** (Excel/CSV tùy chọn cho dữ liệu cũ).
 - **Không CLI**, không Docker/Redis/Celery.
 - Logic L1→L2→L3 giữ nguyên, **validation chặt chẽ hơn**.
@@ -68,14 +68,14 @@ Chi tiết topology xem `PROJECT_TOPOLOGY.md`.
 
 - **GĐ1-2:** Nền tảng + CRUD + nhập liệu trực tiếp + validation.
 - **GĐ3-4:** Frontend core + editor + data grid.
-- **GĐ5:** Render sơ đồ + layout mode + style preset.
+- **GĐ5:** Render sơ đồ + style chung + preset.
 - **GĐ6:** Nhập liệu + template + versioning + (tùy chọn) Excel/CSV.
 - **GĐ7:** Kiểm thử + triển khai tối giản.
 
 ## 5.1. Tiến độ hiện tại (tóm tắt)
 
 - **Hoàn thành:** Phase 1, 2A, 2B, 2C, 3, 4, 5, 6, 7 (backend đầy đủ, frontend khung + data grid đã nối API cơ bản).
-- **Đang thiếu:** Hoàn thiện chỉnh sửa/sync dữ liệu canvas theo nghiệp vụ, layout mode + style preset, UI import/export, kiểm thử.
+- **Đang thiếu:** Hoàn thiện chỉnh sửa/sync dữ liệu canvas theo nghiệp vụ, style chung + preset, UI import/export, kiểm thử.
 
 ## 5.2. TODO tiếp theo (ưu tiên)
 
@@ -86,9 +86,8 @@ Chi tiết topology xem `PROJECT_TOPOLOGY.md`.
 2) **Canvas editor**
    - Tạo/sửa/xóa area, device, link trên canvas.
    - Kéo‑thả, resize, snap/grid theo dữ liệu thật.
-3) **Layout mode + style**
+3) **Style chung + preset**
    - Áp dụng `docs/DIAGRAM_STYLE_SPEC.md`.
-   - Bổ sung lựa chọn Cisco/ISO/Custom.
 4) **Import/Export UI**
    - UI import template/JSON + validate.
    - UI export PPTX/Excel và theo dõi trạng thái job.
@@ -105,7 +104,7 @@ Chi tiết topology xem `PROJECT_TOPOLOGY.md`.
 | Sai khác xuất PPTX/Excel | Golden files hoặc rule-based checks |
 | Toàn vẹn dữ liệu | FK + validation matrix + transaction ngắn |
 | Job queue treo/trùng | Claim job + heartbeat + retry giới hạn |
-| UX rối | Layout mode chuẩn + UI tối giản |
+| UX rối | Style chung + UI tối giản |
 | Cấu hình sai | Audit log + restore version |
 
 ---

@@ -13,8 +13,8 @@
 {
   "config_version": "1.0",
   "layout": {
-    "default_mode": "cisco",
-    "allowed_modes": ["cisco", "iso", "custom"]
+    "default_mode": "standard",
+    "allowed_modes": ["standard"]
   },
   "layout_tuning": {
     "layer_gap": 1.5,
@@ -72,7 +72,7 @@
 ## 2. Quy tắc cập nhật
 
 - Mọi thay đổi config phải ghi audit log.
-- Khi thay đổi `allowed_modes` hoặc `themes`, cần cập nhật UI chọn mode/theme.
+- Khi thay đổi `themes`, cần cập nhật UI chọn theme (không có chọn layout mode).
 - `config_version` tăng khi thay đổi schema.
 - Khi thay đổi `validation.layout_checks`, cần cập nhật `docs/RULE_BASED_CHECKS.md` và test liên quan.
 

@@ -112,7 +112,6 @@ const props = defineProps<{
   devices: DeviceModel[]
   links: LinkModel[]
   viewport: Viewport
-  layoutMode?: 'cisco' | 'iso' | 'custom'
   selectedId?: string | null
   viewMode?: ViewMode
   l2Assignments?: L2AssignmentRecord[]
@@ -611,13 +610,8 @@ const deviceViewMap = computed(() => {
         const col = index % cols
         const row = Math.floor(index / cols)
         const rect = { ...entry.rect }
-        if (props.layoutMode === 'iso') {
-          rect.x = deviceArea.x + AREA_PADDING + (rowCursor + row) * cellWidth
-          rect.y = deviceArea.y + AREA_PADDING + col * cellHeight
-        } else {
-          rect.x = deviceArea.x + AREA_PADDING + col * cellWidth
-          rect.y = deviceArea.y + AREA_PADDING + (rowCursor + row) * cellHeight
-        }
+        rect.x = deviceArea.x + AREA_PADDING + col * cellWidth
+        rect.y = deviceArea.y + AREA_PADDING + (rowCursor + row) * cellHeight
         clampIntoArea(rect, deviceArea)
         map.set(entry.device.id, rect)
       })

@@ -15,15 +15,14 @@
 
 ---
 
-## 2. Chế độ layout & style
+## 2. Style chung & preset
 
-### 2.1 Layout mode (bắt buộc chọn)
-- `cisco`: bố cục core–distribution–access, trái → phải.
-- `iso`: bố cục phân tầng trung tính (top → down hoặc left → right).
-- `custom`: cho phép định nghĩa quy tắc bố cục riêng (có kiểm soát).
+### 2.1 Style chung (bắt buộc)
+- **Chỉ một style chung**, không có lựa chọn layout mode theo project.
+- Bố cục phân tầng **top‑to‑bottom** là mặc định; liên kết ưu tiên **ngang/dọc** để dễ đọc.
 
 ### 2.2 Preset (mặc định)
-- Dùng preset màu/nét/chữ/shape theo layout mode đã chọn.
+- Dùng preset màu/nét/chữ/shape theo **style chung**.
 - Không cho phép tùy biến tự do ngoài bộ preset.
 
 ### 2.3 Flexible (tùy chọn)
@@ -31,11 +30,10 @@
 - Phải map được sang PPTX không làm vỡ layout.
 - Cần cảnh báo khi xuất nếu có override không tương thích.
 
-### 2.4 Quy tắc bố cục theo mode (tối thiểu)
+### 2.4 Quy tắc bố cục theo style chung (tối thiểu)
 
-- **Cisco-style:** core → distribution → access theo trục ngang (left → right); link ưu tiên ngang.
-- **ISO/IEC generic:** phân tầng top → down (hoặc left → right), trung tính về màu/nhãn.
-- **Custom:** phải khai báo hướng bố cục, khoảng cách tối thiểu, và quy tắc nhóm; nếu thiếu thì fallback về ISO.
+- **Phân tầng:** Core/Distribution ở trên, Access ở giữa, Endpoints ở dưới.
+- **Hướng ưu tiên:** top‑to‑bottom; liên kết ưu tiên ngang/dọc, tránh chéo không cần thiết.
 
 ### 2.5 Bố cục phân tầng 2 tầng (Area/Device) theo AI Context
 
@@ -167,7 +165,7 @@
 - **Backup/MGMT:** nét đứt theo preset.
 - **Arrow:** chỉ dùng khi cần hướng; mặc định tắt.
 
-### 5.1 Preset nét vẽ (theo layout mode)
+### 5.1 Preset nét vẽ (theo style chung)
 
 | Đối tượng | Stroke | StrokeWidth | Dash |
 |----------|--------|-------------|------|
@@ -205,7 +203,7 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 ### 6.2 Màu link theo purpose
 - Dùng bảng mapping (WAN/DMZ/LAN/MGMT/HA/STORAGE/BACKUP/VPN).
 
-### 6.3 Bảng preset màu (theo layout mode)
+### 6.3 Bảng preset màu (theo style chung)
 
 **Thiết bị (theo prefix tên):**
 
@@ -255,7 +253,7 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 - Màu chữ: đen/xám đậm để đảm bảo tương phản.
 - Nền area: màu nhạt trung tính.
 
-### 7.1 Preset chữ (theo layout mode)
+### 7.1 Preset chữ (theo style chung)
 
 | Đối tượng | Font | Size | Màu chữ |
 |----------|------|------|--------|
@@ -264,7 +262,7 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 | Link Label | Calibri | 9 | #000000 |
 | Interface Tag | Calibri | 9 | #000000 |
 
-### 7.2 Preset nền (theo layout mode)
+### 7.2 Preset nền (theo style chung)
 
 | Đối tượng | Nền |
 |----------|-----|
@@ -359,4 +357,4 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 ## 14. Kiểm tra rule-based (tham chiếu)
 
 - Bộ quy tắc kiểm tra tối thiểu (không chồng lấn, khoảng cách tối thiểu, nhãn không đè, số lượng node/link, logic L1→L2→L3) được chuẩn hóa tại `docs/RULE_BASED_CHECKS.md`.
-- Layout mode có thể override các tham số khoảng cách theo preset hoặc cấu hình admin.
+- Style chung có thể override các tham số khoảng cách theo preset hoặc cấu hình admin.

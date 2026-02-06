@@ -1,24 +1,18 @@
 import { computed, reactive, ref } from 'vue'
 import type { ProjectRecord } from '../models/api'
-import { listProjects, createProject, updateProject } from '../services/projects'
+import { listProjects, createProject } from '../services/projects'
 
 export function useProjects(setNotice: (msg: string, type: 'info' | 'success' | 'error') => void) {
   const projects = ref<ProjectRecord[]>([])
   const selectedProjectId = ref<string | null>(null)
   const projectForm = reactive({
     name: '',
-    description: '',
-    layoutMode: 'cisco' as 'cisco' | 'iso' | 'custom'
+    description: ''
   })
 
   const activeProject = computed(() =>
     projects.value.find(p => p.id === selectedProjectId.value) || null
   )
-
-  const layoutMode = computed(() => activeProject.value?.layout_mode || 'cisco')
-
-  const layoutModeSelection = ref<'cisco' | 'iso' | 'custom'>('cisco')
-  const layoutModeUpdating = ref(false)
 
   async function loadProjects() {
     try {
@@ -39,8 +33,7 @@ export function useProjects(setNotice: (msg: string, type: 'info' | 'success' | 
     try {
       const created = await createProject({
         name: projectForm.name,
-        description: projectForm.description || undefined,
-        layout_mode: projectForm.layoutMode
+        description: projectForm.description || undefined
       })
       projects.value = [created, ...projects.value]
       selectedProjectId.value = created.id
@@ -52,37 +45,12 @@ export function useProjects(setNotice: (msg: string, type: 'info' | 'success' | 
     }
   }
 
-  async function handleLayoutModeChange(
-    value: 'cisco' | 'iso' | 'custom',
-    onSuccess: (projectId: string) => void
-  ) {
-    if (!activeProject.value) return
-    if (layoutModeUpdating.value) return
-    if (activeProject.value.layout_mode === value) return
-    layoutModeUpdating.value = true
-    try {
-      const updated = await updateProject(activeProject.value.id, { layout_mode: value })
-      projects.value = projects.value.map(project => (project.id === updated.id ? updated : project))
-      setNotice('Đã cập nhật layout mode.', 'success')
-      onSuccess(updated.id)
-    } catch (error: any) {
-      setNotice(error?.message || 'Cập nhật layout mode thất bại.', 'error')
-      layoutModeSelection.value = activeProject.value.layout_mode
-    } finally {
-      layoutModeUpdating.value = false
-    }
-  }
-
   return {
     projects,
     selectedProjectId,
     projectForm,
     activeProject,
-    layoutMode,
-    layoutModeSelection,
-    layoutModeUpdating,
     loadProjects,
-    handleCreateProject,
-    handleLayoutModeChange,
+    handleCreateProject
   }
 }

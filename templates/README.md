@@ -23,5 +23,5 @@
 ## 3. Quy ước
 
 - Mọi mẫu phải tuân theo `schemas/template.json`.
-- Nên khai báo `metadata.layout_mode` nếu có yêu cầu bố cục cụ thể.
+- Có thể khai báo `metadata.layout_mode = "standard"` để nhất quán style chung.
 - Không đưa dữ liệu nhạy cảm vào mẫu.

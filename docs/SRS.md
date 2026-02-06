@@ -3,7 +3,7 @@
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
 > **Cập nhật:** 2026-02-03  
-> **Mục tiêu:** Đặc tả yêu cầu kỹ thuật để triển khai web app theo chuẩn layout network phổ biến.
+> **Mục tiêu:** Đặc tả yêu cầu kỹ thuật để triển khai web app theo style chung (chuẩn nội bộ).
 
 ---
 
@@ -15,7 +15,7 @@
 
 ### 2.1 Quản lý dự án
 - Tạo/sửa/xóa dự án.
-- Gán layout mode (cisco/iso/custom) và theme.
+- Dùng style chung (không có layout mode).
 - Quản lý phiên bản topology (snapshot, xem lại, khôi phục).
 - Cho phép cập nhật topology hiện có; trước khi export có thể tạo snapshot tự động.
 
@@ -35,7 +35,7 @@
 - Sơ đồ L1/L2/L3 hiển thị và chỉnh sửa.
 - Đồng bộ dữ liệu L1→L2→L3 theo quy tắc logic chuẩn (validation chặt chẽ).
 - Auto-layout theo **2 tầng** (macro Area + micro Device), ưu tiên bố cục top‑to‑bottom.
-- Auto-layout tự động **chỉ chạy khi project chưa có tọa độ layout** (device/area position trống hoặc 0); nếu đã có layout thì **không tự chạy lại**. Cho phép chạy lại khi đổi layout mode hoặc người dùng chủ động.
+- Auto-layout tự động **chỉ chạy khi project chưa có tọa độ layout** (device/area position trống hoặc 0); nếu đã có layout thì **không tự chạy lại**. Cho phép chạy lại khi người dùng chủ động.
 - Khoảng cách giữa thiết bị trong auto-layout **tính cả vùng nhãn port (Interface Tag)** để tránh chồng lấn.
 - Cho phép người dùng **override anchor per-port** bằng `side + offset_ratio` (cho phép `offset_ratio = null` để giữ auto offset); override **được lưu DB** và **không bị auto-layout ghi đè**.
 - Bảng thuộc tính thiết bị cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port**, áp dụng kiểm tra **trùng link** và **port đã dùng** trước khi lưu.
@@ -54,7 +54,7 @@
 - **Server Switch** chỉ được kết nối tới **Server/Storage** và **Distribution Switch**.
 
 ### 2.5 Xuất dữ liệu
-- Sinh PPTX/Excel theo layout mode đã chọn.
+- Sinh PPTX/Excel theo style chung.
 - Quản lý job, trạng thái, retry giới hạn.
 - Gắn export với phiên bản topology (version_id).
 - Preview/export hiển thị metadata phiên bản (label, time, user).
@@ -127,7 +127,7 @@ CREATE TABLE config_versions (
 - Grid nhập liệu có validate tại chỗ và báo lỗi theo dòng/cột.
 - Hiển thị lỗi nhập liệu rõ ràng.
 - Hệ style phải tuân theo `docs/DIAGRAM_STYLE_SPEC.md`.
-- Cần hỗ trợ layout mode (cisco/iso/custom) và preset/flexible theo spec.
+- Chỉ một style chung và preset/flexible theo spec.
 
 ## 5. Ràng buộc kỹ thuật
 
@@ -138,7 +138,7 @@ CREATE TABLE config_versions (
 
 ## 6. Thuộc tính chất lượng
 
-- **Chính xác:** Ưu tiên số 1, so sánh output theo layout mode (golden files hoặc rule-based).
+- **Chính xác:** Ưu tiên số 1, so sánh output theo style chung (golden files hoặc rule-based).
 - **Tối giản:** Giảm phụ thuộc, giảm thành phần.
 - **Ổn định:** Job queue an toàn, idempotent.
 - **An toàn tối thiểu:** Kiểm soát upload, phân quyền theo project, log lỗi đầy đủ.

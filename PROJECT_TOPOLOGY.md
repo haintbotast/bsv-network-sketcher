@@ -130,8 +130,8 @@ UI đọc trạng thái → tải file
 
 - Không dùng CLI trong dự án web.
 - Logic L1→L2→L3 giữ nguyên; validation chặt chẽ hơn.
-- Output theo **layout mode** đã chọn (Cisco/ISO/custom); NS chỉ tham chiếu.
-- Bắt buộc có bộ “golden files” theo layout mode để đối chiếu PPTX/Excel.
+- Output theo **style chung** (chuẩn nội bộ); NS chỉ tham chiếu.
+- Bắt buộc có bộ “golden files” theo style chung để đối chiếu PPTX/Excel.
 - Style sơ đồ phải tuân theo `docs/DIAGRAM_STYLE_SPEC.md`.
 
 ---

@@ -59,7 +59,7 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
     owner_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
-    layout_mode: Mapped[str] = mapped_column(String(20), default="cisco")  # cisco | iso | custom
+    layout_mode: Mapped[str] = mapped_column(String(20), default="standard")  # one-style
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

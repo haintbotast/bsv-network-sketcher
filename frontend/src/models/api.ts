@@ -16,7 +16,7 @@ export type ProjectRecord = {
   id: string
   name: string
   description?: string | null
-  layout_mode: 'cisco' | 'iso' | 'custom'
+  layout_mode: 'standard'
   stats?: ProjectStats | null
 }
 

@@ -191,13 +191,13 @@ test.describe('Diagram Editor', () => {
 
 ## 4. Regression testing
 
-**Mục tiêu:** đảm bảo đầu ra PPTX/Excel đúng logic và layout mode đã chọn.
+**Mục tiêu:** đảm bảo đầu ra PPTX/Excel đúng logic và style chung.
 
 > **Lưu ý:** Dự án không yêu cầu tương thích 1:1 với Network Sketcher gốc. Thay vào đó, tự định nghĩa expected output dựa trên `docs/DIAGRAM_STYLE_SPEC.md`.
 
 **Thiết lập:**
 - Tạo bộ input chuẩn (small/medium/large) trong `templates/samples/`.
-- Tạo expected output **theo từng layout mode** (cisco/iso/custom) làm baseline.
+- Tạo expected output **theo style chung** làm baseline.
 - Script so sánh: kiểm tra cấu trúc slide/shape + bảng Excel.
 
 **Nếu bỏ golden files (chỉ kiểm tra rule-based):** Xem chi tiết tại `docs/RULE_BASED_CHECKS.md`.
@@ -217,7 +217,7 @@ test.describe('Diagram Editor', () => {
 | RB-101..RB-104 | Integration | Kiểm tra chồng lấn, nằm trong area, link xuyên node |
 | RB-121..RB-122 | Integration | Kiểm tra va chạm nhãn/nhãn lên node/link |
 | RB-141..RB-143 | Integration | Cảnh báo khoảng cách tối thiểu |
-| RB-201..RB-202 | Unit/Integration | Kiểm tra hướng layout & fallback custom |
+| RB-201..RB-202 | Unit/Integration | Kiểm tra hướng layout theo style chung |
 
 **Checklist regression bắt buộc (rule-based):**
 - [ ] RB-001..RB-005: dữ liệu liên lớp hợp lệ, không tạo interface ảo sai.
@@ -229,7 +229,7 @@ test.describe('Diagram Editor', () => {
 - [ ] L1 routing: liên‑area/waypoint có thể đi ngoài đường bao sơ đồ; pan/viewport vẫn nhìn thấy đầy đủ đoạn link.
 - [ ] RB-121..RB-122: nhãn không đè lên node/link; interface tag hợp lệ.
 - [ ] RB-141..RB-143: cảnh báo khoảng cách hiển thị đúng khi vi phạm ngưỡng.
-- [ ] RB-201..RB-202: hướng layout đúng mode; custom thiếu tham số -> fallback ISO + cảnh báo.
+- [ ] RB-201..RB-202: hướng layout đúng style chung.
 - [ ] RB-205..RB-206: cảnh báo đúng khi Edge/Security/DMZ/Core/Dist nằm ngoài Data Center; Server placement gần DMZ.
 
 **Bộ dữ liệu:**

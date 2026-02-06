@@ -15,6 +15,7 @@
 - **same_type_row:** thiết bị cùng loại ưu tiên ở cùng hàng khi `max_nodes_per_row` cho phép.
 - **port_label_band:** giãn khoảng cách thiết bị có tính đến kích thước nhãn cổng.
 - **port_embedded_render:** L1 port label phải nằm trong object (port band top/bottom), không hiển thị overlay label trên link.
+- **l1_technical_render:** L1 giữ nét kỹ thuật (đường orthogonal, góc vuông rõ, giảm dùng màu nhấn cho link LAN/DEFAULT).
 - **port_anchor_override:** override anchor per-port **được ưu tiên** và **không bị auto-layout ghi đè**; kiểm tra thêm trường hợp `offset_ratio = null` để giữ auto offset.
 - **uplink_anchor_policy:** L1 auto-anchor phải đặt **uplink ở top** và **non-uplink ở bottom**; chỉ lệch khi có override thủ công.
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
@@ -241,6 +242,8 @@ test.describe('Diagram Editor', () => {
 - [ ] Uplink anchor policy: override thủ công (`side + offset_ratio`) phải giữ ưu tiên cao nhất.
 - [ ] Port embedded render: port label hiển thị trong object theo dải top/bottom, không còn nhãn port nổi trên link ở view L1.
 - [ ] Port embedded render: object tự nới rộng/nới cao theo số lượng và độ dài port để không đè chữ.
+- [ ] L1 technical render: tuyến L1 giữ orthogonal/góc vuông, không bị bo cong quá mức.
+- [ ] L1 technical render: link LAN/DEFAULT ở L1 dùng màu trung tính, chỉ purpose đặc biệt mới dùng màu nhấn.
 - [ ] RB-121..RB-122: nhãn không đè lên node/link; port cell/nhãn cổng hợp lệ.
 - [ ] RB-141..RB-143: cảnh báo khoảng cách hiển thị đúng khi vi phạm ngưỡng.
 - [ ] RB-201..RB-202: hướng layout đúng style chung.

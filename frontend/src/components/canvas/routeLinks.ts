@@ -231,7 +231,8 @@ function computePadCorridors(
   scale: number,
 ): Map<string, PadCorridor> {
   const result = new Map<string, PadCorridor>()
-  const laneSpacing = Math.max(6, (renderTuning.bundle_gap ?? 0) * scale * 2.0)
+  const laneSpacing = Math.max(8, (renderTuning.bundle_gap ?? 0) * scale * 2.8)
+  const laneSnapStep = Math.max(8, laneSpacing * 0.5)
   const pairKey = (a: string, b: string) => a < b ? `${a}|${b}` : `${b}|${a}`
 
   const pairs = new Set<string>()
@@ -289,9 +290,11 @@ function computePadCorridors(
     const pickLeft = leftScore.hits === rightScore.hits
       ? leftScore.length <= rightScore.length
       : leftScore.hits < rightScore.hits
+    const rawCoord = pickLeft ? leftCoord : rightCoord
+    const snappedCoord = Math.round(rawCoord / laneSnapStep) * laneSnapStep
     result.set(key, {
       side: pickLeft ? 'left' : 'right',
-      coord: pickLeft ? leftCoord : rightCoord,
+      coord: snappedCoord,
       laneSpacing
     })
   }
@@ -587,7 +590,7 @@ export function routeLinks(
         : 0
       // Increased multiplier for better corridor separation
       const interAreaBundleGap = (renderTuning.bundle_gap ?? 0) * scale
-        * (areaBundle && areaBundle.total > 4 ? 2.5 : 2.0)
+        * (areaBundle && areaBundle.total > 4 ? 3.2 : 2.8)
       const areaBundleOffset = areaBundle && areaBundle.total > 1
         ? (areaBundle.index - (areaBundle.total - 1) / 2) * interAreaBundleGap
         : 0
@@ -764,16 +767,13 @@ export function routeLinks(
           corridorPath.push(toAreaAnchor, toExit, toBase, toAnchor)
           points = []
           corridorPath.forEach(p => pushPoint(points, p.x, p.y))
-          // Bo góc cho đường hành lang
           const pathPoints: Array<{ x: number; y: number }> = []
           for (let i = 0; i + 1 < points.length; i += 2) {
             pathPoints.push({ x: points[i], y: points[i + 1] })
           }
           const simplified = simplifyOrthogonalPath(pathPoints)
-          const cornerRadius = Math.max(4, Math.min(minSegment * 1.2, 14 * scale))
-          const rounded = roundOrthogonalCorners(simplified, cornerRadius, minSegment)
           points = []
-          rounded.forEach(point => pushPoint(points, point.x, point.y))
+          simplified.forEach(point => pushPoint(points, point.x, point.y))
           routed = true
         }
       }
@@ -857,9 +857,7 @@ export function routeLinks(
             appendPoints(assembled, [toExit, toBase, toAnchor])
 
             const simplified = simplifyOrthogonalPath(assembled)
-            const cornerRadius = Math.max(4, Math.min(minSegment * 1.2, 14 * scale))
-            const rounded = roundOrthogonalCorners(simplified, cornerRadius, minSegment)
-            rounded.forEach(point => pushPoint(points, point.x, point.y))
+            simplified.forEach(point => pushPoint(points, point.x, point.y))
             routed = true
           }
         } else {
@@ -1068,13 +1066,14 @@ export function routeLinks(
           pathPoints.push({ x: points[i], y: points[i + 1] })
         }
         const simplified = simplifyOrthogonalPath(pathPoints)
-        const cornerRadius = Math.max(4, Math.min(minSegment * 1.2, 14 * scale))
-        const rounded = roundOrthogonalCorners(simplified, cornerRadius, minSegment)
         points = []
-        rounded.forEach(point => pushPoint(points, point.x, point.y))
+        simplified.forEach(point => pushPoint(points, point.x, point.y))
       }
 
-      const baseStroke = resolveLinkPurposeColor(link.purpose)
+      const purpose = (link.purpose || '').trim().toUpperCase()
+      const neutralL1Purposes = new Set(['', 'DEFAULT', 'LAN'])
+      const purposeStroke = resolveLinkPurposeColor(link.purpose)
+      const baseStroke = (isL1 && neutralL1Purposes.has(purpose)) ? '#2b2a28' : purposeStroke
       const debugStroke = (() => {
         if (!debugOn) return baseStroke
         if (!isL1) return DEBUG_STROKE_L2
@@ -1093,11 +1092,11 @@ export function routeLinks(
         config: {
           points,
           stroke: debugStroke,
-          strokeWidth: 1.5,
-          lineCap: 'round',
-          lineJoin: 'round',
+          strokeWidth: isL1 ? 1.35 : 1.5,
+          lineCap: isL1 ? 'butt' : 'round',
+          lineJoin: isL1 ? 'miter' : 'round',
           dash: link.style === 'dashed' ? [8, 6] : link.style === 'dotted' ? [2, 4] : [],
-          opacity: 0.8
+          opacity: isL1 ? 0.92 : 0.8
         }
       }
     })

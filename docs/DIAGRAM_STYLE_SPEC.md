@@ -59,7 +59,7 @@
 - Liên‑area đi trong **pad trái/phải** của mỗi Area; hành lang chỉ băng qua **khoảng trống giữa Area** khi cần, **không dùng corridor global ngoài biên Area**.
 - **Không cho phép tuyến liên‑area/waypoint đi ra ngoài đường bao sơ đồ**; nếu thiếu chỗ thì tăng `area_padding` hoặc nới layout.
 - **Liên‑area qua waypoint:**  
-  - **L1:** giữ **Manhattan (ngang/dọc)**, **không shortcut chéo**; bo góc bằng **lineJoin round**.  
+  - **L1:** giữ **Manhattan (ngang/dọc)**, **không shortcut chéo**; ưu tiên **góc vuông rõ ràng** (technical style).  
   - **L2/L3:** ưu tiên **any‑angle (Theta\*) + bo góc nhẹ**; nếu không tìm được đường thì fallback hành lang.
 - Routing link ưu tiên **tránh vật cản** (area/device/**port cell**) và **giảm chồng lấn**:  
 - **L1:** giữ **orthogonal**; nếu không bị cản thì đường thẳng ngắn nhất, nếu bị cản thì **A\*** theo lưới và **không tạo đoạn chéo**.  
@@ -138,10 +138,10 @@
 
 | Đối tượng | Shape | Ghi chú |
 |----------|-------|--------|
-| Area | Rectangle bo góc | Nền nhạt xám nhẹ, label góc trên trái, **không viền**, có **đổ bóng nhẹ** |
+| Area | Rectangle bo góc nhẹ | Nền xám nhạt, label góc trên trái, **viền mảnh rõ**, không đổ bóng |
 | Device | Rectangle (ưu tiên góc vuông khi có port band) | Màu theo loại thiết bị, có viền rõ để tách thân thiết bị và dải port |
 | Waypoint | Diamond hoặc Circle | Không hiện label khi zoom out |
-| Link | Line | **L1 ưu tiên Manhattan (ngang/dọc)** theo tuyến tối ưu tránh vật cản, **không shortcut chéo**; bo góc bằng **lineJoin/lineCap round**. **L2/L3 ưu tiên any‑angle (Theta\*) + bo góc nhẹ**; màu theo purpose; nét liền/đứt |
+| Link | Line | **L1 ưu tiên Manhattan (ngang/dọc)** theo tuyến tối ưu tránh vật cản, **không shortcut chéo**, **lineJoin miter/lineCap butt** để rõ nét kỹ thuật; **LAN/DEFAULT ở L1 dùng màu trung tính** để giảm rối. **L2/L3 ưu tiên any‑angle (Theta\*) + bo góc nhẹ**; màu theo purpose; nét liền/đứt |
 | Port Cell (L1) | Rect + Text (gắn vào object) | Hiển thị tên port trực tiếp trên dải top/bottom của object; ưu tiên rõ ràng và ổn định theo số lượng port |
 
 - Auto-layout cần **tính thêm vùng đệm port band** khi giãn khoảng cách giữa thiết bị để tránh chồng lấn.

@@ -312,8 +312,8 @@ const visibleAreas = computed(() => {
 
       // L1 view: areas fully visible with clear borders (NS gốc style)
       // Waypoint areas: nhỏ, mờ, viền nét đứt
-      const areaOpacity = isWaypoint ? 0.3 : 0.95
-      const areaFill = isWaypoint ? '#f5f5f5' : adjustHexLightness(area.fill, -0.06)
+      const areaOpacity = isWaypoint ? 0.25 : 1
+      const areaFill = isWaypoint ? '#fbfbfb' : '#f2f2f2'
 
       const isSelected = props.selectedId === area.id
       return {
@@ -333,14 +333,14 @@ const visibleAreas = computed(() => {
           height: rect.height,
           fill: areaFill,
           opacity: areaOpacity,
-          stroke: isWaypoint ? '#b4b4b4' : (isSelected ? '#d66c3b' : 'transparent'),
-          strokeWidth: isWaypoint ? 1 : (isSelected ? 2 : 0),
+          stroke: isWaypoint ? '#bdbdbd' : (isSelected ? '#d66c3b' : '#cdcdcd'),
+          strokeWidth: isWaypoint ? 1 : (isSelected ? 2 : 1),
           dash: isWaypoint ? [4, 3] : [],
-          cornerRadius: isWaypoint ? 4 : 10,
-          shadowColor: isWaypoint ? 'transparent' : 'rgba(28, 28, 28, 0.25)',
-          shadowBlur: isWaypoint ? 0 : 14,
-          shadowOffset: { x: 0, y: isWaypoint ? 0 : 6 },
-          shadowOpacity: isWaypoint ? 0 : 0.18,
+          cornerRadius: isWaypoint ? 2 : 4,
+          shadowColor: 'transparent',
+          shadowBlur: 0,
+          shadowOffset: { x: 0, y: 0 },
+          shadowOpacity: 0,
           shadowForStrokeEnabled: false
         },
         label: {
@@ -476,40 +476,6 @@ const DEVICE_LABEL_FONT_SIZE = 13
 const DEVICE_LABEL_MIN_HEIGHT = 30
 const DEVICE_BODY_VERTICAL_PADDING = 6
 const DEVICE_MIN_WIDTH = 96
-
-const DEVICE_COLORS: Array<{ match: (device: DeviceModel) => boolean; color: [number, number, number] }> = [
-  { match: device => device.type === 'Router' || /RTR|ROUTER|ISP/i.test(device.name), color: [70, 130, 180] },
-  { match: device => device.type === 'Firewall' || /FW|FIREWALL|VPN|SECURITY/i.test(device.name), color: [220, 80, 80] },
-  { match: device => /CORE|SW-CORE/i.test(device.name), color: [34, 139, 34] },
-  { match: device => /DIST|DISTR/i.test(device.name), color: [60, 179, 113] },
-  { match: device => /ACC|ACCESS/i.test(device.name), color: [0, 139, 139] },
-  { match: device => device.type === 'Server' || /SRV|SERVER|APP|WEB|DB/i.test(device.name), color: [106, 90, 205] },
-  { match: device => device.type === 'Storage' || /STO|NAS|SAN|STORAGE|BACKUP/i.test(device.name), color: [205, 133, 63] },
-  { match: device => device.type === 'AP' || /\\bAP\\b/i.test(device.name), color: [0, 139, 139] }
-]
-
-function rgbToHex(rgb: [number, number, number]) {
-  return `#${rgb.map(value => value.toString(16).padStart(2, '0')).join('')}`
-}
-
-function adjustHexLightness(hex: string, delta: number) {
-  const cleaned = hex.replace('#', '')
-  if (cleaned.length !== 6) return hex
-  const r = parseInt(cleaned.slice(0, 2), 16)
-  const g = parseInt(cleaned.slice(2, 4), 16)
-  const b = parseInt(cleaned.slice(4, 6), 16)
-  const adjust = (value: number) => Math.min(255, Math.max(0, Math.round(value + 255 * delta)))
-  return `#${[adjust(r), adjust(g), adjust(b)].map(v => v.toString(16).padStart(2, '0')).join('')}`
-}
-
-function resolveDeviceFill(device: DeviceModel) {
-  for (const entry of DEVICE_COLORS) {
-    if (entry.match(device)) {
-      return rgbToHex(entry.color)
-    }
-  }
-  return '#d9d9d9'
-}
 
 function resolveDeviceRole(device: DeviceModel) {
   const name = device.name.toUpperCase()
@@ -659,10 +625,10 @@ const expandDeviceRectForPorts = (deviceId: string, rect: { x: number; y: number
   const frame = resolveDeviceRenderFrame(rect, bands)
   const height = frame.topBandHeight + frame.bodyHeight + frame.bottomBandHeight
   const centerX = rect.x + rect.width / 2
-  const centerY = rect.y + rect.height / 2
   return {
     x: centerX - width / 2,
-    y: centerY - height / 2,
+    // Keep top baseline stable, grow downward to avoid drifting devices upward on dense port bands.
+    y: rect.y,
     width,
     height
   }
@@ -852,7 +818,6 @@ const visibleDevices = computed(() => {
     .map(device => {
       const rect = deviceViewMap.value.get(device.id)!
       const isSelected = props.selectedId === device.id
-      const fill = resolveDeviceFill(device)
       const bands = devicePortBands.value.get(device.id) || { top: [], bottom: [] }
       const topBandHeight = bands.top.length > 0 ? DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2 : 0
       const bottomBandHeight = bands.bottom.length > 0 ? DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2 : 0
@@ -881,14 +846,14 @@ const visibleDevices = computed(() => {
           y: bodyY,
           width: rect.width,
           height: bodyHeight,
-          fill: adjustHexLightness(fill, 0.27),
+          fill: '#ffffff',
           stroke: isSelected ? '#d66c3b' : '#2b2a28',
           strokeWidth: isSelected ? 2 : 1,
           cornerRadius: 0,
-          shadowColor: 'rgba(0, 0, 0, 0.22)',
-          shadowBlur: 6,
-          shadowOffset: { x: 0, y: 3 },
-          shadowOpacity: 0.22,
+          shadowColor: 'transparent',
+          shadowBlur: 0,
+          shadowOffset: { x: 0, y: 0 },
+          shadowOpacity: 0,
           shadowForStrokeEnabled: false
         },
         topPorts,
@@ -1052,13 +1017,13 @@ const deviceAreaMap = computed(() => {
 const DEFAULT_RENDER_TUNING = {
   port_edge_inset: 6,
   port_label_offset: 12,
-  bundle_gap: 18,
-  bundle_stub: 18,
-  area_clearance: 18,
-  area_anchor_offset: 18,
+  bundle_gap: 28,
+  bundle_stub: 28,
+  area_clearance: 30,
+  area_anchor_offset: 26,
   label_gap_x: 8,
   label_gap_y: 6,
-  corridor_gap: 40
+  corridor_gap: 56
 }
 const renderTuning = computed(() => ({
   ...DEFAULT_RENDER_TUNING,
@@ -1357,10 +1322,10 @@ watch([visibleAreas, visibleDevices, visibleLinks, visibleLinkPortLabels, l2Labe
 .canvas-shell {
   width: 100%;
   height: 100%;
-  background: radial-gradient(circle at 20% 20%, #fff7f2 0%, #ffffff 42%, #f6f1ea 100%);
-  border-radius: 18px;
-  border: 1px solid rgba(28, 28, 28, 0.08);
-  box-shadow: var(--shadow);
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid rgba(28, 28, 28, 0.1);
+  box-shadow: none;
   overflow: hidden;
 }
 </style>

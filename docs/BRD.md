@@ -58,6 +58,7 @@
 - Auto-layout tự chạy khi mở project và sau CRUD topology; thao tác viewport (`pan/zoom/reset view`) không làm thay đổi layout.
 - Quy ước L1 bắt buộc theo sơ đồ chuẩn: **uplink đặt ở top của object**, **kết nối còn lại đặt ở bottom** (trừ khi người dùng override thủ công).
 - Nhãn port trong L1 phải là **thành phần của object** (không là nhãn nổi trên link); kích thước object co giãn theo số lượng/độ dài port để giữ bố cục rõ ràng như PDF chuẩn.
+- L1 phải ưu tiên phong cách kỹ thuật dễ đọc: đường orthogonal/góc vuông rõ và giảm màu nhấn cho kết nối LAN/DEFAULT.
 - Bảo vệ dữ liệu dự án (phân quyền theo project, kiểm soát upload/download).
 - Cho phép quản trị preset/layout/validation qua trang cấu hình (không hardcode).
 

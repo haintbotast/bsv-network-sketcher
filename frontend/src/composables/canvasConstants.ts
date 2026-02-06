@@ -23,13 +23,13 @@ export const DEFAULT_LAYOUT_TUNING: LayoutTuning = {
 export const DEFAULT_RENDER_TUNING: RenderTuning = {
   port_edge_inset: 6,       // Khoảng cách port từ cạnh device
   port_label_offset: 14,    // Offset port label từ anchor
-  bundle_gap: 22,           // Khoảng cách giữa các link trong bundle
-  bundle_stub: 20,          // Độ dài stub khi tách bundle
-  area_clearance: 24,       // Khoảng cách tránh cạnh area
-  area_anchor_offset: 20,   // Offset điểm neo từ cạnh area
+  bundle_gap: 28,           // Khoảng cách giữa các link trong bundle
+  bundle_stub: 28,          // Độ dài stub khi tách bundle
+  area_clearance: 30,       // Khoảng cách tránh cạnh area
+  area_anchor_offset: 26,   // Offset điểm neo từ cạnh area
   label_gap_x: 8,           // Gap label theo chiều ngang
   label_gap_y: 6,           // Gap label theo chiều dọc
-  corridor_gap: 36          // Khoảng cách corridor bên ngoài bounds
+  corridor_gap: 56          // Khoảng cách corridor bên ngoài bounds
 }
 
 export const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']

@@ -172,6 +172,74 @@
                 </div>
               </div>
             </div>
+
+            <div class="divider"></div>
+            <div class="section">
+              <h2>Khai báo peer-control</h2>
+              <p class="hint-text">Tạo nhanh kết nối <strong>HA / STACK / HSRP</strong> và xem chú giải màu/nét.</p>
+              <div v-if="devices.length < 2" class="inspector-empty">
+                <p>Cần ít nhất 2 thiết bị để khai báo kết nối peer-control.</p>
+              </div>
+              <div v-else class="peer-link-editor">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Thiết bị nguồn</label>
+                    <select v-model="peerLinkDraft.fromDeviceId">
+                      <option :value="null">-- Chọn --</option>
+                      <option v-for="device in devices" :key="`peer-from-${device.id}`" :value="device.id">{{ device.name }}</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Port nguồn</label>
+                    <input v-model="peerLinkDraft.fromPort" type="text" placeholder="vd: HA 1 / Stack 1" />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Thiết bị đích</label>
+                    <select v-model="peerLinkDraft.toDeviceId">
+                      <option :value="null">-- Chọn --</option>
+                      <option
+                        v-for="device in devices"
+                        :key="`peer-to-${device.id}`"
+                        :value="device.id"
+                        :disabled="device.id === peerLinkDraft.fromDeviceId"
+                      >
+                        {{ device.name }}
+                      </option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Port đích</label>
+                    <input v-model="peerLinkDraft.toPort" type="text" placeholder="vd: HA 1 / Stack 1" />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Loại kết nối</label>
+                    <select v-model="peerLinkDraft.purpose">
+                      <option v-for="purpose in peerControlPurposes" :key="`peer-purpose-${purpose}`" :value="purpose">
+                        {{ purpose }}
+                      </option>
+                    </select>
+                  </div>
+                  <div class="form-group peer-link-actions">
+                    <label>&nbsp;</label>
+                    <button type="button" class="primary" @click="createPeerControlLink">
+                      Tạo kết nối peer-control
+                    </button>
+                  </div>
+                </div>
+
+                <div class="peer-legend">
+                  <div v-for="item in peerLegendItems" :key="`peer-legend-${item.purpose}`" class="peer-legend-row">
+                    <span class="peer-legend-line" :style="item.swatchStyle"></span>
+                    <span class="peer-legend-title">{{ item.purpose }}</span>
+                    <span class="peer-legend-note">{{ item.note }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -810,6 +878,25 @@ const deviceNameById = computed(() => {
 })
 
 const linkLineStyles: Array<'solid' | 'dashed' | 'dotted'> = ['solid', 'dashed', 'dotted']
+const peerControlPurposes = ['STACK', 'HA', 'HSRP'] as const
+type PeerControlPurpose = (typeof peerControlPurposes)[number]
+const peerControlVisualMap: Record<PeerControlPurpose, { color: string; lineStyle: 'solid' | 'dashed' | 'dotted'; note: string }> = {
+  STACK: {
+    color: '#2d8cf0',
+    lineStyle: 'solid',
+    note: 'Kết nối stack/stackwise giữa cặp thiết bị',
+  },
+  HA: {
+    color: '#16a085',
+    lineStyle: 'dashed',
+    note: 'Heartbeat / đồng bộ HA',
+  },
+  HSRP: {
+    color: '#9b59b6',
+    lineStyle: 'dotted',
+    note: 'Kết nối điều khiển HSRP',
+  },
+}
 
 const deviceIdByName = computed(() => {
   return new Map(devices.value.map(device => [device.name, device.id]))
@@ -961,6 +1048,34 @@ const newLinkDraft = ref({
   purpose: 'DEFAULT',
   lineStyle: 'solid' as 'solid' | 'dashed' | 'dotted'
 })
+
+const peerLinkDraft = ref<{
+  fromDeviceId: string | null
+  fromPort: string
+  toDeviceId: string | null
+  toPort: string
+  purpose: PeerControlPurpose
+}>({
+  fromDeviceId: null,
+  fromPort: '',
+  toDeviceId: null,
+  toPort: '',
+  purpose: 'STACK',
+})
+
+const peerLegendItems = computed(() =>
+  peerControlPurposes.map(purpose => {
+    const visual = peerControlVisualMap[purpose]
+    return {
+      purpose,
+      note: visual.note,
+      swatchStyle: {
+        '--peer-color': visual.color,
+        '--peer-dash': visual.lineStyle === 'solid' ? 'none' : (visual.lineStyle === 'dashed' ? 'dashed' : 'dotted'),
+      } as Record<string, string>,
+    }
+  })
+)
 
 watch(selectedDeviceLinkEntries, () => {
   const next: Record<string, { targetDeviceId: string | null; targetPort: string; purpose: string; lineStyle: 'solid' | 'dashed' | 'dotted' }> = {}
@@ -1153,6 +1268,63 @@ async function createPortLink() {
   }
 }
 
+async function createPeerControlLink() {
+  if (!selectedProjectId.value) {
+    setNotice('Vui lòng chọn project trước.', 'error')
+    return
+  }
+
+  const draft = peerLinkDraft.value
+  const fromDeviceId = draft.fromDeviceId
+  const toDeviceId = draft.toDeviceId
+  if (!fromDeviceId || !toDeviceId) {
+    setNotice('Cần chọn đủ thiết bị nguồn/đích.', 'error')
+    return
+  }
+
+  const error = validateLinkDraft({
+    fromDeviceId,
+    fromPort: draft.fromPort,
+    toDeviceId,
+    toPort: draft.toPort,
+  })
+  if (error) {
+    setNotice(error, 'error')
+    return
+  }
+
+  const fromName = deviceNameById.value.get(fromDeviceId)
+  const toName = deviceNameById.value.get(toDeviceId)
+  if (!fromName || !toName) {
+    setNotice('Không tìm thấy thiết bị nguồn/đích.', 'error')
+    return
+  }
+
+  const visual = peerControlVisualMap[draft.purpose]
+  try {
+    const created = await createLink(selectedProjectId.value, {
+      from_device: fromName,
+      from_port: draft.fromPort.trim(),
+      to_device: toName,
+      to_port: draft.toPort.trim(),
+      purpose: draft.purpose,
+      line_style: visual.lineStyle,
+    })
+    links.value.push(created)
+    scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'link-crud' })
+    setNotice(`Đã tạo kết nối ${draft.purpose}.`, 'success')
+    peerLinkDraft.value = {
+      fromDeviceId: fromDeviceId,
+      fromPort: '',
+      toDeviceId: toDeviceId,
+      toPort: '',
+      purpose: draft.purpose,
+    }
+  } catch (error: any) {
+    setNotice(error?.message || 'Tạo kết nối peer-control thất bại.', 'error')
+  }
+}
+
 function cloneRow<T>(row: T): T {
   return JSON.parse(JSON.stringify(row)) as T
 }
@@ -1229,6 +1401,13 @@ function handleLogout() {
     onLogout: () => {
       positionEditEnabled.value = false
       positionSaveSeq.clear()
+      peerLinkDraft.value = {
+        fromDeviceId: null,
+        fromPort: '',
+        toDeviceId: null,
+        toPort: '',
+        purpose: 'STACK',
+      }
       resetLayoutConfig()
       projects.value = []
       selectedProjectId.value = null
@@ -1346,6 +1525,13 @@ watch(selectedProjectId, async (projectId) => {
   resetViewModeData()
   positionEditEnabled.value = false
   positionSaveSeq.clear()
+  peerLinkDraft.value = {
+    fromDeviceId: null,
+    fromPort: '',
+    toDeviceId: null,
+    toPort: '',
+    purpose: 'STACK',
+  }
 
   if (projectId) {
     await loadProjectData(projectId)
@@ -1575,11 +1761,15 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 10px;
   background: #faf6f2;
   border-radius: 12px;
   border: 1px solid rgba(28, 28, 28, 0.1);
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
 }
 
 .topbar-nav button {
@@ -1789,6 +1979,54 @@ onMounted(() => {
 .device-area-list {
   display: grid;
   gap: 10px;
+}
+
+.peer-link-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.peer-link-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.peer-link-actions button {
+  width: 100%;
+}
+
+.peer-legend {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f6f2ef;
+}
+
+.peer-legend-row {
+  display: grid;
+  grid-template-columns: 46px 64px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.peer-legend-line {
+  display: inline-block;
+  width: 42px;
+  height: 0;
+  border-top: 2px var(--peer-dash, solid) var(--peer-color, #2b2a28);
+}
+
+.peer-legend-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #303030;
+}
+
+.peer-legend-note {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .device-area-row {

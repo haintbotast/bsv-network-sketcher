@@ -21,9 +21,12 @@
 - **port_anchor_override:** override anchor per-port **được ưu tiên** và **không bị auto-layout ghi đè**; kiểm tra thêm trường hợp `offset_ratio = null` để giữ auto offset.
 - **uplink_anchor_policy:** L1 auto-anchor phải đặt **uplink ở top** và **non-uplink ở bottom**; chỉ lệch khi có override thủ công.
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
+- **main_navigator_center_policy:** cụm điều khiển viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) hiển thị canh giữa trong main navigator panel.
 - **manual_position_edit_policy:** khi bật chế độ sửa vị trí, kéo‑thả `Area/Device` phải lưu `position_x/position_y` về DB ở `drag-end` và không trigger `/auto-layout`.
 - **drag_alignment_policy:** trong chế độ sửa vị trí phải hiển thị guide ngang/dọc và snap nhẹ khi object gần mốc align của object liên quan.
 - **position_standard_table_policy:** `position_x/position_y` sau drag hoặc nhập tay phải nằm trên mốc chuẩn (bội số step 0.25 đv).
+- **peer_control_quick_create_policy:** tab Bố cục có form khai báo nhanh peer-control (`STACK/HA/HSRP`), tạo link đúng purpose/line_style và trigger auto-layout theo reason `link-crud`.
+- **peer_control_legend_policy:** legend peer-control hiển thị đúng mapping màu/nét/chú giải cho `STACK/HA/HSRP`.
 - **link_update_validation:** cập nhật link phải chặn **trùng link** và **port đã dùng** (kể cả khi chỉ đổi đầu còn lại).
 - **inter‑area:** link khác Area bắt buộc qua Waypoint area (`_wp_`).
 
@@ -240,6 +243,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Trigger policy: mở project chạy auto-layout đúng 1 lượt.
 - [ ] Trigger policy: CRUD area/device/link/port-link/anchor đều trigger auto-layout.
 - [ ] Trigger policy: pan/zoom/reset view không phát sinh request `/auto-layout`.
+- [ ] Main navigator panel: cụm `zoom/reset/L1/L2/L3/Sửa vị trí` hiển thị canh giữa panel ở desktop.
 - [ ] Trigger policy: CRUD dồn dập khi đang chạy auto-layout chỉ tạo thêm 1 lượt chạy bù sau cùng.
 - [ ] Trigger policy: auto-run chỉ báo lỗi, không báo success.
 - [ ] Manual position edit: bật chế độ sửa vị trí, kéo‑thả `Area/Device` và thả chuột sẽ lưu `position_x/position_y` thành công.
@@ -256,6 +260,8 @@ test.describe('Diagram Editor', () => {
 - [ ] L1 technical render: link LAN/DEFAULT ở L1 dùng màu trung tính, chỉ purpose đặc biệt mới dùng màu nhấn.
 - [ ] Area compact render: khung Area hiển thị co theo cụm thiết bị (giảm khoảng trắng lớn) và không làm thay đổi lưu trữ area trong DB.
 - [ ] Peer-control render: link `STACK/HA/HSRP` dùng màu/nét đúng quy ước và dễ phân biệt với link mặc định.
+- [ ] Peer-control quick create: tạo link từ form nhanh trong tab Bố cục phải tạo đúng `from_device/from_port/to_device/to_port/purpose/line_style`.
+- [ ] Peer-control legend: panel hiển thị đủ 3 dòng `STACK/HA/HSRP` với màu/nét/chú giải đúng mapping style.
 - [ ] Peer-control routing: với thiết bị cùng hàng trong nội-area, link `STACK/HA/HSRP` ưu tiên tuyến ngắn, ít giao cắt.
 - [ ] RB-121..RB-122: nhãn không đè lên node/link; port cell/nhãn cổng hợp lệ.
 - [ ] RB-141..RB-143: cảnh báo khoảng cách hiển thị đúng khi vi phạm ngưỡng.

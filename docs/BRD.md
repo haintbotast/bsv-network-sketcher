@@ -57,13 +57,13 @@
 - Cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port** ngay trong bảng thuộc tính thiết bị, có kiểm tra trùng và port đã dùng.
 - Auto-layout tự chạy khi mở project và sau CRUD topology; thao tác viewport (`pan/zoom/reset view`) không làm thay đổi layout.
 - Cho phép bật chế độ chỉnh vị trí thủ công để kéo‑thả `Area/Device`; vị trí được lưu ngay sau drag‑end và không bị auto-layout tự động ghi đè ngay lập tức.
-- Cụm điều khiển chính (`zoom/reset/L1/L2/L3/Sửa vị trí`) cần nằm ở main navigator panel; khi drag object phải có gióng/snap để căn chỉnh nhanh theo object liên quan.
+- Cụm điều khiển chính (`zoom/reset/L1/L2/L3/Sửa vị trí`) cần nằm ở main navigator panel và **canh giữa theo panel**; khi drag object phải có gióng/snap để căn chỉnh nhanh theo object liên quan.
 - Tọa độ chỉnh tay cần theo bộ mốc chuẩn X/Y (step mặc định 0.25 đv) để vận hành dễ kiểm soát và đồng nhất giữa người dùng.
 - Quy ước L1 bắt buộc theo sơ đồ chuẩn: **uplink đặt ở top của object**, **kết nối còn lại đặt ở bottom** (trừ khi người dùng override thủ công).
 - Nhãn port trong L1 phải là **thành phần của object** (không là nhãn nổi trên link); kích thước object co giãn theo số lượng/độ dài port để giữ bố cục rõ ràng như PDF chuẩn.
 - L1 phải ưu tiên phong cách kỹ thuật dễ đọc: đường orthogonal/góc vuông rõ và giảm màu nhấn cho kết nối LAN/DEFAULT.
 - UI L1 cần hiển thị khung Area theo dạng compact bám cụm thiết bị (giảm khoảng trắng lớn) nhưng không làm đổi dữ liệu Area gốc.
-- Kết nối peer-control (`STACK/HA/HSRP`) cần được thể hiện riêng bằng màu/nét/lane để đội vận hành nhận biết nhanh trong sơ đồ dày.
+- Kết nối peer-control (`STACK/HA/HSRP`) cần được thể hiện riêng bằng màu/nét/lane để đội vận hành nhận biết nhanh trong sơ đồ dày; tab **Bố cục** cần có khối khai báo nhanh và legend màu/nét/chú giải cho nhóm kết nối này.
 - Bảo vệ dữ liệu dự án (phân quyền theo project, kiểm soát upload/download).
 - Cho phép quản trị preset/layout/validation qua trang cấu hình (không hardcode).
 

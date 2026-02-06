@@ -39,10 +39,12 @@
 - Auto-layout **không được trigger** bởi thao tác viewport để xem sơ đồ (`pan`, `zoom`, `reset view`).
 - Cho phép chạy lại auto-layout khi người dùng chủ động từ tab **Bố cục**.
 - Nhóm điều khiển viewport/view mode (`zoom/reset view/L1/L2/L3/Sửa vị trí`) hiển thị ở **main navigator panel** để thao tác nhất quán toàn màn hình.
+- Cụm điều khiển viewport/view mode ở main navigator được **canh giữa theo panel** để giảm lệch thị giác khi thao tác.
 - Cho phép bật chế độ **Sửa vị trí** để kéo‑thả trực tiếp `Area/Device` trên canvas; vị trí mới được lưu vào DB tại thời điểm thả chuột.
 - Luồng kéo‑thả chỉnh vị trí thủ công **không trigger auto-layout** để tránh ghi đè bố cục người dùng vừa tinh chỉnh.
 - Khi kéo‑thả trong chế độ sửa vị trí, UI hiển thị **đường gióng căn chỉnh** và hỗ trợ **snap nhẹ** theo object liên quan (device cùng area hoặc area cùng cấp).
 - Tọa độ `position_x/position_y` phải được chuẩn hóa theo **bảng vị trí chuẩn X/Y** với bước mặc định **0.25 đv** để tránh số lẻ khó kiểm soát.
+- Tab **Bố cục** cần có thành phần khai báo nhanh kết nối peer-control (`HA/STACK/HSRP`) và hiển thị legend màu/nét/chú giải tương ứng.
 - Với L1, điểm nối port tự động phải theo quy ước: **uplink ở cạnh trên (top)**, **kết nối không phải uplink ở cạnh dưới (bottom)**; chỉ cho phép lệch quy ước khi có **override thủ công**.
 - Với L1, **nhãn port là một phần của object** (port band trên/dưới), không render nhãn nổi giữa đường link.
 - Kích thước object L1 phải **co giãn theo số lượng port và độ dài nhãn port** để giữ rõ ràng theo sơ đồ chuẩn PDF.

@@ -71,6 +71,7 @@ UI thao tác → REST API → Service → DB → phản hồi → UI render
 - Auto-layout tự chạy khi mở project và sau CRUD topology (area/device/link/port-link/anchor override).
 - Thao tác viewport (`pan/zoom/reset view`) chỉ đổi góc nhìn trên client, **không** trigger auto-layout.
 - Quy ước anchor L1: uplink đi ra từ **cạnh trên** object, non-uplink đi ra từ **cạnh dưới** object; override thủ công được ưu tiên.
+- Render L1 dùng **port band gắn trực tiếp vào object** (top/bottom); kích thước object được nới theo số lượng/độ dài port.
 
 ### 4.2 Luồng xem trước thời gian thực
 ```

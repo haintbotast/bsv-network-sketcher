@@ -53,7 +53,21 @@
           :config="device.group"
           @click="() => emitSelect(device.id, 'device')"
         >
-          <v-rect :config="device.rect" />
+          <v-rect :config="device.bodyRect" />
+          <v-group
+            v-for="port in device.topPorts"
+            :key="port.id"
+          >
+            <v-rect :config="port.rect" />
+            <v-text :config="port.text" />
+          </v-group>
+          <v-group
+            v-for="port in device.bottomPorts"
+            :key="port.id"
+          >
+            <v-rect :config="port.rect" />
+            <v-text :config="port.text" />
+          </v-group>
           <v-text :config="device.label" />
         </v-group>
         <v-group
@@ -70,7 +84,7 @@
       <v-layer ref="overlayLayerRef" :config="layerTransform">
         <!-- L1 Port Labels -->
         <v-group
-          v-for="label in linkPortLabels"
+          v-for="label in visibleLinkPortLabels"
           :key="label.id"
           :config="label.group"
         >
@@ -106,6 +120,8 @@ import type { AreaModel, DeviceModel, LinkModel, Viewport, ViewMode, L2Assignmen
 import type { PortAnchorOverrideMap } from './canvas/linkRoutingTypes'
 import { getVisibleBounds, logicalRectToView } from '../utils/viewport'
 import { useLinkRouting } from './canvas/useLinkRouting'
+import { comparePorts } from './canvas/linkRoutingUtils'
+import { buildDeviceTierMap, resolveAutoPortSide } from './canvas/portSidePolicy'
 
 const props = defineProps<{
   areas: AreaModel[]
@@ -450,6 +466,16 @@ const visibleSubnetGroups = computed(() => {
 const DEVICE_GAP = 12
 const ROLE_ORDER_MAIN = ['router', 'firewall', 'core', 'dist', 'server', 'access', 'endpoint']
 const ROLE_ORDER_SUB = ['access', 'server', 'endpoint']
+const DEVICE_PORT_CELL_MIN_WIDTH = 30
+const DEVICE_PORT_CELL_HEIGHT = 18
+const DEVICE_PORT_CELL_GAP = 2
+const DEVICE_PORT_BAND_PADDING_X = 6
+const DEVICE_PORT_BAND_PADDING_Y = 4
+const DEVICE_PORT_FONT_SIZE = 10
+const DEVICE_LABEL_FONT_SIZE = 13
+const DEVICE_LABEL_MIN_HEIGHT = 30
+const DEVICE_BODY_VERTICAL_PADDING = 6
+const DEVICE_MIN_WIDTH = 96
 
 const DEVICE_COLORS: Array<{ match: (device: DeviceModel) => boolean; color: [number, number, number] }> = [
   { match: device => device.type === 'Router' || /RTR|ROUTER|ISP/i.test(device.name), color: [70, 130, 180] },
@@ -508,6 +534,186 @@ function resolveDeviceRole(device: DeviceModel) {
   return 'endpoint'
 }
 
+type DevicePortBands = {
+  top: string[]
+  bottom: string[]
+}
+
+type DevicePortCell = {
+  id: string
+  rect: {
+    x: number
+    y: number
+    width: number
+    height: number
+    fill: string
+    stroke: string
+    strokeWidth: number
+    cornerRadius: number
+    opacity: number
+  }
+  text: {
+    x: number
+    y: number
+    width: number
+    height: number
+    text: string
+    fontSize: number
+    fill: string
+    align: 'center'
+    verticalAlign: 'middle'
+  }
+}
+
+type DeviceRenderFrame = {
+  topBandHeight: number
+  bottomBandHeight: number
+  bodyHeight: number
+}
+
+const deviceTierMap = computed(() => buildDeviceTierMap(props.devices))
+
+const normalizedOverrideSide = (side: 'left' | 'right' | 'top' | 'bottom') => {
+  if (side === 'top') return 'top'
+  if (side === 'bottom') return 'bottom'
+  return 'bottom'
+}
+
+const devicePortBands = computed(() => {
+  const map = new Map<string, DevicePortBands>()
+  const addPort = (deviceId: string, port: string | null | undefined, side: 'top' | 'bottom') => {
+    const normalizedPort = (port || '').trim()
+    if (!deviceId || !normalizedPort) return
+    const entry = map.get(deviceId) || { top: [], bottom: [] }
+    const from = side === 'top' ? entry.top : entry.bottom
+    if (!from.includes(normalizedPort)) from.push(normalizedPort)
+    map.set(deviceId, entry)
+  }
+
+  props.links.forEach(link => {
+    const fromPort = (link.fromPort || '').trim()
+    const toPort = (link.toPort || '').trim()
+
+    let fromSide = fromPort
+      ? resolveAutoPortSide(link.fromDeviceId, link.toDeviceId, fromPort, deviceTierMap.value)
+      : 'bottom'
+    let toSide = toPort
+      ? resolveAutoPortSide(link.toDeviceId, link.fromDeviceId, toPort, deviceTierMap.value)
+      : 'bottom'
+
+    const fromOverride = props.portAnchorOverrides?.get(link.fromDeviceId)?.get(fromPort)
+    if (fromOverride) fromSide = normalizedOverrideSide(fromOverride.side)
+    const toOverride = props.portAnchorOverrides?.get(link.toDeviceId)?.get(toPort)
+    if (toOverride) toSide = normalizedOverrideSide(toOverride.side)
+
+    addPort(link.fromDeviceId, fromPort, fromSide)
+    addPort(link.toDeviceId, toPort, toSide)
+  })
+
+  props.portAnchorOverrides?.forEach((ports, deviceId) => {
+    ports.forEach((override, portName) => {
+      addPort(deviceId, portName, normalizedOverrideSide(override.side))
+    })
+  })
+
+  map.forEach(entry => {
+    entry.top.sort(comparePorts)
+    entry.bottom.sort(comparePorts)
+  })
+
+  return map
+})
+
+const estimatePortCellWidth = (portName: string) => {
+  const text = portName.trim()
+  const charWidth = DEVICE_PORT_FONT_SIZE * 0.62
+  return Math.max(DEVICE_PORT_CELL_MIN_WIDTH, Math.ceil(text.length * charWidth + 10))
+}
+
+const estimateBandWidth = (ports: string[]) => {
+  if (!ports.length) return 0
+  const cellsWidth = ports.reduce((sum, port) => sum + estimatePortCellWidth(port), 0)
+  const gapsWidth = DEVICE_PORT_CELL_GAP * Math.max(ports.length - 1, 0)
+  return DEVICE_PORT_BAND_PADDING_X * 2 + cellsWidth + gapsWidth
+}
+
+const resolveDeviceRenderFrame = (deviceRect: { width: number; height: number }, bands: DevicePortBands): DeviceRenderFrame => {
+  const topBandHeight = bands.top.length > 0 ? DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2 : 0
+  const bottomBandHeight = bands.bottom.length > 0 ? DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2 : 0
+  const bodyHeight = Math.max(
+    deviceRect.height,
+    DEVICE_LABEL_MIN_HEIGHT,
+    DEVICE_LABEL_FONT_SIZE + DEVICE_BODY_VERTICAL_PADDING * 2
+  )
+  return { topBandHeight, bottomBandHeight, bodyHeight }
+}
+
+const expandDeviceRectForPorts = (deviceId: string, rect: { x: number; y: number; width: number; height: number }) => {
+  const bands = devicePortBands.value.get(deviceId) || { top: [], bottom: [] }
+  const width = Math.max(
+    rect.width,
+    DEVICE_MIN_WIDTH,
+    estimateBandWidth(bands.top),
+    estimateBandWidth(bands.bottom)
+  )
+  const frame = resolveDeviceRenderFrame(rect, bands)
+  const height = frame.topBandHeight + frame.bodyHeight + frame.bottomBandHeight
+  const centerX = rect.x + rect.width / 2
+  const centerY = rect.y + rect.height / 2
+  return {
+    x: centerX - width / 2,
+    y: centerY - height / 2,
+    width,
+    height
+  }
+}
+
+const buildPortCells = (
+  deviceId: string,
+  ports: string[],
+  y: number,
+  deviceWidth: number,
+  side: 'top' | 'bottom'
+): DevicePortCell[] => {
+  if (!ports.length) return []
+  const cellWidths = ports.map(estimatePortCellWidth)
+  const totalWidth = cellWidths.reduce((sum, width) => sum + width, 0) + DEVICE_PORT_CELL_GAP * Math.max(ports.length - 1, 0)
+  const startX = Math.max(DEVICE_PORT_BAND_PADDING_X, (deviceWidth - totalWidth) / 2)
+  let cursorX = startX
+  const cells: DevicePortCell[] = []
+  ports.forEach((portName, index) => {
+    const width = cellWidths[index]
+    const id = `${deviceId}-${side}-${portName}`
+    cells.push({
+      id,
+      rect: {
+        x: cursorX,
+        y: y + DEVICE_PORT_BAND_PADDING_Y,
+        width,
+        height: DEVICE_PORT_CELL_HEIGHT,
+        fill: '#ffffff',
+        stroke: '#2b2a28',
+        strokeWidth: 1,
+        cornerRadius: 0,
+        opacity: 0.96
+      },
+      text: {
+        x: cursorX + 2,
+        y: y + DEVICE_PORT_BAND_PADDING_Y + 1,
+        width: Math.max(width - 4, 1),
+        height: Math.max(DEVICE_PORT_CELL_HEIGHT - 2, 1),
+        text: portName,
+        fontSize: DEVICE_PORT_FONT_SIZE,
+        fill: '#2b2a28',
+        align: 'center',
+        verticalAlign: 'middle'
+      }
+    })
+    cursorX += width + DEVICE_PORT_CELL_GAP
+  })
+  return cells
+}
+
 const deviceViewMap = computed(() => {
   const map = new Map<string, { x: number; y: number; width: number; height: number }>()
   const devicesByArea = new Map<string, Array<{ device: DeviceModel; rect: { x: number; y: number; width: number; height: number } }>>()
@@ -517,21 +723,22 @@ const deviceViewMap = computed(() => {
     const autoCoords = props.autoLayoutCoords?.get(device.id)
     if (autoCoords) {
       const deviceWithAutoCoords = { ...device, x: autoCoords.x * 120, y: autoCoords.y * 120 }
-      const rect = logicalRectToView(deviceWithAutoCoords, layoutViewport.value)
-      map.set(device.id, rect)
+      const baseRect = logicalRectToView(deviceWithAutoCoords, layoutViewport.value)
+      map.set(device.id, expandDeviceRectForPorts(device.id, baseRect))
       return
     }
 
     // Priority 2: Database positions (from applied auto-layout or manual positioning)
     // If device has non-zero position_x/position_y from DB, use them directly
     if (device.x !== 0 || device.y !== 0) {
-      const rect = logicalRectToView(device, layoutViewport.value)
-      map.set(device.id, rect)
+      const baseRect = logicalRectToView(device, layoutViewport.value)
+      map.set(device.id, expandDeviceRectForPorts(device.id, baseRect))
       return
     }
 
     // Priority 3: Fallback to tier-based positioning (for devices without positions)
-    const rect = logicalRectToView(device, layoutViewport.value)
+    const baseRect = logicalRectToView(device, layoutViewport.value)
+    const rect = expandDeviceRectForPorts(device.id, baseRect)
     const list = devicesByArea.get(device.areaId) || []
     list.push({ device, rect })
     devicesByArea.set(device.areaId, list)
@@ -646,6 +853,19 @@ const visibleDevices = computed(() => {
       const rect = deviceViewMap.value.get(device.id)!
       const isSelected = props.selectedId === device.id
       const fill = resolveDeviceFill(device)
+      const bands = devicePortBands.value.get(device.id) || { top: [], bottom: [] }
+      const topBandHeight = bands.top.length > 0 ? DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2 : 0
+      const bottomBandHeight = bands.bottom.length > 0 ? DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2 : 0
+      const bodyY = topBandHeight
+      const bodyHeight = Math.max(rect.height - topBandHeight - bottomBandHeight, DEVICE_LABEL_MIN_HEIGHT)
+      const topPorts = buildPortCells(device.id, bands.top, 0, rect.width, 'top')
+      const bottomPorts = buildPortCells(
+        device.id,
+        bands.bottom,
+        rect.height - bottomBandHeight,
+        rect.width,
+        'bottom'
+      )
       return {
         id: device.id,
         group: {
@@ -656,29 +876,32 @@ const visibleDevices = computed(() => {
           clipWidth: rect.width,
           clipHeight: rect.height
         },
-        rect: {
+        bodyRect: {
           x: 0,
-          y: 0,
+          y: bodyY,
           width: rect.width,
-          height: rect.height,
-          fill,
-          stroke: isSelected ? '#d66c3b' : 'transparent',
-          strokeWidth: isSelected ? 2 : 0,
-          cornerRadius: 8,
+          height: bodyHeight,
+          fill: adjustHexLightness(fill, 0.27),
+          stroke: isSelected ? '#d66c3b' : '#2b2a28',
+          strokeWidth: isSelected ? 2 : 1,
+          cornerRadius: 0,
           shadowColor: 'rgba(0, 0, 0, 0.22)',
           shadowBlur: 6,
           shadowOffset: { x: 0, y: 3 },
           shadowOpacity: 0.22,
           shadowForStrokeEnabled: false
         },
+        topPorts,
+        bottomPorts,
         label: {
-          x: 8,
-          y: 8,
+          x: 10,
+          y: bodyY + Math.max((bodyHeight - DEVICE_LABEL_FONT_SIZE) / 2 - 1, 4),
           width: Math.max(rect.width - 16, 0),
           text: device.name,
-          fontSize: 13,
-          fill: '#302b27',
+          fontSize: DEVICE_LABEL_FONT_SIZE,
+          fill: '#1f1f1f',
           wrap: 'none',
+          align: 'center',
           ellipsis: true
         }
       }
@@ -842,7 +1065,7 @@ const renderTuning = computed(() => ({
   ...(props.renderTuning || {})
 }))
 
-const { visibleLinks, visibleLinkShapes, linkPortLabels } = useLinkRouting({
+const { visibleLinks, visibleLinkShapes } = useLinkRouting({
   props,
   layoutViewport,
   renderTuning,
@@ -851,6 +1074,10 @@ const { visibleLinks, visibleLinkShapes, linkPortLabels } = useLinkRouting({
   deviceAreaMap,
   areaBounds,
   isPanning
+})
+const visibleLinkPortLabels = computed(() => {
+  // Port label được render trực tiếp trên object (top/bottom port band), không render overlay trên link.
+  return []
 })
 
 const linkBounds = computed(() => {
@@ -1120,7 +1347,7 @@ onBeforeUnmount(() => {
   }
 })
 
-watch([visibleAreas, visibleDevices, visibleLinks, linkPortLabels, l2Labels, l3Labels, stageSize], () => {
+watch([visibleAreas, visibleDevices, visibleLinks, visibleLinkPortLabels, l2Labels, l3Labels, stageSize], () => {
   scheduleBatchDraw()
 })
 

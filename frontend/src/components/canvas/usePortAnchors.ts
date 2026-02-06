@@ -2,6 +2,7 @@ import { computed, type ComputedRef } from 'vue'
 import type { DeviceModel, LinkModel, L2AssignmentRecord, ViewMode } from '../../models/types'
 import type { Rect, AnchorOverrideMap, RenderTuning, PortAnchorOverrideMap } from './linkRoutingTypes'
 import { clamp, comparePorts, computePortAnchorFallback, computeSide, extractPortIndex } from './linkRoutingUtils'
+import { buildDeviceTierMap, isUplinkPortName, resolveAutoPortSide } from './portSidePolicy'
 
 export function usePortAnchors(deps: {
   props: {
@@ -15,50 +16,17 @@ export function usePortAnchors(deps: {
   portAnchorOverrides?: ComputedRef<PortAnchorOverrideMap>
 }) {
   const { props, renderTuning, deviceViewMap, portAnchorOverrides } = deps
-  const normalizeType = (value: string) => value.trim().toLowerCase()
-  const normalizeName = (value: string) => value.trim().toLowerCase()
-  const deviceTier = (type: string, name: string) => {
-    const t = normalizeType(type)
-    const n = normalizeName(name)
-    if (t === 'router' || /(router|rtr|edge|wan|internet|isp)/.test(n)) return 0
-    if (t === 'firewall' || /(firewall|fw|security|ids|ips|vpn|waf)/.test(n)) return 1
-    if (/(core)/.test(n)) return 2
-    if (/(distribution|dist|ds\d*)/.test(n)) return 3
-    if (/(access|acc|asw)/.test(n)) return 4
-    if (t === 'switch' && /(server|srv|storage|nas|san|sv\d*)/.test(n)) return 5
-    if (t === 'server' || t === 'storage' || /(server|srv|app|web|db|nas|san|storage|backup)/.test(n)) return 6
-    if (['pc', 'printer', 'camera', 'phone', 'ipphone', 'endpoint', 'ap'].includes(t)) return 7
-    if (/(pc|printer|prn|cam|cctv|phone|ipphone|endpoint|client|terminal|ap)/.test(n)) return 7
-    return 5
-  }
 
   const deviceInfoMap = computed(() => {
-    const map = new Map<string, { type: string; name: string; tier: number }>()
-    const devices = (props as { devices?: DeviceModel[] }).devices || []
-    devices.forEach(device => {
-      const type = device.type || ''
-      const name = device.name || ''
-      map.set(device.id, { type, name, tier: deviceTier(type, name) })
-    })
-    return map
+    return buildDeviceTierMap((props as { devices?: DeviceModel[] }).devices)
   })
 
-  const isUplinkPort = (port: string) => {
-    const idx = extractPortIndex(port)
-    return idx === 1
-  }
   const resolveAutoSide = (
     deviceId: string,
     neighborId: string,
     port: string | undefined,
   ): 'top' | 'bottom' => {
-    const info = deviceInfoMap.value.get(deviceId)
-    const neighborInfo = deviceInfoMap.value.get(neighborId)
-    if (info && neighborInfo && info.tier !== neighborInfo.tier) {
-      return info.tier > neighborInfo.tier ? 'top' : 'bottom'
-    }
-    if (port && isUplinkPort(port)) return 'top'
-    return 'bottom'
+    return resolveAutoPortSide(deviceId, neighborId, port, deviceInfoMap.value)
   }
 
   const devicePortList = computed(() => {
@@ -295,7 +263,7 @@ export function usePortAnchors(deps: {
         ? clamp((target.x - rect.x - inset) / usableWidth, 0.1, 0.9)
         : ((index % 12) + 0.5) / 12
       const x = rect.x + inset + usableWidth * ratio
-      const isTop = isUplinkPort(port)
+      const isTop = isUplinkPortName(port)
       const y = isTop ? rect.y : rect.y + rect.height
       return { x, y, side: isTop ? 'top' : 'bottom' }
     }

@@ -61,22 +61,22 @@
 - **Liên‑area qua waypoint:**  
   - **L1:** giữ **Manhattan (ngang/dọc)**, **không shortcut chéo**; bo góc bằng **lineJoin round**.  
   - **L2/L3:** ưu tiên **any‑angle (Theta\*) + bo góc nhẹ**; nếu không tìm được đường thì fallback hành lang.
-- Routing link ưu tiên **tránh vật cản** (area/device/**interface tag**) và **giảm chồng lấn**:  
+- Routing link ưu tiên **tránh vật cản** (area/device/**port cell**) và **giảm chồng lấn**:  
 - **L1:** giữ **orthogonal**; nếu không bị cản thì đường thẳng ngắn nhất, nếu bị cản thì **A\*** theo lưới và **không tạo đoạn chéo**.  
 - **L2/L3:** có thể dùng **any‑angle (Theta\*)** để ưu tiên đường chéo và **bo góc nhẹ**.
 - **Lưới routing (A\*):** kích thước ô lưới **tự tăng** theo kích thước sơ đồ để **giới hạn số node**, tránh vô hiệu hóa A\* ở sơ đồ lớn.
 - **Anchor port tối ưu 2‑pass:** pass 1 định tuyến để lấy hướng/điểm tham chiếu, pass 2 sắp xếp lại anchor theo side + thứ tự để giãn cách hợp lý và bám tuyến ngắn nhất.
 - **Pair alignment:** với nhiều link giữa 2 thiết bị kề nhau, anchor được **xếp đồng bộ theo thứ tự port phía đối diện** để giảm chéo.
-- **Same-row alignment:** link giữa **2 thiết bị cùng hàng/cùng cột** sẽ ưu tiên **canh thẳng anchor + port label** (ngang hoặc dọc). Chỉ áp dụng khi **đường thẳng không bị vật cản**; nếu bị cản thì giữ routing tránh vật cản.
-- **Stub theo nhãn port (L1):** đoạn link đi ra khỏi thiết bị **tối thiểu bằng** `max(base_exit_stub, (port_label_offset − “/”) + label_width/2 + padding)` để **nhãn nằm trên đoạn thẳng đầu tiên** và không đè lên biên thiết bị.
+- **Same-row alignment:** link giữa **2 thiết bị cùng hàng/cùng cột** sẽ ưu tiên **canh thẳng anchor + ô port** (ngang hoặc dọc). Chỉ áp dụng khi **đường thẳng không bị vật cản**; nếu bị cản thì giữ routing tránh vật cản.
+- **Stub theo port band (L1):** đoạn link đi ra khỏi thiết bị phải đủ dài để tách rõ khỏi biên object/ô port và tránh gãy góc ngay sát mép thiết bị.
 - **Thứ tự thiết bị (L1 micro):** **Router ở hàng trên**, Firewall **ở hàng dưới Router**, Core/Distro nằm dưới Firewall.
-- **Nhãn port (L1):** nhãn **nằm giữa đường link**, khoảng cách **anchor → tâm nhãn** theo `port_label_offset` **trừ đi 1 ký tự (≈ độ rộng “/”)** để nhãn **đè nhẹ lên device**, **không dịch để tránh va chạm**; nhãn có thể đè lên đường link nhưng **không được chồng lên vùng chữ device** (tự đẩy ra ngoài khi giao nhau). Mức “đè” cố định tương đương **1 ký tự “/”** và **áp dụng đồng nhất cho cả top/bottom** (không dùng chiều cao chữ).
+- **Nhãn port (L1):** nhãn là **thành phần của object** (ô port trong dải top/bottom), không hiển thị dạng nhãn nổi trên link.
 - **Quy ước side tự động (L1):** mặc định chỉ dùng **top/bottom** cho anchor port:
   - **uplink => top**
   - **non-uplink => bottom**
   - **left/right** chỉ dùng khi có **override thủ công**.
-- **Rebalance port/side (L1):** sức chứa mỗi band tính theo **minSpacing = max(`bundle_gap` + (`port_label_offset` − 1 ký tự) + `label_height`/2, `label_height` + `label_gap_y`/2)**; khi quá tải chỉ cân lại giữa **top/bottom** để giữ đúng quy ước chuẩn.
-- **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng; offset tối thiểu bằng **max(`bundle_gap`, `port_label_offset`, `grid cell`)** và **tự nhân hệ số theo `total`** (nhiều link → khoảng cách lớn hơn). **Lane shift** được áp **ngay tại anchor (trên cạnh device)** để giữ đường **thẳng ra khỏi device** và tránh gãy góc tại port label; nếu **exit bundle > 1** thì **không dùng đường thẳng trực tiếp**, bắt buộc route qua lưới để tách lane.
+- **Rebalance port/side (L1):** sức chứa mỗi band tính theo chiều rộng object và số ô port; khi quá tải chỉ cân lại giữa **top/bottom** để giữ đúng quy ước chuẩn.
+- **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng; offset tối thiểu bằng **max(`bundle_gap`, `grid cell`)** và **tự nhân hệ số theo `total`** (nhiều link → khoảng cách lớn hơn). **Lane shift** được áp **ngay tại anchor (trên cạnh object)** để giữ đường **thẳng ra khỏi thiết bị**; nếu **exit bundle > 1** thì **không dùng đường thẳng trực tiếp**, bắt buộc route qua lưới để tách lane.
 - **Bundle song song (L1):** nếu 2 thiết bị **cùng hàng/cột**, không bị vật cản thì ưu tiên **đường thẳng song song** cho các link bundle (bỏ A\*), để tránh “uốn cong” ngay tại port label.
 - **Waypoint (L1):** khi có waypoint giữa 2 Area, link đi qua **nhiều tọa độ neo** trên waypoint (theo lane index) để **không chồng lên nhau**.
 - **Override thủ công (per-port):** người dùng có thể **cố định side + offset_ratio** cho từng port; `offset_ratio` có thể để `null` để **giữ auto offset** theo side đã chọn. Override **giữ side là ưu tiên cao nhất**, nhưng **có thể tự căn lại tọa độ** để **giữ link thẳng hàng** khi 2 thiết bị cùng hàng/cột và side đã phù hợp.
@@ -139,17 +139,17 @@
 | Đối tượng | Shape | Ghi chú |
 |----------|-------|--------|
 | Area | Rectangle bo góc | Nền nhạt xám nhẹ, label góc trên trái, **không viền**, có **đổ bóng nhẹ** |
-| Device | Rectangle bo góc | Màu theo loại thiết bị, **không viền**, có **đổ bóng nhẹ** |
+| Device | Rectangle (ưu tiên góc vuông khi có port band) | Màu theo loại thiết bị, có viền rõ để tách thân thiết bị và dải port |
 | Waypoint | Diamond hoặc Circle | Không hiện label khi zoom out |
 | Link | Line | **L1 ưu tiên Manhattan (ngang/dọc)** theo tuyến tối ưu tránh vật cản, **không shortcut chéo**; bo góc bằng **lineJoin/lineCap round**. **L2/L3 ưu tiên any‑angle (Theta\*) + bo góc nhẹ**; màu theo purpose; nét liền/đứt |
-| Interface Tag | Text + background | Hiển thị tên port ở L1, neo theo **port anchor**, có thể xoay theo hướng link; auto-scale theo zoom (0.6-1.15) và tự giãn để tránh chồng lấn; **viền xám mảnh, không đổ bóng** |
+| Port Cell (L1) | Rect + Text (gắn vào object) | Hiển thị tên port trực tiếp trên dải top/bottom của object; ưu tiên rõ ràng và ổn định theo số lượng port |
 
-- Auto-layout cần **tính thêm vùng đệm Interface Tag** khi giãn khoảng cách giữa thiết bị để tránh chồng lấn.
+- Auto-layout cần **tính thêm vùng đệm port band** khi giãn khoảng cách giữa thiết bị để tránh chồng lấn.
 - Auto-layout cần **tính thêm băng nhãn** khi xác định kích thước node và khoảng cách:
   - **L1:** cộng `port_label_band` vào kích thước node (rộng/cao) và vào `node_spacing`/`layer_gap`.
-  - **L1 (thực tế):** ước lượng **bề ngang nhãn port** theo độ dài port + `render_tuning`, **cộng thêm 2×`port_label_offset`** để tăng `node_spacing`/`row_gap` (tránh nhãn bị kẹp giữa thiết bị).
+  - **L1 (thực tế):** ước lượng **bề ngang dải port (port band)** theo số lượng/độ dài port để tăng `node_spacing`/`row_gap` (tránh object chèn lên nhau).
   - **L2/L3:** cộng `label_band` vào chiều cao node để chừa chỗ nhãn L2/L3 dưới thiết bị; đồng thời chừa band nhãn cho group (VLAN/Subnet).
-- **Kích thước thiết bị (Device):** tự động **nới rộng theo độ dài tên + độ dài nhãn port dài nhất** và **tăng chiều cao theo mật độ port** để tránh chồng nhãn.
+- **Kích thước thiết bị (Device):** tự động **nới rộng theo số lượng/độ dài port** và giữ vùng thân thiết bị đủ chỗ cho tên thiết bị.
 - Micro layout sử dụng **kích thước thiết bị sau auto-resize** để tính bounding và sắp xếp trước khi tính macro layout.
 - **Quy tắc nhãn port:** định dạng **chữ cái + khoảng trắng + số hiệu**.  
   Ví dụ: `Gi 0/1`, `Gi 1/0/48`, `HA 1`, `Port 1`.
@@ -161,7 +161,7 @@
 | Area | Tối thiểu 3.0 x 1.5 | Tự co giãn theo nội dung |
 | Device | 1.2 x 0.5 | Theo preset layout |
 | Waypoint | 0.25 x 0.25 | Kích thước cố định |
-| Interface Tag | 0.6 x 0.2 | Auto-fit theo text |
+| Port Cell (L1) | Auto-fit theo text | Nằm trong dải port top/bottom của object |
 
 ---
 
@@ -180,7 +180,7 @@
 | Link Primary | Theo purpose | 1.5 | None |
 | Link Backup | Theo purpose | 1.5 | 4,2 |
 | Link MGMT | Theo purpose | 1.5 | 6,3 |
-| Interface Tag | #333333 | 0.5 | None |
+| Port Cell (L1) | #2b2a28 | 1 | None |
 
 ### 5.2 Line Jump/Arc tại giao điểm
 
@@ -266,14 +266,14 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 | Area Label | Calibri | 14 | #333333 |
 | Device Label | Calibri | 10 | #000000 |
 | Link Label | Calibri | 9 | #000000 |
-| Interface Tag | Calibri | 9 | #000000 |
+| Port Cell (L1) | Calibri | 9 | #000000 |
 
 ### 7.2 Preset nền (theo style chung)
 
 | Đối tượng | Nền |
 |----------|-----|
 | Area | #F0F0F0 |
-| Interface Tag | #FFFFFF (80% opacity) |
+| Port Cell (L1) | #FFFFFF |
 | Canvas | #FFFFFF |
 
 ---
@@ -319,12 +319,12 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 |----------|-------------|-----------|------------|
 | Area | Rect: `fill`, `stroke`, `strokeWidth`, `cornerRadius` | Rectangle (rounded) | Fill solid, line solid |
 | Area Label | Text: `fontFamily`, `fontSize`, `fill` | TextBox | Font + size + color |
-| Device | Rect: `fill`, `stroke`, `strokeWidth`, `cornerRadius` | Rectangle (rounded) | Fill solid, line solid |
+| Device | Rect: `fill`, `stroke`, `strokeWidth`, `cornerRadius` | Rectangle | Fill solid, line solid |
 | Device Label | Text: `fontFamily`, `fontSize`, `fill` | TextBox | Font + size + color |
 | Waypoint | Rect/Circle | Diamond/Ellipse | Fill solid, line solid |
 | Link | Line: `stroke`, `strokeWidth`, `dash` | Line | Line color + width + dash |
 | Link Label | Text: `fontFamily`, `fontSize`, `fill` | TextBox | Font + size + color |
-| Interface Tag | Rect + Text | Rectangle + TextBox | Fill (alpha) + line |
+| Port Cell (L1) | Rect + Text | Rectangle + TextBox | Fill solid + line |
 
 **Lưu ý:**
 - Không dùng gradient trong chế độ preset.
@@ -336,8 +336,8 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 
 | Ngưỡng zoom | Hiển thị |
 |------------|----------|
-| ≥ 1.0 | Hiển thị đầy đủ label + interface tag |
-| 0.7 – 0.99 | Ẩn interface tag, giữ device label |
+| ≥ 1.0 | Hiển thị đầy đủ label + port cell |
+| 0.7 – 0.99 | Rút gọn hiển thị port cell, giữ device label |
 | 0.4 – 0.69 | Ẩn device label, giữ area label |
 | < 0.4 | Ẩn tất cả label, chỉ giữ shape + link |
 
@@ -355,7 +355,7 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 
 **Không cho phép:**
 - Màu tùy ý ngoài preset.
-- Gradient/opacity tự do (trừ interface tag theo preset).
+- Gradient/opacity tự do (trừ port cell theo preset).
 - Thay đổi font family ngoài `Calibri` khi xuất PPTX.
 
 ---

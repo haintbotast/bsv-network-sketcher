@@ -40,6 +40,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-15:** Cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port** ngay trong bảng thuộc tính thiết bị, có kiểm tra trùng và port đã dùng.
 - **FR-16:** Auto-layout tự chạy khi mở project và sau CRUD topology; thao tác viewport (`pan/zoom/reset view`) không được trigger auto-layout.
 - **FR-17:** L1 port anchor mặc định theo chuẩn: **uplink gắn top**, **non-uplink gắn bottom**; override thủ công là ưu tiên cao nhất.
+- **FR-18:** Trong L1, nhãn port phải hiển thị như **một phần của object** (port band top/bottom) và kích thước object tự nới theo số lượng/độ dài port để khớp sơ đồ chuẩn.
 
 ## 5. Yêu cầu phi chức năng (NFR)
 

@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0",
-  "template_version": "1.0",
+  "template_version": "1.1",
   "metadata": {
     "name": "Phục dựng Network diagram",
-    "description": "Phục dựng sơ đồ từ docs/Network diagram.pdf (bản rút gọn để khôi phục dữ liệu)",
-    "created_at": "2026-02-05T09:00:00Z",
+    "description": "Phục dựng sơ đồ từ docs/Network diagram.pdf – v1.1: sửa area assignment, thêm port_channels & L2 segments",
+    "created_at": "2026-02-06T10:00:00Z",
     "author": "recovery"
   },
   "areas": [
@@ -14,14 +14,14 @@
     { "name": "Server", "grid_row": 2, "grid_col": 3 },
     { "name": "Core", "grid_row": 3, "grid_col": 2 },
     { "name": "Distribution", "grid_row": 4, "grid_col": 2 },
+    { "name": "Access-HTM", "grid_row": 4, "grid_col": 3 },
     { "name": "Access-3F-PMJ", "grid_row": 5, "grid_col": 1 },
     { "name": "Access-3F-Rakuma", "grid_row": 5, "grid_col": 2 },
     { "name": "Access-KF-SODA-SQEX", "grid_row": 5, "grid_col": 3 },
     { "name": "Access-3F-SCSJ", "grid_row": 6, "grid_col": 1 },
     { "name": "Access-KF-CTCT", "grid_row": 6, "grid_col": 2 },
     { "name": "Access-3F-BackOffice", "grid_row": 6, "grid_col": 3 },
-    { "name": "Access-KF-BackOffice", "grid_row": 6, "grid_col": 4 },
-    { "name": "Access-HTM", "grid_row": 4, "grid_col": 3 }
+    { "name": "Access-KF-BackOffice", "grid_row": 6, "grid_col": 4 }
   ],
   "devices": [
     { "name": "CH-BAT-1", "area_name": "Edge-CH", "device_type": "Router" },
@@ -202,8 +202,55 @@
     { "from_device": "TK-HTH-1", "from_port": "Gi 0/2", "to_device": "PC-HTH-1", "to_port": "Eth 1", "purpose": "LAN" },
     { "from_device": "TK-HTH-2", "from_port": "Gi 0/2", "to_device": "PC-HTH-2", "to_port": "Eth 1", "purpose": "LAN" }
   ],
-  "l2_segments": [],
-  "interface_l2_assignments": [],
+  "port_channels": [
+    { "device_name": "YH-DS1", "name": "Port-Channel 1", "mode": "static", "members": ["Stack 1"] },
+    { "device_name": "YH-DS2", "name": "Port-Channel 1", "mode": "static", "members": ["Stack 1"] },
+    { "device_name": "TK-SV1", "name": "Port-Channel 2", "mode": "static", "members": ["Gi 1/0/2"] },
+    { "device_name": "TK-SV2", "name": "Port-Channel 2", "mode": "static", "members": ["Gi 1/0/2"] }
+  ],
+  "l2_segments": [
+    { "name": "MGMT", "vlan_id": 1, "description": "Management 172.18.1.0/24" },
+    { "name": "3F-BackOffice", "vlan_id": 3, "description": "3F BackOffice 172.18.3.0/24" },
+    { "name": "KF-BackOffice", "vlan_id": 4, "description": "KF BackOffice 172.18.4.0/24" },
+    { "name": "AD-2", "vlan_id": 9, "description": "AD#2 172.18.9.0/24" },
+    { "name": "CMC-VPN", "vlan_id": 10, "description": "CMC VPN 172.18.10.0/24" },
+    { "name": "AD-1-VPN", "vlan_id": 11, "description": "AD#1 VPN 172.18.11.0/24" },
+    { "name": "3F-PMJ", "vlan_id": 21, "description": "3F PMJ 172.18.21.0/24" },
+    { "name": "3F-SCSJ", "vlan_id": 22, "description": "3F SCSJ 172.18.22.0/24" },
+    { "name": "3F-Rakuma", "vlan_id": 23, "description": "3F Rakuma 172.18.23.0/24" },
+    { "name": "KF-CTCT", "vlan_id": 24, "description": "KF CTCT 172.18.24.0/24" },
+    { "name": "KF-SODA-SQEX", "vlan_id": 25, "description": "KF SODA/SQEX 172.18.25.0/24" },
+    { "name": "HTM", "vlan_id": 31, "description": "HTM 172.18.31.0/24" }
+  ],
+  "interface_l2_assignments": [
+    { "device_name": "YH-PMJ-1", "interface_name": "Gi 0/2", "l2_segment": "3F-PMJ", "port_mode": "access" },
+    { "device_name": "YH-PMJ-1", "interface_name": "Gi 0/3", "l2_segment": "3F-PMJ", "port_mode": "access" },
+    { "device_name": "YH-PMJ-2", "interface_name": "Gi 0/2", "l2_segment": "3F-PMJ", "port_mode": "access" },
+    { "device_name": "YH-PMJ-2", "interface_name": "Gi 0/3", "l2_segment": "3F-PMJ", "port_mode": "access" },
+    { "device_name": "YH-PMJ-3", "interface_name": "Gi 0/2", "l2_segment": "3F-PMJ", "port_mode": "access" },
+    { "device_name": "YH-Rak-1", "interface_name": "Gi 0/2", "l2_segment": "3F-Rakuma", "port_mode": "access" },
+    { "device_name": "YH-Rak-1", "interface_name": "Gi 0/3", "l2_segment": "3F-Rakuma", "port_mode": "access" },
+    { "device_name": "YH-SCSJ-2", "interface_name": "Gi 0/2", "l2_segment": "3F-SCSJ", "port_mode": "access" },
+    { "device_name": "YH-SCSJ-2", "interface_name": "Gi 0/3", "l2_segment": "3F-SCSJ", "port_mode": "access" },
+    { "device_name": "YH-CTCT-1", "interface_name": "Gi 0/2", "l2_segment": "KF-CTCT", "port_mode": "access" },
+    { "device_name": "YH-CTCT-1", "interface_name": "Gi 0/3", "l2_segment": "KF-CTCT", "port_mode": "access" },
+    { "device_name": "YH-SQ-SO-1", "interface_name": "Gi 0/2", "l2_segment": "KF-SODA-SQEX", "port_mode": "access" },
+    { "device_name": "YH-SQ-SO-1", "interface_name": "Gi 0/3", "l2_segment": "KF-SODA-SQEX", "port_mode": "access" },
+    { "device_name": "YH-BO-3F-1", "interface_name": "Gi 0/2", "l2_segment": "3F-BackOffice", "port_mode": "access" },
+    { "device_name": "YH-BO-3F-1", "interface_name": "Gi 0/3", "l2_segment": "3F-BackOffice", "port_mode": "access" },
+    { "device_name": "YH-BO-3F-1", "interface_name": "Gi 0/4", "l2_segment": "3F-BackOffice", "port_mode": "access" },
+    { "device_name": "YH-BO-3F-1", "interface_name": "Gi 0/5", "l2_segment": "3F-BackOffice", "port_mode": "access" },
+    { "device_name": "YH-BO-3F-1", "interface_name": "Gi 0/6", "l2_segment": "3F-BackOffice", "port_mode": "access" },
+    { "device_name": "YH-BO-KF-1", "interface_name": "Gi 0/2", "l2_segment": "KF-BackOffice", "port_mode": "access" },
+    { "device_name": "YH-BO-KF-1", "interface_name": "Gi 0/3", "l2_segment": "KF-BackOffice", "port_mode": "access" },
+    { "device_name": "YH-BO-KF-2", "interface_name": "Gi 0/2", "l2_segment": "KF-BackOffice", "port_mode": "access" },
+    { "device_name": "YH-BO-KF-2", "interface_name": "Gi 0/3", "l2_segment": "KF-BackOffice", "port_mode": "access" },
+    { "device_name": "YH-BO-KF-3", "interface_name": "Gi 0/2", "l2_segment": "KF-BackOffice", "port_mode": "access" },
+    { "device_name": "TK-HTH-1", "interface_name": "Gi 0/2", "l2_segment": "HTM", "port_mode": "access" },
+    { "device_name": "TK-HTH-2", "interface_name": "Gi 0/2", "l2_segment": "HTM", "port_mode": "access" },
+    { "device_name": "YH-DS1", "interface_name": "TenGi 1/1/1", "l2_segment": "MGMT", "port_mode": "trunk", "native_vlan": 1, "allowed_vlans": [1, 3, 21, 23, 25] },
+    { "device_name": "YH-DS2", "interface_name": "TenGi 1/1/1", "l2_segment": "MGMT", "port_mode": "trunk", "native_vlan": 1, "allowed_vlans": [1, 4, 9, 22, 24, 31] }
+  ],
   "l3_addresses": [
     { "device_name": "YH-PMJ-1", "interface_name": "Vlan 1", "ip_address": "172.18.1.201", "prefix_length": 24 },
     { "device_name": "YH-PMJ-2", "interface_name": "Vlan 1", "ip_address": "172.18.1.202", "prefix_length": 24 },

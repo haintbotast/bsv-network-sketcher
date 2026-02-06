@@ -44,8 +44,15 @@ const PEER_PURPOSE_VISUAL: Record<PeerPurposeKind, { stroke: string; dash: numbe
   hsrp: { stroke: '#9b59b6', dash: [3, 4], strokeWidth: 1.8, opacity: 0.96 },
 }
 
-function resolvePeerPurposeKind(purpose: string): PeerPurposeKind | null {
+function resolvePeerPurposeKind(
+  purpose: string,
+  fromPort?: string | null,
+  toPort?: string | null
+): PeerPurposeKind | null {
   const key = (purpose || '').trim().toUpperCase()
+  const from = (fromPort || '').trim().toUpperCase()
+  const to = (toPort || '').trim().toUpperCase()
+  if (from.includes('STACK') || to.includes('STACK')) return 'stack'
   if (!key) return null
   if (key.includes('STACK')) return 'stack'
   if (key.includes('HSRP')) return 'hsrp'
@@ -691,7 +698,7 @@ export function routeLinks(
       const fromExit = { x: fromBase.x + fromExitShift.dx, y: fromBase.y + fromExitShift.dy }
       const toExit = { x: toBase.x + toExitShift.dx, y: toBase.y + toExitShift.dy }
       const purpose = (link.purpose || '').trim().toUpperCase()
-      const peerPurpose = resolvePeerPurposeKind(purpose)
+      const peerPurpose = resolvePeerPurposeKind(purpose, link.fromPort, link.toPort)
       const isPeerControlLink = isL1 && !!peerPurpose && isIntraArea
 
       let routed = false

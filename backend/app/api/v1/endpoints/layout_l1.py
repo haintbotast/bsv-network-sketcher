@@ -2,6 +2,8 @@
 L1 layout computation: area-based with tier-aware packing.
 """
 
+import re
+
 from app.services.layout_models import LayoutConfig
 from app.services.simple_layer_layout import simple_layer_layout
 from app.schemas.layout import DeviceLayout, AreaLayout, LayoutStats
@@ -58,6 +60,7 @@ def compute_layout_l1(
     def detect_area_tier(name: str | None) -> int | None:
         """Detect area tier with enhanced granularity (0-10)."""
         label = normalize(name)
+        floor_marker_re = re.compile(r"(?:^|[^a-z0-9])(?:b?\d{1,2}\s*f)(?:$|[^a-z0-9])")
         tier_hints = [
             (0, ["router", "rtr", "edge", "wan", "internet", "isp"]),
             (1, ["security", "firewall", "fw", "ids", "ips", "waf", "vpn", "soc"]),
@@ -66,7 +69,7 @@ def compute_layout_l1(
             (4, ["distribution", "dist"]),
             (5, ["campus", "hq", "headquarters", "main"]),
             (6, ["branch", "site", "remote"]),
-            (7, ["office", "floor", "building"]),
+            (7, ["office", "floor", "building", "access", "backoffice", "back office"]),
             (8, ["department", "dept"]),
             (9, ["project", "proj", "it"]),
             (10, ["server", "servers", "storage", "nas"]),
@@ -74,12 +77,25 @@ def compute_layout_l1(
         for tier, keywords in tier_hints:
             if any(keyword in label for keyword in keywords):
                 return tier
+        if floor_marker_re.search(label):
+            return 7
         return None
+
+    core_token_re = re.compile(r"(?:^|[^a-z0-9])cr\d*(?:$|[^a-z0-9])")
+    dist_token_re = re.compile(r"(?:^|[^a-z0-9])ds\d*(?:$|[^a-z0-9])")
+    server_sw_token_re = re.compile(r"(?:^|[^a-z0-9])sv\d*(?:$|[^a-z0-9])")
 
     def detect_device_tier(device) -> int:
         """Detect device tier with enhanced granularity (0-10)."""
         name = normalize(getattr(device, "name", ""))
         dtype = normalize(getattr(device, "device_type", ""))
+        if dtype == "switch":
+            if core_token_re.search(name):
+                return 3
+            if dist_token_re.search(name):
+                return 4
+            if server_sw_token_re.search(name):
+                return 4
         tier_keywords = [
             (0, ["router", "rtr", "edge", "wan", "internet", "isp"]),
             (1, ["firewall", "fw", "ids", "ips", "waf", "security", "vpn", "soc"]),
@@ -372,6 +388,10 @@ def compute_layout_l1(
             if device_hint == 0:
                 tier = 0
             elif area_hint in {1, 2, 10}:
+                tier = area_hint
+            elif area_hint >= 5:
+                # Với area nghiệp vụ (campus/branch/office/dept/project):
+                # giữ tier theo area để access switch không kéo area lên quá cao.
                 tier = area_hint
             else:
                 tier = min(area_hint, device_hint)

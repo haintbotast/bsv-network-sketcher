@@ -59,7 +59,17 @@ def simple_layer_layout(devices: list, links: list, config: LayoutConfig) -> Lay
     def normalize_name(value: str | None) -> str:
         return (value or "").upper()
 
+    core_token_re = re.compile(r"(?:^|[^A-Z0-9])CR\d*(?:$|[^A-Z0-9])")
+    dist_token_re = re.compile(r"(?:^|[^A-Z0-9])DS\d*(?:$|[^A-Z0-9])")
+    server_token_re = re.compile(r"(?:^|[^A-Z0-9])SV\d*(?:$|[^A-Z0-9])")
+
     def detect_switch_layer(device_name: str) -> int:
+        if core_token_re.search(device_name):
+            return 2
+        if dist_token_re.search(device_name):
+            return 3
+        if server_token_re.search(device_name):
+            return 4
         if "CORE" in device_name:
             return 2
         if "DIST" in device_name or "DISTR" in device_name:

@@ -2,6 +2,8 @@
 Device classification predicates.
 """
 
+import re
+
 from .layout_constants import (
     MONITOR_DEVICE_KEYWORDS,
     SECURITY_DEVICE_KEYWORDS,
@@ -22,6 +24,10 @@ from .layout_constants import (
     MONITOR_AREA_KEYWORDS,
     normalize_text,
 )
+
+CORE_TOKEN_RE = re.compile(r"(?:^|[^a-z0-9])cr\d*(?:$|[^a-z0-9])")
+DIST_TOKEN_RE = re.compile(r"(?:^|[^a-z0-9])ds\d*(?:$|[^a-z0-9])")
+SERVER_SW_TOKEN_RE = re.compile(r"(?:^|[^a-z0-9])sv\d*(?:$|[^a-z0-9])")
 
 
 def is_monitor_device(device) -> bool:
@@ -77,6 +83,8 @@ def is_distribution_switch(device) -> bool:
     name = normalize_text(getattr(device, "name", ""))
     if dtype != "switch":
         return False
+    if CORE_TOKEN_RE.search(name) or DIST_TOKEN_RE.search(name) or SERVER_SW_TOKEN_RE.search(name):
+        return True
     if "dist" in name or "distribution" in name:
         return True
     if "core" in name:

@@ -85,8 +85,9 @@
   - **uplink => top**
   - **non-uplink => bottom**
   - **left/right** chỉ dùng khi có **override thủ công**.
-- **Rebalance port/side (L1):** sức chứa mỗi band tính theo chiều rộng object và số ô port; khi quá tải chỉ cân lại giữa **top/bottom** để giữ đúng quy ước chuẩn.
-- **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng; offset tối thiểu bằng **max(`bundle_gap`, `grid cell`)** và **tự nhân hệ số theo `total`** (nhiều link → khoảng cách lớn hơn). **Lane shift** được áp **ngay tại anchor (trên cạnh object)** để giữ đường **thẳng ra khỏi thiết bị**; nếu **exit bundle > 1** thì **không dùng đường thẳng trực tiếp**, bắt buộc route qua lưới để tách lane.
+- **Port side stability (L1):** side tự động chỉ theo policy `top/bottom`; không tự ép sang `left/right` trong auto pass để tránh lệch giữa anchor và port band.
+- **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng; offset tối thiểu bằng **max(`bundle_gap`, `grid cell`)** và **tự nhân hệ số theo `total`** (nhiều link → khoảng cách lớn hơn). **Lane shift** được áp **sau đoạn stub rời port**, không dịch trực tiếp endpoint khỏi anchor của ô port.
+- **Endpoint anchoring (L1):** điểm đầu/cuối link phải trùng side + tọa độ anchor của ô port (sai số render cho phép <= 1px).
 - **Bundle song song (L1):** nếu 2 thiết bị **cùng hàng/cột**, không bị vật cản thì ưu tiên **đường thẳng song song** cho các link bundle (bỏ A\*), để tránh “uốn cong” ngay tại port label.
 - **Peer control links (L1):** `STACK/HA/HSRP` ưu tiên tuyến nội‑area ngắn, tách lane riêng theo loại link để không hòa vào bó uplink/data.
 - **Waypoint (L1):** khi có waypoint giữa 2 Area, link đi qua **nhiều tọa độ neo** trên waypoint (theo lane index) để **không chồng lên nhau**.

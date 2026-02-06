@@ -2,7 +2,6 @@ import type { Rect, RenderLink, RenderTuning, LinkMeta, AreaRectEntry, DeviceRec
 import {
   clamp,
   computeSide,
-  normalizeVector,
   offsetFromAnchor,
   segmentIntersectsRect,
   computeAreaAnchor,
@@ -369,28 +368,6 @@ export function routeLinks(
     })
   }
 
-  const hasCorner = (pts: number[]) => {
-    if (pts.length < 6) return false
-    for (let i = 2; i + 3 < pts.length; i += 2) {
-      const ax = pts[i - 2]
-      const ay = pts[i - 1]
-      const bx = pts[i]
-      const by = pts[i + 1]
-      const cx = pts[i + 2]
-      const cy = pts[i + 3]
-      const dx1 = bx - ax
-      const dy1 = by - ay
-      const dx2 = cx - bx
-      const dy2 = cy - by
-      const len1 = Math.hypot(dx1, dy1)
-      const len2 = Math.hypot(dx2, dy2)
-      if (len1 <= 0 || len2 <= 0) continue
-      const dot = (dx1 * dx2 + dy1 * dy2) / (len1 * len2)
-      if (dot < 0.999) return true
-    }
-    return false
-  }
-
   const hasSignificantDiagonal = (pts: number[], minDiagonal: number) => {
     if (pts.length < 4) return false
     for (let i = 2; i + 1 < pts.length; i += 2) {
@@ -431,43 +408,28 @@ export function routeLinks(
     return out
   }
 
-  const roundOrthogonalCorners = (
+  const orthogonalizePath = (
     pts: Array<{ x: number; y: number }>,
-    cornerRadius: number,
-    minSegmentValue: number
+    preferAxis: 'x' | 'y'
   ) => {
-    if (pts.length <= 2) return pts
-    const output: Array<{ x: number; y: number }> = [pts[0]]
-    for (let i = 1; i < pts.length - 1; i += 1) {
-      const prev = pts[i - 1]
+    if (pts.length <= 1) return pts
+    const out: Array<{ x: number; y: number }> = [pts[0]]
+    for (let i = 1; i < pts.length; i += 1) {
+      const prev = out[out.length - 1]
       const curr = pts[i]
-      const next = pts[i + 1]
-      const v1x = prev.x - curr.x
-      const v1y = prev.y - curr.y
-      const v2x = next.x - curr.x
-      const v2y = next.y - curr.y
-      const len1 = Math.hypot(v1x, v1y)
-      const len2 = Math.hypot(v2x, v2y)
-      if (len1 <= 0 || len2 <= 0) {
-        output.push(curr)
+      const sameX = Math.abs(prev.x - curr.x) < 0.5
+      const sameY = Math.abs(prev.y - curr.y) < 0.5
+      if (sameX || sameY) {
+        out.push(curr)
         continue
       }
-      const dot = (v1x * v2x + v1y * v2y) / (len1 * len2)
-      if (dot > 0.999) {
-        output.push(curr)
-        continue
+      if (preferAxis === 'x') {
+        out.push({ x: curr.x, y: prev.y }, curr)
+      } else {
+        out.push({ x: prev.x, y: curr.y }, curr)
       }
-      const offset = Math.min(cornerRadius, len1 * 0.4, len2 * 0.4)
-      if (offset < minSegmentValue * 0.25) {
-        output.push(curr)
-        continue
-      }
-      const p1 = { x: curr.x + (v1x / len1) * offset, y: curr.y + (v1y / len1) * offset }
-      const p2 = { x: curr.x + (v2x / len2) * offset, y: curr.y + (v2y / len2) * offset }
-      output.push(p1, p2)
     }
-    output.push(pts[pts.length - 1])
-    return output
+    return out
   }
 
   type ExitSide = 'left' | 'right' | 'top' | 'bottom'
@@ -513,7 +475,6 @@ export function routeLinks(
   const exitBundleGap = exitBundleGapBase > 0
     ? Math.max(6, exitBundleGapBase, labelGapBase, gridCell)
     : 0
-  const portEdgeInset = renderTuning.port_edge_inset ?? 0
   const resolveExitGap = (entry?: { total: number }) => {
     if (!entry || entry.total <= 1 || exitBundleGap <= 0) return 0
     const extra = Math.max(0, entry.total - 4)
@@ -530,26 +491,6 @@ export function routeLinks(
     }
     return { dx: offset, dy: 0 }
   }
-  const shiftAnchorAlongSide = (anchor: { x: number; y: number }, rect: Rect, side: ExitSide, offset: number) => {
-    if (side === 'left' || side === 'right') {
-      const minY = rect.y + portEdgeInset
-      const maxY = rect.y + rect.height - portEdgeInset
-      const y = clamp(anchor.y + offset, minY, maxY)
-      return { x: anchor.x, y, side }
-    }
-    const minX = rect.x + portEdgeInset
-    const maxX = rect.x + rect.width - portEdgeInset
-    const x = clamp(anchor.x + offset, minX, maxX)
-    return { x, y: anchor.y, side }
-  }
-  const resolveAnchorShift = (key: string, side: ExitSide, rect: Rect, anchor: { x: number; y: number }) => {
-    const entry = exitBundleIndex.get(key)
-    const gap = resolveExitGap(entry)
-    if (!entry || gap <= 0) return { x: anchor.x, y: anchor.y, side }
-    const offset = (entry.index - (entry.total - 1) / 2) * gap
-    return shiftAnchorAlongSide(anchor, rect, side, offset)
-  }
-
   const occupancy = new Map<string, number>()
   const cache = new Map<string, {
     points: number[]
@@ -602,13 +543,9 @@ export function routeLinks(
       const hasExitBundle = (fromExitEntry?.total ?? 0) > 1 || (toExitEntry?.total ?? 0) > 1
       const fromSide = (fromAnchor.side || computeSide(fromView, toCenter)) as ExitSide
       const toSide = (toAnchor.side || computeSide(toView, fromCenter)) as ExitSide
-      if (isL1) {
-        fromAnchor = resolveAnchorShift(`${link.id}|from`, fromSide, fromView, fromAnchor)
-        toAnchor = resolveAnchorShift(`${link.id}|to`, toSide, toView, toAnchor)
-      } else {
-        fromAnchor = { ...fromAnchor, side: fromSide }
-        toAnchor = { ...toAnchor, side: toSide }
-      }
+      // Keep endpoint anchor pinned to the port cell; lane separation starts after exit stub.
+      fromAnchor = { ...fromAnchor, side: fromSide }
+      toAnchor = { ...toAnchor, side: toSide }
       const bundleOffset = bundle && bundle.total > 1
         ? (bundle.index - (bundle.total - 1) / 2) * ((renderTuning.bundle_gap ?? 0) * scale)
         : 0
@@ -693,8 +630,8 @@ export function routeLinks(
       const toStubDistance = Math.max(baseExitStub, toLabelStub)
       const fromBase = offsetFromAnchor(fromAnchor, fromStubDistance)
       const toBase = offsetFromAnchor(toAnchor, toStubDistance)
-      const fromExitShift = isL1 ? { dx: 0, dy: 0 } : resolveExitShift(`${link.id}|from`)
-      const toExitShift = isL1 ? { dx: 0, dy: 0 } : resolveExitShift(`${link.id}|to`)
+      const fromExitShift = resolveExitShift(`${link.id}|from`)
+      const toExitShift = resolveExitShift(`${link.id}|to`)
       const fromExit = { x: fromBase.x + fromExitShift.dx, y: fromBase.y + fromExitShift.dy }
       const toExit = { x: toBase.x + toExitShift.dx, y: toBase.y + toExitShift.dy }
       const purpose = (link.purpose || '').trim().toUpperCase()
@@ -1122,12 +1059,16 @@ export function routeLinks(
         }
       }
 
-      if (isL1 && !routed && points.length >= 6 && hasCorner(points)) {
+      if (isL1 && points.length >= 4) {
         const pathPoints: Array<{ x: number; y: number }> = []
         for (let i = 0; i + 1 < points.length; i += 2) {
           pathPoints.push({ x: points[i], y: points[i + 1] })
         }
-        const simplified = simplifyOrthogonalPath(pathPoints)
+        const primaryAxis: 'x' | 'y' = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y)
+          ? 'x'
+          : 'y'
+        const orth = orthogonalizePath(pathPoints, primaryAxis)
+        const simplified = simplifyOrthogonalPath(orth)
         points = []
         simplified.forEach(point => pushPoint(points, point.x, point.y))
       }

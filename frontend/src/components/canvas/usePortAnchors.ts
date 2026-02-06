@@ -164,41 +164,6 @@ export function usePortAnchors(deps: {
         buckets[side].push(port)
       })
 
-      // --- Port side capacity rebalancing ---
-      // Keep auto anchors in top/bottom bands and move overflow to the opposite vertical band.
-      const baseSpacing = renderTuning.value.bundle_gap ?? 22
-      const labelOffset = renderTuning.value.port_label_offset ?? 0
-      const labelInset = 6
-      const effectiveLabelOffset = Math.max(0, labelOffset - labelInset)
-      const labelHeight = 16
-      const labelGap = Math.max(2, (renderTuning.value.label_gap_y ?? 0) * 0.5)
-      const labelSpacingPenalty = Math.round(labelHeight * 0.5)
-      const minSpacing = Math.max(
-        baseSpacing + effectiveLabelOffset + labelSpacingPenalty,
-        labelHeight + labelGap
-      )
-      const sideCap = (s: string) => {
-        if (s === 'top' || s === 'bottom') {
-          const len = rect.width
-          return Math.max(1, Math.floor((len - portEdgeInset * 2) / minSpacing))
-        }
-        return Number.POSITIVE_INFINITY
-      }
-      for (const side of ['top', 'bottom'] as const) {
-        const list = buckets[side]
-        const cap = sideCap(side)
-        if (list.length <= cap + 1) continue
-        const targetSide = side === 'top' ? 'bottom' : 'top'
-        const targetList = buckets[targetSide]
-        const targetFree = Math.max(0, sideCap(targetSide) - targetList.length)
-        if (targetFree <= 0) continue
-        // Keep earliest ports on preferred side, move overflow to the opposite vertical band.
-        list.sort(comparePorts)
-        const excess = list.splice(cap)
-        targetList.push(...excess.slice(0, targetFree))
-        list.push(...excess.slice(targetFree))
-      }
-
       const anchors = new Map<string, { x: number; y: number; side: string }>()
       ;(['left', 'right'] as const).forEach(side => {
         const list = buckets[side]

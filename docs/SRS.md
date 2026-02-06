@@ -47,6 +47,7 @@
 - Tab **Bố cục** cần có thành phần khai báo nhanh kết nối peer-control (`HA/STACK/HSRP`) và hiển thị legend màu/nét/chú giải tương ứng.
 - Với L1, điểm nối port tự động phải theo quy ước: **uplink ở cạnh trên (top)**, **kết nối không phải uplink ở cạnh dưới (bottom)**; chỉ cho phép lệch quy ước khi có **override thủ công**.
 - Với L1, **nhãn port là một phần của object** (port band trên/dưới), không render nhãn nổi giữa đường link.
+- Với L1, điểm đầu/cuối link phải **bám đúng anchor của ô port**; cơ chế tách lane chỉ được áp dụng **sau đoạn stub rời port**, không được dời trực tiếp anchor khỏi ô port.
 - Kích thước object L1 phải **co giãn theo số lượng port và độ dài nhãn port** để giữ rõ ràng theo sơ đồ chuẩn PDF.
 - Khoảng cách giữa thiết bị trong auto-layout **tính cả phần mở rộng theo port band** để tránh chồng lấn.
 - Render L1 ưu tiên kiểu kỹ thuật: đường orthogonal/góc vuông rõ, giảm dùng màu nhấn cho link LAN/DEFAULT để hạn chế rối.

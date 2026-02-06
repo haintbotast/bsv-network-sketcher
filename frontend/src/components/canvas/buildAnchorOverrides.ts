@@ -1,5 +1,5 @@
 import type { Rect, RenderTuning, AnchorOverrideMap, LinkMeta, AreaRectEntry, DeviceRectEntry, PortAnchorOverrideMap } from './linkRoutingTypes'
-import { clamp, computeSide, computeSideFromVector, segmentIntersectsRect } from './linkRoutingUtils'
+import { clamp, computeSide, computeSideFromVector } from './linkRoutingUtils'
 
 export type BuildAnchorOverridesParams = {
   isL1View: boolean
@@ -23,12 +23,16 @@ export function buildAnchorOverrides(
   ctx: BuildAnchorOverridesParams
 ): AnchorOverrideMap {
   const {
-    isL1View, scale, clearance, areaRects, deviceRects,
+    isL1View,
     renderTuning, deviceViewMap,
     devicePortList, devicePortSideMap, devicePortOrder, devicePortNeighbors,
-    linkBundleIndex,
     userAnchorOverrides,
   } = ctx
+
+  const normalizeAutoL1Side = (side: 'left' | 'right' | 'top' | 'bottom') => {
+    if (!isL1View) return side
+    return side === 'top' || side === 'bottom' ? side : 'bottom'
+  }
 
   const getUserOverride = (deviceId: string, port: string | undefined) => {
     if (!port) return null
@@ -65,20 +69,6 @@ export function buildAnchorOverrides(
     const deviceMap = portForcedSide.get(deviceId) || new Map<string, 'left' | 'right' | 'top' | 'bottom'>()
     deviceMap.set(port, side)
     portForcedSide.set(deviceId, deviceMap)
-  }
-
-  const registerForcedSideIfUnset = (deviceId: string, port: string, side: 'left' | 'right' | 'top' | 'bottom') => {
-    const deviceMap = portForcedSide.get(deviceId) || new Map<string, 'left' | 'right' | 'top' | 'bottom'>()
-    if (!deviceMap.has(port)) {
-      deviceMap.set(port, side)
-      portForcedSide.set(deviceId, deviceMap)
-    }
-  }
-
-  const registerAlignedCoord = (deviceId: string, port: string, axis: 'x' | 'y', coord: number) => {
-    const deviceMap = portAlignedCoord.get(deviceId) || new Map<string, { axis: 'x' | 'y'; coord: number }>()
-    deviceMap.set(port, { axis, coord })
-    portAlignedCoord.set(deviceId, deviceMap)
   }
 
   const ensureStats = (deviceId: string, port: string) => {
@@ -136,14 +126,16 @@ export function buildAnchorOverrides(
       : { x: entry.fromAnchor.x, y: entry.fromAnchor.y }
     const fromVector = { x: fromNext.x - entry.fromAnchor.x, y: fromNext.y - entry.fromAnchor.y }
     const toVector = { x: toPrev.x - entry.toAnchor.x, y: toPrev.y - entry.toAnchor.y }
-    const fromSide = (Math.hypot(fromVector.x, fromVector.y) >= 1
+    const fromRawSide = (Math.hypot(fromVector.x, fromVector.y) >= 1
       ? computeSideFromVector(fromVector.x, fromVector.y)
       : (entry.fromAnchor.side || computeSide(meta.fromView, meta.toCenter))) as 'left' | 'right' | 'top' | 'bottom'
-    const toSide = (Math.hypot(toVector.x, toVector.y) >= 1
+    const toRawSide = (Math.hypot(toVector.x, toVector.y) >= 1
       ? computeSideFromVector(toVector.x, toVector.y)
       : (entry.toAnchor.side || computeSide(meta.toView, meta.fromCenter))) as 'left' | 'right' | 'top' | 'bottom'
     const fromOverride = getUserOverride(meta.link.fromDeviceId, meta.link.fromPort)
     const toOverride = getUserOverride(meta.link.toDeviceId, meta.link.toPort)
+    const fromSide = fromOverride?.side ?? normalizeAutoL1Side(fromRawSide)
+    const toSide = toOverride?.side ?? normalizeAutoL1Side(toRawSide)
 
     if (meta.link.fromPort && !hasUserOverride(meta.link.fromDeviceId, meta.link.fromPort)) {
       const coord = fromSide === 'left' || fromSide === 'right' ? fromNext.y : fromNext.x
@@ -154,107 +146,6 @@ export function buildAnchorOverrides(
       const coord = toSide === 'left' || toSide === 'right' ? toPrev.y : toPrev.x
       record(meta.link.toDeviceId, meta.link.toPort, toSide, coord)
       registerNeighborDevice(meta.link.toDeviceId, meta.link.toPort, meta.link.fromDeviceId)
-    }
-
-    if (
-      isL1View
-      && meta.link.fromPort
-      && meta.link.toPort
-    ) {
-      const fromCenter = meta.fromCenter
-      const toCenter = meta.toCenter
-      const fromView = meta.fromView
-      const toView = meta.toView
-      const dxCenter = toCenter.x - fromCenter.x
-      const dyCenter = toCenter.y - fromCenter.y
-      const rowTolerance = Math.min(fromView.height, toView.height) * 0.35
-      const colTolerance = Math.min(fromView.width, toView.width) * 0.35
-      let axis: 'x' | 'y' | null = null
-      if (Math.abs(dyCenter) <= rowTolerance && Math.abs(dxCenter) >= Math.abs(dyCenter)) {
-        axis = 'y'
-      } else if (Math.abs(dxCenter) <= colTolerance && Math.abs(dyCenter) > Math.abs(dxCenter)) {
-        axis = 'x'
-      }
-
-      if (axis) {
-        const expectedSides = axis === 'y' ? ['left', 'right'] : ['top', 'bottom']
-        if (fromOverride && !expectedSides.includes(fromOverride.side)) axis = null
-        if (toOverride && !expectedSides.includes(toOverride.side)) axis = null
-      }
-
-      if (axis) {
-        const portEdgeInset = renderTuning.port_edge_inset ?? 0
-        const bundle = linkBundleIndex.get(meta.link.id)
-        const bundleGap = Math.max(6, (renderTuning.bundle_gap ?? 0) * scale * 0.6)
-        const bundleOffset = bundle && bundle.total > 1
-          ? (bundle.index - (bundle.total - 1) / 2) * bundleGap
-          : 0
-        const baseCoord = axis === 'y'
-          ? (fromCenter.y + toCenter.y) / 2
-          : (fromCenter.x + toCenter.x) / 2
-
-        const fromMin = axis === 'y'
-          ? fromView.y + portEdgeInset
-          : fromView.x + portEdgeInset
-        const fromMax = axis === 'y'
-          ? fromView.y + fromView.height - portEdgeInset
-          : fromView.x + fromView.width - portEdgeInset
-        const toMin = axis === 'y'
-          ? toView.y + portEdgeInset
-          : toView.x + portEdgeInset
-        const toMax = axis === 'y'
-          ? toView.y + toView.height - portEdgeInset
-          : toView.x + toView.width - portEdgeInset
-        const minCoord = Math.max(fromMin, toMin)
-        const maxCoord = Math.min(fromMax, toMax)
-        if (minCoord <= maxCoord) {
-          const coord = clamp(baseCoord + bundleOffset, minCoord, maxCoord)
-          const fromSideAligned = axis === 'y'
-            ? (toCenter.x >= fromCenter.x ? 'right' : 'left')
-            : (toCenter.y >= fromCenter.y ? 'bottom' : 'top')
-          const toSideAligned = axis === 'y'
-            ? (fromCenter.x >= toCenter.x ? 'right' : 'left')
-            : (fromCenter.y >= toCenter.y ? 'bottom' : 'top')
-          if (fromOverride && fromOverride.side !== fromSideAligned) return
-          if (toOverride && toOverride.side !== toSideAligned) return
-          const fromSideFinal = fromOverride?.side ?? fromSideAligned
-          const toSideFinal = toOverride?.side ?? toSideAligned
-
-          const fromAnchor = axis === 'y'
-            ? { x: fromSideFinal === 'left' ? fromView.x : fromView.x + fromView.width, y: coord }
-            : { x: coord, y: fromSideFinal === 'top' ? fromView.y : fromView.y + fromView.height }
-          const toAnchor = axis === 'y'
-            ? { x: toSideFinal === 'left' ? toView.x : toView.x + toView.width, y: coord }
-            : { x: coord, y: toSideFinal === 'top' ? toView.y : toView.y + toView.height }
-
-          const obstacles: Rect[] = []
-          deviceRects.forEach(({ id, rect }) => {
-            if (id === meta.link.fromDeviceId || id === meta.link.toDeviceId) return
-            obstacles.push(rect)
-          })
-          if (meta.fromAreaId && meta.toAreaId && meta.fromAreaId !== meta.toAreaId) {
-            areaRects.forEach(({ id, rect }) => {
-              if (id === meta.fromAreaId || id === meta.toAreaId) return
-              obstacles.push(rect)
-            })
-          }
-
-          const blocked = obstacles.some(rect =>
-            segmentIntersectsRect(fromAnchor, toAnchor, rect, clearance)
-          )
-
-          if (!blocked) {
-            registerAlignedCoord(meta.link.fromDeviceId, meta.link.fromPort, axis, coord)
-            registerAlignedCoord(meta.link.toDeviceId, meta.link.toPort, axis, coord)
-            if (!fromOverride) {
-              registerForcedSideIfUnset(meta.link.fromDeviceId, meta.link.fromPort, fromSideAligned as 'left' | 'right' | 'top' | 'bottom')
-            }
-            if (!toOverride) {
-              registerForcedSideIfUnset(meta.link.toDeviceId, meta.link.toPort, toSideAligned as 'left' | 'right' | 'top' | 'bottom')
-            }
-          }
-        }
-      }
     }
 
     if (
@@ -280,6 +171,7 @@ export function buildAnchorOverrides(
   })
 
   pairGroups.forEach(list => {
+    if (isL1View) return
     if (list.length < 2) return
     const orientationByDevice = new Map<string, 'left' | 'right' | 'top' | 'bottom'>()
     let valid = true
@@ -316,6 +208,7 @@ export function buildAnchorOverrides(
   })
 
   pairGroups.forEach(list => {
+    if (isL1View) return
     if (list.length < 2) return
     const first = list[0]
     const aRect = deviceViewMap.get(first.fromDeviceId)

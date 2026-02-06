@@ -60,6 +60,7 @@
 - Cụm điều khiển chính (`zoom/reset/L1/L2/L3/Sửa vị trí`) cần nằm ở main navigator panel và **canh giữa theo panel**; khi drag object phải có gióng/snap để căn chỉnh nhanh theo object liên quan.
 - Tọa độ chỉnh tay cần theo bộ mốc chuẩn X/Y (step mặc định 0.25 đv) để vận hành dễ kiểm soát và đồng nhất giữa người dùng.
 - Quy ước L1 bắt buộc theo sơ đồ chuẩn: **uplink đặt ở top của object**, **kết nối còn lại đặt ở bottom** (trừ khi người dùng override thủ công).
+- Endpoint của link L1 phải bám đúng ô port trên object; lane separation chỉ áp dụng sau đoạn stub rời port để tránh lệch điểm nối so với nhãn port.
 - Nhãn port trong L1 phải là **thành phần của object** (không là nhãn nổi trên link); kích thước object co giãn theo số lượng/độ dài port để giữ bố cục rõ ràng như PDF chuẩn.
 - L1 phải ưu tiên phong cách kỹ thuật dễ đọc: đường orthogonal/góc vuông rõ và giảm màu nhấn cho kết nối LAN/DEFAULT.
 - UI L1 cần hiển thị khung Area theo dạng compact bám cụm thiết bị (giảm khoảng trắng lớn) nhưng không làm đổi dữ liệu Area gốc.

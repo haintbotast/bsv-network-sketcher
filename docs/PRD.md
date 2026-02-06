@@ -45,6 +45,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-20:** Khung Area ở L1 được phép hiển thị dạng compact theo cụm thiết bị để giảm khoảng trắng, nhưng không thay đổi dữ liệu Area lưu trong DB.
 - **FR-21:** Link `STACK/HA/HSRP` trong L1 phải có style chuyên biệt (màu/nét/lane) và được tách hiển thị khỏi nhóm uplink/data.
 - **FR-22:** Cho phép bật chế độ **Sửa vị trí** để kéo‑thả trực tiếp `Area/Device` trên canvas; lưu `position_x/position_y` ngay khi thả và **không trigger auto-layout** từ thao tác này.
+- **FR-23:** Nhóm điều khiển `zoom/reset/L1/L2/L3/Sửa vị trí` đặt ở **main navigator panel**; khi drag object trong chế độ sửa vị trí phải có **đường gióng/snap alignment** theo object liên quan.
 
 ## 5. Yêu cầu phi chức năng (NFR)
 

@@ -25,7 +25,8 @@
           :key="area.id"
           :config="area.group"
           @click="() => emitSelect(area.id, 'area')"
-          @dragstart="onObjectDragStart"
+          @dragstart="event => onObjectDragStart(event, area.id, 'area')"
+          @dragmove="event => onObjectDragMove(event, area.id, 'area')"
           @dragend="event => onObjectDragEnd(event, area.id, 'area')"
         >
           <v-rect :config="area.rect" />
@@ -54,7 +55,8 @@
           :key="device.id"
           :config="device.group"
           @click="() => emitSelect(device.id, 'device')"
-          @dragstart="onObjectDragStart"
+          @dragstart="event => onObjectDragStart(event, device.id, 'device')"
+          @dragmove="event => onObjectDragMove(event, device.id, 'device')"
           @dragend="event => onObjectDragEnd(event, device.id, 'device')"
         >
           <v-rect :config="device.bodyRect" />
@@ -86,6 +88,11 @@
 
       <!-- L2/L3 Overlay Layer -->
       <v-layer ref="overlayLayerRef" :config="layerTransform">
+        <v-line
+          v-for="guide in alignmentGuides"
+          :key="guide.id"
+          :config="guide.config"
+        />
         <!-- L1 Port Labels -->
         <v-group
           v-for="label in visibleLinkPortLabels"
@@ -121,7 +128,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AreaModel, DeviceModel, LinkModel, Viewport, ViewMode, L2AssignmentRecord, L3AddressRecord } from '../models/types'
-import type { PortAnchorOverrideMap } from './canvas/linkRoutingTypes'
+import type { PortAnchorOverrideMap, Rect } from './canvas/linkRoutingTypes'
 import { getVisibleBounds, logicalRectToView, viewToLogical } from '../utils/viewport'
 import { useLinkRouting } from './canvas/useLinkRouting'
 import { comparePorts } from './canvas/linkRoutingUtils'
@@ -182,12 +189,30 @@ const stageRef = ref()
 const stageSize = ref({ width: 300, height: 200 })
 let observer: ResizeObserver | null = null
 const isPanning = ref(false)
+const isObjectDragging = ref(false)
 const panStartPointer = ref<{ x: number; y: number } | null>(null)
 const panBaseOffset = ref<{ x: number; y: number } | null>(null)
 const panTranslation = ref({ x: 0, y: 0 })
 const pendingTranslation = ref<{ x: number; y: number } | null>(null)
 let panRaf = 0
 const layoutViewport = ref<Viewport>({ ...props.viewport })
+
+type DragObjectContext = {
+  id: string
+  type: 'device' | 'area'
+  width: number
+  height: number
+  areaId: string | null
+}
+
+type AlignmentMatch = {
+  axis: 'x' | 'y'
+  delta: number
+  lineCoord: number
+}
+
+const dragContext = ref<DragObjectContext | null>(null)
+const activeGuideCoords = ref<{ x: number | null; y: number | null }>({ x: null, y: null })
 
 const gridLayerRef = ref()
 const areaLayerRef = ref()
@@ -209,6 +234,42 @@ const gridConfig = computed(() => ({
 
 const visibleBounds = computed(() => getVisibleBounds(stageSize.value, layoutViewport.value))
 
+const alignmentGuides = computed(() => {
+  if (!props.positionEditEnabled || !isObjectDragging.value) return []
+  const guides: Array<{ id: string; config: Record<string, any> }> = []
+  const bounds = visibleBounds.value
+  const x = activeGuideCoords.value.x
+  const y = activeGuideCoords.value.y
+
+  if (x != null) {
+    guides.push({
+      id: 'guide-x',
+      config: {
+        points: [x, bounds.top, x, bounds.bottom],
+        stroke: GUIDE_STROKE,
+        strokeWidth: 1,
+        dash: [6, 4],
+        opacity: 0.85,
+        listening: false,
+      },
+    })
+  }
+  if (y != null) {
+    guides.push({
+      id: 'guide-y',
+      config: {
+        points: [bounds.left, y, bounds.right, y],
+        stroke: GUIDE_STROKE,
+        strokeWidth: 1,
+        dash: [6, 4],
+        opacity: 0.85,
+        listening: false,
+      },
+    })
+  }
+  return guides
+})
+
 const AREA_PADDING = 12
 const TEXT_PADDING = 10
 const SUB_ZONES = new Set(['Department', 'Projects', 'IT'])
@@ -220,6 +281,8 @@ const AREA_DISPLAY_PAD_Y = 18
 const AREA_DISPLAY_LABEL_BAND = 22
 const AREA_DISPLAY_MIN_WIDTH = 200
 const AREA_DISPLAY_MIN_HEIGHT = 130
+const DRAG_SNAP_THRESHOLD_PX = 10
+const GUIDE_STROKE = '#d66c3b'
 
 const areaViewMap = computed(() => {
   const map = new Map<string, { x: number; y: number; width: number; height: number }>()
@@ -1106,6 +1169,58 @@ const deviceAreaMap = computed(() => {
   return map
 })
 
+function clearDragGuides() {
+  activeGuideCoords.value = { x: null, y: null }
+}
+
+function buildAxisAnchors(start: number, size: number) {
+  return [start, start + size * 0.5, start + size]
+}
+
+function resolveAlignmentMatch(
+  sourceValues: number[],
+  targetValues: number[],
+  threshold: number,
+  axis: 'x' | 'y'
+): AlignmentMatch | null {
+  let best: AlignmentMatch | null = null
+  let bestAbs = Number.POSITIVE_INFINITY
+  sourceValues.forEach(source => {
+    targetValues.forEach(target => {
+      const delta = target - source
+      const abs = Math.abs(delta)
+      if (abs > threshold || abs >= bestAbs) return
+      bestAbs = abs
+      best = { axis, delta, lineCoord: target }
+    })
+  })
+  return best
+}
+
+function collectRelatedRects(context: DragObjectContext) {
+  if (context.type === 'area') {
+    const rects: Rect[] = []
+    areaRenderMap.value.forEach((rect, id) => {
+      if (id === context.id) return
+      rects.push(rect)
+    })
+    return rects
+  }
+
+  const rects: Rect[] = []
+  const areaId = context.areaId
+  deviceViewMap.value.forEach((rect, id) => {
+    if (id === context.id) return
+    if (areaId && deviceAreaMap.value.get(id) !== areaId) return
+    rects.push(rect)
+  })
+  if (areaId) {
+    const areaRect = areaRenderMap.value.get(areaId)
+    if (areaRect) rects.push(areaRect)
+  }
+  return rects
+}
+
 const DEFAULT_RENDER_TUNING = {
   port_edge_inset: 6,
   port_label_offset: 12,
@@ -1323,13 +1438,58 @@ function onPointerDown(event: any) {
   pendingTranslation.value = null
 }
 
-function onObjectDragStart() {
+function onObjectDragStart(_event: any, id: string, type: 'device' | 'area') {
   if (!props.positionEditEnabled) return
+  const rect = type === 'area' ? areaRenderMap.value.get(id) : deviceViewMap.value.get(id)
+  if (!rect) return
+
+  isObjectDragging.value = true
+  dragContext.value = {
+    id,
+    type,
+    width: rect.width,
+    height: rect.height,
+    areaId: type === 'device' ? (deviceAreaMap.value.get(id) || null) : null,
+  }
+  clearDragGuides()
+
   isPanning.value = false
   panStartPointer.value = null
   panBaseOffset.value = null
   panTranslation.value = { x: 0, y: 0 }
   pendingTranslation.value = null
+}
+
+function onObjectDragMove(event: any, id: string, type: 'device' | 'area') {
+  if (!props.positionEditEnabled) return
+  const context = dragContext.value
+  if (!context || context.id !== id || context.type !== type) return
+  const target = event?.target
+  if (!target || typeof target.x !== 'function' || typeof target.y !== 'function') return
+
+  const rawX = Number(target.x())
+  const rawY = Number(target.y())
+  if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) return
+
+  const threshold = Math.max(2, DRAG_SNAP_THRESHOLD_PX / Math.max(zoomScale.value, 0.1))
+  const relatedRects = collectRelatedRects(context)
+  const targetXValues = relatedRects.flatMap(rect => buildAxisAnchors(rect.x, rect.width))
+  const targetYValues = relatedRects.flatMap(rect => buildAxisAnchors(rect.y, rect.height))
+  const sourceXValues = buildAxisAnchors(rawX, context.width)
+  const sourceYValues = buildAxisAnchors(rawY, context.height)
+
+  const matchX = resolveAlignmentMatch(sourceXValues, targetXValues, threshold, 'x')
+  const matchY = resolveAlignmentMatch(sourceYValues, targetYValues, threshold, 'y')
+
+  const snappedX = matchX ? rawX + matchX.delta : rawX
+  const snappedY = matchY ? rawY + matchY.delta : rawY
+  if (snappedX !== rawX) target.x(snappedX)
+  if (snappedY !== rawY) target.y(snappedY)
+
+  activeGuideCoords.value = {
+    x: matchX?.lineCoord ?? null,
+    y: matchY?.lineCoord ?? null,
+  }
 }
 
 function onObjectDragEnd(event: any, id: string, type: 'device' | 'area') {
@@ -1339,6 +1499,10 @@ function onObjectDragEnd(event: any, id: string, type: 'device' | 'area') {
   const x = Number(target.x())
   const y = Number(target.y())
   if (!Number.isFinite(x) || !Number.isFinite(y)) return
+
+  isObjectDragging.value = false
+  dragContext.value = null
+  clearDragGuides()
 
   const logicalX = viewToLogical(x, layoutViewport.value.scale, layoutViewport.value.offsetX)
   const logicalY = viewToLogical(y, layoutViewport.value.scale, layoutViewport.value.offsetY)
@@ -1425,13 +1589,16 @@ onBeforeUnmount(() => {
     observer.unobserve(containerRef.value)
   }
   observer = null
+  isObjectDragging.value = false
+  dragContext.value = null
+  clearDragGuides()
   if (batchDrawRaf) {
     cancelAnimationFrame(batchDrawRaf)
     batchDrawRaf = 0
   }
 })
 
-watch([visibleAreas, visibleDevices, visibleLinks, visibleLinkPortLabels, l2Labels, l3Labels, stageSize], () => {
+watch([visibleAreas, visibleDevices, visibleLinks, visibleLinkPortLabels, l2Labels, l3Labels, alignmentGuides, stageSize], () => {
   scheduleBatchDraw()
 })
 

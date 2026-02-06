@@ -1,14 +1,33 @@
 <template>
   <div class="app-shell">
     <header class="topbar">
-      <div>
-        <h1>BSV Network Sketcher</h1>
-        <p>Port từ Network Sketcher gốc</p>
+      <div class="topbar-main">
+        <div>
+          <h1>BSV Network Sketcher</h1>
+          <p>Port từ Network Sketcher gốc</p>
+        </div>
+        <div class="status">
+          <span>Backend</span>
+          <strong :class="statusClass">{{ statusText }}</strong>
+        </div>
       </div>
-      <div class="status">
-        <span>Backend</span>
-        <strong :class="statusClass">{{ statusText }}</strong>
-      </div>
+      <nav class="topbar-nav">
+        <button type="button" @click="handleZoomIn">Zoom +</button>
+        <button type="button" @click="handleZoomOut">Zoom -</button>
+        <button type="button" class="ghost" @click="handleResetViewport">Reset view</button>
+        <button type="button" :class="{ active: positionEditEnabled }" @click="togglePositionEditMode">
+          {{ positionEditEnabled ? 'Khóa vị trí' : 'Sửa vị trí' }}
+        </button>
+        <span class="toolbar-divider"></span>
+        <button type="button" :class="{ active: viewMode === 'L1' }" @click="setViewMode('L1')">[L1]</button>
+        <button type="button" :class="{ active: viewMode === 'L2' }" @click="setViewMode('L2')">[L2]</button>
+        <button type="button" :class="{ active: viewMode === 'L3' }" @click="setViewMode('L3')">[L3]</button>
+        <span class="view-badge">{{ viewModeLabel }}</span>
+        <span class="toolbar-divider"></span>
+        <button type="button" class="ghost" @click="toggleRightPanel">
+          {{ showRightPanel ? 'Ẩn panel' : 'Hiện panel' }}
+        </button>
+      </nav>
     </header>
 
     <section class="workspace" :class="{ 'right-collapsed': !showRightPanel }" :style="{ '--right-panel-width': `${rightPanelWidth}px` }">
@@ -65,23 +84,6 @@
       </aside>
 
       <main class="canvas">
-        <div class="canvas-toolbar">
-          <button type="button" @click="handleZoomIn">Zoom +</button>
-          <button type="button" @click="handleZoomOut">Zoom -</button>
-          <button type="button" class="ghost" @click="handleResetViewport">Reset view</button>
-          <button type="button" :class="{ active: positionEditEnabled }" @click="togglePositionEditMode">
-            {{ positionEditEnabled ? 'Khóa vị trí' : 'Sửa vị trí' }}
-          </button>
-          <span class="toolbar-divider"></span>
-          <button type="button" :class="{ active: viewMode === 'L1' }" @click="setViewMode('L1')">[L1]</button>
-          <button type="button" :class="{ active: viewMode === 'L2' }" @click="setViewMode('L2')">[L2]</button>
-          <button type="button" :class="{ active: viewMode === 'L3' }" @click="setViewMode('L3')">[L3]</button>
-          <span class="view-badge">{{ viewModeLabel }}</span>
-          <span class="toolbar-divider"></span>
-          <button type="button" class="ghost" @click="toggleRightPanel">
-            {{ showRightPanel ? 'Ẩn panel' : 'Hiện panel' }}
-          </button>
-        </div>
         <!-- Viewport interaction không được trigger auto-layout. -->
         <CanvasStage
           :areas="canvasAreas"
@@ -1357,14 +1359,20 @@ onMounted(() => {
 }
 
 .topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  gap: 12px;
   background: var(--panel);
   border-radius: 18px;
   border: 1px solid var(--panel-border);
   padding: 18px 22px;
   box-shadow: var(--shadow);
+}
+
+.topbar-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .topbar h1 {
@@ -1549,21 +1557,18 @@ onMounted(() => {
   position: relative;
 }
 
-.canvas-toolbar {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 2;
+.topbar-nav {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.92);
+  padding: 10px;
+  background: #faf6f2;
   border-radius: 12px;
   border: 1px solid rgba(28, 28, 28, 0.1);
-  box-shadow: var(--shadow);
 }
 
-.canvas-toolbar button {
+.topbar-nav button {
   border-radius: 10px;
   border: 1px solid transparent;
   padding: 6px 10px;
@@ -1572,12 +1577,12 @@ onMounted(() => {
   font-size: 12px;
 }
 
-.canvas-toolbar .ghost {
+.topbar-nav .ghost {
   background: transparent;
   border-color: #dccfc4;
 }
 
-.canvas-toolbar button.active {
+.topbar-nav button.active {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);

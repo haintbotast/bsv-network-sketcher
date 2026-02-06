@@ -22,6 +22,7 @@
 - **uplink_anchor_policy:** L1 auto-anchor phải đặt **uplink ở top** và **non-uplink ở bottom**; chỉ lệch khi có override thủ công.
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
 - **manual_position_edit_policy:** khi bật chế độ sửa vị trí, kéo‑thả `Area/Device` phải lưu `position_x/position_y` về DB ở `drag-end` và không trigger `/auto-layout`.
+- **drag_alignment_policy:** trong chế độ sửa vị trí phải hiển thị guide ngang/dọc và snap nhẹ khi object gần mốc align của object liên quan.
 - **link_update_validation:** cập nhật link phải chặn **trùng link** và **port đã dùng** (kể cả khi chỉ đổi đầu còn lại).
 - **inter‑area:** link khác Area bắt buộc qua Waypoint area (`_wp_`).
 
@@ -243,6 +244,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Manual position edit: bật chế độ sửa vị trí, kéo‑thả `Area/Device` và thả chuột sẽ lưu `position_x/position_y` thành công.
 - [ ] Manual position edit: thao tác kéo‑thả chỉnh vị trí không phát sinh request `/auto-layout`.
 - [ ] Manual position edit: khi tắt chế độ sửa vị trí, kéo chuột trên object không thay đổi tọa độ lưu DB.
+- [ ] Manual position edit: khi drag gần trục giữa/mép của object liên quan, phải hiện guide ngang/dọc và object snap nhẹ vào trục đó.
 - [ ] Uplink anchor policy: endpoint uplink (tier thấp -> tier cao) luôn neo ở top; chiều ngược lại neo ở bottom.
 - [ ] Uplink anchor policy: khi không suy ra tier, heuristic `port index = 1` phải neo top.
 - [ ] Uplink anchor policy: override thủ công (`side + offset_ratio`) phải giữ ưu tiên cao nhất.

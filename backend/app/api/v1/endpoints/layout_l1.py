@@ -326,7 +326,6 @@ def compute_layout_l1(
         ]
 
         ports_by_device = collect_device_ports(area_port_links)
-        label_clearance_x, label_clearance_y = estimate_label_clearance(ports_by_device, render_cfg)
 
         # Compute max rendered size accounting for frontend port band expansion
         max_rendered_w = DEFAULT_DEVICE_WIDTH
@@ -340,13 +339,14 @@ def compute_layout_l1(
             max_rendered_h = max(max_rendered_h, r_h)
         area_node_width = max_rendered_w + max(0.0, label_extra)
         area_node_height = max_rendered_h + max(0.0, label_extra)
+        # Port labels render as band cells inside device — no extra label clearance needed.
         area_micro_config = LayoutConfig(
-            layer_gap=micro_config.layer_gap + label_clearance_y,
-            node_spacing=micro_config.node_spacing + label_clearance_x,
+            layer_gap=micro_config.layer_gap,
+            node_spacing=micro_config.node_spacing,
             node_width=area_node_width,
             node_height=area_node_height,
             max_nodes_per_row=micro_config.max_nodes_per_row,
-            row_gap=micro_config.row_gap + label_clearance_y,
+            row_gap=micro_config.row_gap,
             row_stagger=micro_config.row_stagger,
         )
 
@@ -461,7 +461,10 @@ def compute_layout_l1(
             else:
                 # Cell trùng nhau: dàn ngang nhẹ để tránh chồng lấn.
                 x = base_x + index_in_cell * (area_meta[aid]["computed_width"] + AREA_GAP * 0.5)
-            y = row_offsets[row]
+            # Căn giữa dọc trong row nếu area thấp hơn row height.
+            area_h = area_meta[aid]["computed_height"]
+            y_offset = (row_heights[row] - area_h) / 2 if area_h < row_heights[row] else 0
+            y = row_offsets[row] + y_offset
             positions[aid] = (x, y)
 
         return positions

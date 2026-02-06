@@ -7,15 +7,15 @@ export const GRID_FALLBACK_Y = 2.5
 
 // Layout tuning: khoảng cách và padding (đơn vị: inch)
 export const DEFAULT_LAYOUT_TUNING: LayoutTuning = {
-  layer_gap: 1.8,         // Khoảng cách giữa các tầng (Core → Distribution → Access)
-  node_spacing: 1.0,      // Khoảng cách ngang giữa các device
-  port_label_band: 0.25,  // Dải dành cho port labels
-  area_gap: 1.3,          // Khoảng cách giữa các area
-  area_padding: 0.4,      // Padding bên trong area
-  label_band: 0.5,        // Dải cho area label
+  layer_gap: 0.9,         // Khoảng cách giữa các tầng (giảm vì port bands đã tạo phân cách)
+  node_spacing: 0.7,      // Khoảng cách ngang giữa các device
+  port_label_band: 0.0,   // Không cần thêm — port labels nằm trong band cells
+  area_gap: 0.9,          // Khoảng cách giữa các area
+  area_padding: 0.3,      // Padding bên trong area
+  label_band: 0.35,       // Dải cho area label
   max_row_width_base: 12.0,
   max_nodes_per_row: 8,
-  row_gap: 0.6,           // Khoảng cách giữa các hàng trong area
+  row_gap: 0.5,           // Khoảng cách giữa các hàng trong area
   row_stagger: 0.5        // Độ so le hàng (0-1)
 }
 

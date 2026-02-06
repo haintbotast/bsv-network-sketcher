@@ -15,52 +15,50 @@ export function usePortAnchors(deps: {
   portAnchorOverrides?: ComputedRef<PortAnchorOverrideMap>
 }) {
   const { props, renderTuning, deviceViewMap, portAnchorOverrides } = deps
+  const normalizeType = (value: string) => value.trim().toLowerCase()
+  const normalizeName = (value: string) => value.trim().toLowerCase()
+  const deviceTier = (type: string, name: string) => {
+    const t = normalizeType(type)
+    const n = normalizeName(name)
+    if (t === 'router' || /(router|rtr|edge|wan|internet|isp)/.test(n)) return 0
+    if (t === 'firewall' || /(firewall|fw|security|ids|ips|vpn|waf)/.test(n)) return 1
+    if (/(core)/.test(n)) return 2
+    if (/(distribution|dist|ds\d*)/.test(n)) return 3
+    if (/(access|acc|asw)/.test(n)) return 4
+    if (t === 'switch' && /(server|srv|storage|nas|san|sv\d*)/.test(n)) return 5
+    if (t === 'server' || t === 'storage' || /(server|srv|app|web|db|nas|san|storage|backup)/.test(n)) return 6
+    if (['pc', 'printer', 'camera', 'phone', 'ipphone', 'endpoint', 'ap'].includes(t)) return 7
+    if (/(pc|printer|prn|cam|cctv|phone|ipphone|endpoint|client|terminal|ap)/.test(n)) return 7
+    return 5
+  }
+
   const deviceInfoMap = computed(() => {
-    const map = new Map<string, { type: string; name: string }>()
+    const map = new Map<string, { type: string; name: string; tier: number }>()
     const devices = (props as { devices?: DeviceModel[] }).devices || []
     devices.forEach(device => {
-      map.set(device.id, { type: device.type || '', name: device.name || '' })
+      const type = device.type || ''
+      const name = device.name || ''
+      map.set(device.id, { type, name, tier: deviceTier(type, name) })
     })
     return map
   })
 
-  const normalizeType = (value: string) => value.trim().toLowerCase()
-  const normalizeName = (value: string) => value.trim().toLowerCase()
-  const isServerLike = (type: string, name: string) => {
-    const t = normalizeType(type)
-    if (t === 'server' || t === 'storage') return true
-    const n = normalizeName(name)
-    return /(server|srv|app|web|db|nas|san|storage|backup)/.test(n)
-  }
-  const isEndpointLike = (type: string, name: string) => {
-    const t = normalizeType(type)
-    if (['pc', 'printer', 'camera', 'phone', 'ipphone', 'endpoint', 'ap'].includes(t)) return true
-    const n = normalizeName(name)
-    return /(pc|printer|prn|cam|cctv|phone|ipphone|endpoint|client|terminal|ap)/.test(n)
-  }
   const isUplinkPort = (port: string) => {
     const idx = extractPortIndex(port)
     return idx === 1
   }
-  const resolvePreferredSide = (
+  const resolveAutoSide = (
     deviceId: string,
+    neighborId: string,
     port: string | undefined,
-    deviceRect: Rect,
-    neighborRect: Rect,
-    fallbackSide: string
-  ) => {
-    if (!port) return fallbackSide
+  ): 'top' | 'bottom' => {
     const info = deviceInfoMap.value.get(deviceId)
-    if (!info) return fallbackSide
-    if (!isUplinkPort(port)) return fallbackSide
-    if (!isServerLike(info.type, info.name) && !isEndpointLike(info.type, info.name)) {
-      return fallbackSide
+    const neighborInfo = deviceInfoMap.value.get(neighborId)
+    if (info && neighborInfo && info.tier !== neighborInfo.tier) {
+      return info.tier > neighborInfo.tier ? 'top' : 'bottom'
     }
-    const centerY = deviceRect.y + deviceRect.height / 2
-    const neighborY = neighborRect.y + neighborRect.height / 2
-    if (neighborY < centerY) return 'top'
-    if (neighborY > centerY) return 'bottom'
-    return fallbackSide
+    if (port && isUplinkPort(port)) return 'top'
+    return 'bottom'
   }
 
   const devicePortList = computed(() => {
@@ -152,12 +150,8 @@ export function usePortAnchors(deps: {
       const fromRect = deviceViewMap.value.get(link.fromDeviceId)
       const toRect = deviceViewMap.value.get(link.toDeviceId)
       if (!fromRect || !toRect) return
-      const toCenter = { x: toRect.x + toRect.width / 2, y: toRect.y + toRect.height / 2 }
-      const fromCenter = { x: fromRect.x + fromRect.width / 2, y: fromRect.y + fromRect.height / 2 }
-      const fromFallback = computeSide(fromRect, toCenter)
-      const toFallback = computeSide(toRect, fromCenter)
-      const fromSide = resolvePreferredSide(link.fromDeviceId, link.fromPort, fromRect, toRect, fromFallback)
-      const toSide = resolvePreferredSide(link.toDeviceId, link.toPort, toRect, fromRect, toFallback)
+      const fromSide = resolveAutoSide(link.fromDeviceId, link.toDeviceId, link.fromPort)
+      const toSide = resolveAutoSide(link.toDeviceId, link.fromDeviceId, link.toPort)
       if (link.fromPort) bump(link.fromDeviceId, link.fromPort, fromSide)
       if (link.toPort) bump(link.toDeviceId, link.toPort, toSide)
     })
@@ -168,7 +162,7 @@ export function usePortAnchors(deps: {
       portVotes.forEach((votes, port) => {
         const entries = Object.entries(votes) as Array<[string, number]>
         entries.sort((a, b) => b[1] - a[1])
-        portSide.set(port, entries[0]?.[0] || 'right')
+        portSide.set(port, entries[0]?.[0] || 'bottom')
       })
       resolved.set(deviceId, portSide)
     })
@@ -194,17 +188,16 @@ export function usePortAnchors(deps: {
       const rect = deviceViewMap.value.get(deviceId)
       if (!rect || ports.length === 0) return
       const sideMap = devicePortSideMap.value.get(deviceId) || new Map<string, string>()
-      const orderMap = devicePortOrder.value.get(deviceId) || new Map<string, number>()
       const neighborMap = devicePortNeighbors.value.get(deviceId) || new Map<string, { xSum: number; ySum: number; count: number }>()
       const buckets: Record<string, string[]> = { left: [], right: [], top: [], bottom: [] }
 
       ports.forEach(port => {
-        const side = sideMap.get(port) || 'right'
+        const side = sideMap.get(port) || 'bottom'
         buckets[side].push(port)
       })
 
       // --- Port side capacity rebalancing ---
-      // If too many ports assigned to one side, move excess to adjacent sides
+      // Keep auto anchors in top/bottom bands and move overflow to the opposite vertical band.
       const baseSpacing = renderTuning.value.bundle_gap ?? 22
       const labelOffset = renderTuning.value.port_label_offset ?? 0
       const labelInset = 6
@@ -217,43 +210,25 @@ export function usePortAnchors(deps: {
         labelHeight + labelGap
       )
       const sideCap = (s: string) => {
-        const len = (s === 'left' || s === 'right') ? rect.height : rect.width
-        return Math.max(1, Math.floor((len - portEdgeInset * 2) / minSpacing))
+        if (s === 'top' || s === 'bottom') {
+          const len = rect.width
+          return Math.max(1, Math.floor((len - portEdgeInset * 2) / minSpacing))
+        }
+        return Number.POSITIVE_INFINITY
       }
-      const adjSides: Record<string, [string, string]> = {
-        left: ['top', 'bottom'], right: ['top', 'bottom'],
-        top: ['left', 'right'], bottom: ['left', 'right']
-      }
-      const sideAlign = (side: string, n: { xSum: number; ySum: number; count: number } | undefined) => {
-        if (!n) return 0
-        const cx = rect.x + rect.width / 2
-        const cy = rect.y + rect.height / 2
-        const nx = n.xSum / n.count
-        const ny = n.ySum / n.count
-        if (side === 'left') return -(nx - cx)
-        if (side === 'right') return nx - cx
-        if (side === 'top') return -(ny - cy)
-        return ny - cy
-      }
-      for (const side of ['left', 'right', 'top', 'bottom']) {
+      for (const side of ['top', 'bottom'] as const) {
         const list = buckets[side]
         const cap = sideCap(side)
         if (list.length <= cap + 1) continue
-        // Keep ports most aligned with this side, move the rest
-        list.sort((a, b) => sideAlign(side, neighborMap.get(b)) - sideAlign(side, neighborMap.get(a)))
+        const targetSide = side === 'top' ? 'bottom' : 'top'
+        const targetList = buckets[targetSide]
+        const targetFree = Math.max(0, sideCap(targetSide) - targetList.length)
+        if (targetFree <= 0) continue
+        // Keep earliest ports on preferred side, move overflow to the opposite vertical band.
+        list.sort(comparePorts)
         const excess = list.splice(cap)
-        const [adj0, adj1] = adjSides[side]
-        for (const port of excess) {
-          const s0 = sideCap(adj0) - buckets[adj0].length
-          const s1 = sideCap(adj1) - buckets[adj1].length
-          if (s0 <= 0 && s1 <= 0) { list.push(port); continue }
-          if (s0 <= 0) { buckets[adj1].push(port); continue }
-          if (s1 <= 0) { buckets[adj0].push(port); continue }
-          // Both have space - pick side more aligned with port's neighbor
-          const a0 = sideAlign(adj0, neighborMap.get(port))
-          const a1 = sideAlign(adj1, neighborMap.get(port))
-          buckets[a0 >= a1 ? adj0 : adj1].push(port)
-        }
+        targetList.push(...excess.slice(0, targetFree))
+        list.push(...excess.slice(targetFree))
       }
 
       const anchors = new Map<string, { x: number; y: number; side: string }>()
@@ -312,10 +287,24 @@ export function usePortAnchors(deps: {
     target: { x: number; y: number },
     portName?: string
   ) {
+    const resolveTopBottomFallback = (port: string) => {
+      const inset = renderTuning.value.port_edge_inset ?? 0
+      const usableWidth = Math.max(rect.width - inset * 2, 1)
+      const index = extractPortIndex(port)
+      const ratio = index == null || Number.isNaN(index)
+        ? clamp((target.x - rect.x - inset) / usableWidth, 0.1, 0.9)
+        : ((index % 12) + 0.5) / 12
+      const x = rect.x + inset + usableWidth * ratio
+      const isTop = isUplinkPort(port)
+      const y = isTop ? rect.y : rect.y + rect.height
+      return { x, y, side: isTop ? 'top' : 'bottom' }
+    }
+
     if (portName) {
       const anchors = devicePortAnchors.value.get(deviceId)
       const anchor = anchors?.get(portName)
       if (anchor) return anchor
+      return resolveTopBottomFallback(portName)
     }
     return {
       ...computePortAnchorFallback(rect, target, portName, renderTuning.value.port_edge_inset ?? 0),

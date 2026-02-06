@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-29  
+> **Cập nhật:** 2026-02-06  
 > **Mục tiêu:** Định nghĩa các kiểm tra tối thiểu thay cho golden files, đảm bảo đúng logic và không vỡ bố cục.
 
 ---
@@ -90,6 +90,7 @@
 - **RB-204:** Overview (nếu bật) chỉ hiển thị L1/flow (không render nhãn L2/L3).
 - **RB-205:** Nếu có **Area Data Center**, các thiết bị Edge/Security/DMZ/Core/Distribution phải nằm trong area này (cảnh báo nếu nằm ngoài).
 - **RB-206:** Area Server ưu tiên đặt **cùng hàng hoặc ngay dưới DMZ** (cảnh báo nếu thấp hơn quá 1 tier).
+- **RB-207:** Với L1 auto-anchor (không có override thủ công), **uplink phải neo ở top** và **non-uplink phải neo ở bottom**.
 
 ---
 

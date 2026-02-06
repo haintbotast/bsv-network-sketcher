@@ -56,6 +56,7 @@
 - Cho phép **chỉnh anchor port thủ công** (side + offset_ratio) để tinh chỉnh đường kết nối; `offset_ratio` có thể để `null` để giữ **auto offset**.
 - Cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port** ngay trong bảng thuộc tính thiết bị, có kiểm tra trùng và port đã dùng.
 - Auto-layout tự chạy khi mở project và sau CRUD topology; thao tác viewport (`pan/zoom/reset view`) không làm thay đổi layout.
+- Quy ước L1 bắt buộc theo sơ đồ chuẩn: **uplink đặt ở top của object**, **kết nối còn lại đặt ở bottom** (trừ khi người dùng override thủ công).
 - Bảo vệ dữ liệu dự án (phân quyền theo project, kiểm soát upload/download).
 - Cho phép quản trị preset/layout/validation qua trang cấu hình (không hardcode).
 

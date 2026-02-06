@@ -38,6 +38,7 @@
 - Auto-layout tự động chạy khi **mở project** và sau mọi CRUD topology của project (area/device/link/port-link/anchor override), có debounce để giảm chạy dồn.
 - Auto-layout **không được trigger** bởi thao tác viewport để xem sơ đồ (`pan`, `zoom`, `reset view`).
 - Cho phép chạy lại auto-layout khi người dùng chủ động từ tab **Bố cục**.
+- Với L1, điểm nối port tự động phải theo quy ước: **uplink ở cạnh trên (top)**, **kết nối không phải uplink ở cạnh dưới (bottom)**; chỉ cho phép lệch quy ước khi có **override thủ công**.
 - Khoảng cách giữa thiết bị trong auto-layout **tính cả vùng nhãn port (Interface Tag)** để tránh chồng lấn.
 - Cho phép người dùng **override anchor per-port** bằng `side + offset_ratio` (cho phép `offset_ratio = null` để giữ auto offset); override **được lưu DB** và **không bị auto-layout ghi đè**.
 - Bảng thuộc tính thiết bị cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port**, áp dụng kiểm tra **trùng link** và **port đã dùng** trước khi lưu.

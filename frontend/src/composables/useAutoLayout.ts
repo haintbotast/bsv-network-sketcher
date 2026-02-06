@@ -66,7 +66,7 @@ export function useAutoLayout(deps: {
         layout_scope: 'project',
         anchor_routing: true,
         overview_mode: 'l1-only',
-        normalize_topology: true
+        normalize_topology: false
       })
       autoLayoutAutoAppliedProjects.add(projectId)
       await deps.loadProjectData(projectId)
@@ -99,7 +99,7 @@ export function useAutoLayout(deps: {
         layout_scope: 'project',
         anchor_routing: true,
         overview_mode: 'l1-only',
-        normalize_topology: true
+        normalize_topology: false
       })
       autoLayoutAutoAppliedProjects.add(projectId)
       await deps.loadProjectData(projectId)

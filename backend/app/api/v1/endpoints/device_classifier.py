@@ -15,6 +15,11 @@ from .layout_constants import (
     SERVER_AREA_KEYWORDS,
     SECURITY_AREA_KEYWORDS,
     DMZ_AREA_KEYWORDS,
+    CLOUD_AREA_KEYWORDS,
+    EDGE_AREA_KEYWORDS,
+    VPN_AREA_KEYWORDS,
+    ACCESS_AREA_KEYWORDS,
+    MONITOR_AREA_KEYWORDS,
     normalize_text,
 )
 
@@ -91,6 +96,48 @@ def classify_area_kind(name: str | None) -> str | None:
         return "security"
     if any(keyword in label for keyword in DMZ_AREA_KEYWORDS):
         return "dmz"
-    if any(keyword in label for keyword in ["edge", "wan", "internet", "isp"]):
+    if any(keyword in label for keyword in CLOUD_AREA_KEYWORDS):
+        return "cloud"
+    if any(keyword in label for keyword in VPN_AREA_KEYWORDS):
+        return "vpn"
+    if any(keyword in label for keyword in EDGE_AREA_KEYWORDS):
         return "edge"
+    if any(keyword in label for keyword in ACCESS_AREA_KEYWORDS):
+        return "access"
+    if any(keyword in label for keyword in MONITOR_AREA_KEYWORDS):
+        return "monitor"
     return None
+
+
+# Mapping: loại device → các area kind mà device đó "hợp lệ" khi ở đó
+_COMPATIBLE_KINDS: dict[str, set[str]] = {
+    "security": {"security", "vpn", "edge", "cloud", "datacenter", "dmz"},
+    "server": {"cloud", "edge", "server", "datacenter", "security"},
+    "router": {"edge", "datacenter", "vpn"},
+    "monitor": {"monitor", "access"},
+    "dmz": {"dmz", "security", "datacenter"},
+    "distribution_switch": {"datacenter", "server"},
+    "access_switch": {"access", "edge"},
+}
+
+
+def device_compatible_with_area_kind(device, area_kind: str | None) -> bool:
+    """Trả về True nếu device đang ở area có kind phù hợp → không cần di chuyển."""
+    if area_kind is None:
+        return False
+
+    if is_monitor_device(device):
+        return area_kind in _COMPATIBLE_KINDS["monitor"]
+    if is_server_device(device):
+        return area_kind in _COMPATIBLE_KINDS["server"]
+    if is_security_device(device):
+        return area_kind in _COMPATIBLE_KINDS["security"]
+    if is_dmz_device(device):
+        return area_kind in _COMPATIBLE_KINDS["dmz"]
+    if is_router_device(device):
+        return area_kind in _COMPATIBLE_KINDS["router"]
+    if is_distribution_switch(device):
+        return area_kind in _COMPATIBLE_KINDS["distribution_switch"]
+    if is_access_switch(device):
+        return area_kind in _COMPATIBLE_KINDS["access_switch"]
+    return False

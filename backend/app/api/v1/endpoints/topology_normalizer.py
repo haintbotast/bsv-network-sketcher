@@ -21,6 +21,7 @@ from .area_classifier import (
 )
 from .device_classifier import (
     classify_area_kind,
+    device_compatible_with_area_kind,
     is_monitor_device,
     is_server_device,
     is_security_device,
@@ -124,6 +125,10 @@ async def normalize_topology(
         area_kind = classify_area_kind(current_area.name if current_area else None)
         target_area = None
 
+        # Guard: nếu device đã ở area có kind phù hợp → không di chuyển
+        if device_compatible_with_area_kind(device, area_kind):
+            continue
+
         if is_monitor_device(device):
             target_area = it_area
         elif is_server_device(device):
@@ -161,11 +166,16 @@ async def normalize_topology(
     if updated:
         await db.commit()
 
-    # Remove empty areas (no devices) after normalization
+    # Chỉ xóa area trống nếu do normalizer tạo ra (không xóa area gốc của user/template)
+    normalizer_area_names = {
+        normalize_text(f"{prefix}Data Center" if prefix else "Data Center"),
+        normalize_text(f"{prefix}Servers" if prefix else "Servers"),
+        normalize_text(f"{prefix}IT" if prefix else "IT"),
+    }
     area_ids_in_use = {device.area_id for device in devices}
     removed = False
     for area in list(area_by_id.values()):
-        if area.id not in area_ids_in_use:
+        if area.id not in area_ids_in_use and normalize_text(area.name) in normalizer_area_names:
             await db.delete(area)
             removed = True
     if removed:

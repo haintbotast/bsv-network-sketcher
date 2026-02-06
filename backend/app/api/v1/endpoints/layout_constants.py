@@ -5,7 +5,7 @@ Layout constants and keyword dictionaries.
 import re
 
 AREA_PREFIX_RE = re.compile(r"^([A-Za-z0-9]{2,6})(\s*-\s*)")
-SECURITY_AREA_KEYWORDS = ["security", "firewall", "fw", "ids", "ips", "vpn", "soc"]
+SECURITY_AREA_KEYWORDS = ["security", "firewall", "fw", "ids", "ips", "soc"]
 SERVER_AREA_KEYWORDS = ["server", "servers", "storage", "nas", "san"]
 DMZ_AREA_KEYWORDS = ["dmz", "proxy"]
 DATACENTER_AREA_KEYWORDS = ["datacenter", "data center", "dc"]
@@ -18,6 +18,12 @@ MONITOR_DEVICE_KEYWORDS = ["monitor", "monitoring", "noc", "nms"]
 SERVER_SWITCH_KEYWORDS = ["server", "srv", "storage", "nas"]
 ACCESS_SWITCH_KEYWORDS = ["access", "acc"]
 DMZ_DEVICE_KEYWORDS = ["dmz", "waf", "proxy"]
+
+CLOUD_AREA_KEYWORDS = ["cloud", "saas", "paas", "iaas"]
+EDGE_AREA_KEYWORDS = ["edge", "wan", "internet", "isp", "branch"]
+VPN_AREA_KEYWORDS = ["vpn", "tunnel", "ipsec"]
+ACCESS_AREA_KEYWORDS = ["access", "floor", "department", "dept"]
+MONITOR_AREA_KEYWORDS = ["monitor", "monitoring", "noc", "nms", "it"]
 
 DEPT_AREA_KEYWORDS = ["department", "dept"]
 PROJECT_AREA_KEYWORDS = ["project", "proj"]

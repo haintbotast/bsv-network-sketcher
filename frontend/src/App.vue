@@ -959,6 +959,48 @@ function buildAnchorOverridePayload(deviceId: string, portName: string, draft: A
   }
 }
 
+function computeAutoAnchorSlotRatios() {
+  const buckets: Record<'left' | 'right' | 'top' | 'bottom', string[]> = {
+    left: [],
+    right: [],
+    top: [],
+    bottom: [],
+  }
+  selectedDevicePorts.value.forEach(port => {
+    const draft = anchorDrafts.value[port]
+    if (!draft) return
+    buckets[draft.side].push(port)
+  })
+  ;(['left', 'right', 'top', 'bottom'] as const).forEach(side => {
+    buckets[side].sort(comparePorts)
+  })
+  const ratioMap = new Map<string, number>()
+  ;(['left', 'right', 'top', 'bottom'] as const).forEach(side => {
+    const list = buckets[side]
+    const total = list.length
+    if (!total) return
+    list.forEach((port, index) => {
+      ratioMap.set(port, (index + 1) / (total + 1))
+    })
+  })
+  return ratioMap
+}
+
+function resolveSwapPosition(port: string, slotRatios: Map<string, number>) {
+  const draft = anchorDrafts.value[port]
+  if (!draft) return null
+  if (!draft.autoOffset) {
+    return {
+      side: draft.side,
+      ratio: normalizeAnchorOffsetRatio(draft.offsetRatio),
+    }
+  }
+  return {
+    side: draft.side,
+    ratio: normalizeAnchorOffsetRatio(slotRatios.get(port) ?? 0.5),
+  }
+}
+
 const canSwapAnchorWith = (port: string) => {
   const target = anchorSwapTargets.value[port]
   return !!target && target !== port && !!anchorDrafts.value[port] && !!anchorDrafts.value[target]
@@ -982,8 +1024,23 @@ async function swapAnchorWith(port: string) {
   const deviceId = (selectedObject.value as DeviceRow).id
   const previousSource = { ...sourceDraft }
   const previousTarget = { ...targetDraft }
-  const nextSource = { ...previousTarget }
-  const nextTarget = { ...previousSource }
+  const slotRatios = computeAutoAnchorSlotRatios()
+  const sourcePosition = resolveSwapPosition(port, slotRatios)
+  const targetPosition = resolveSwapPosition(targetPort, slotRatios)
+  if (!sourcePosition || !targetPosition) {
+    setNotice('Không thể xác định vị trí hiện tại của port để đổi.', 'error')
+    return
+  }
+  const nextSource: AnchorDraft = {
+    side: targetPosition.side,
+    offsetRatio: targetPosition.ratio,
+    autoOffset: false,
+  }
+  const nextTarget: AnchorDraft = {
+    side: sourcePosition.side,
+    offsetRatio: sourcePosition.ratio,
+    autoOffset: false,
+  }
 
   anchorDrafts.value[port] = nextSource
   anchorDrafts.value[targetPort] = nextTarget
@@ -998,6 +1055,8 @@ async function swapAnchorWith(port: string) {
     }
 
     scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'anchor-crud' })
+    anchorSwapTargets.value[port] = ''
+    anchorSwapTargets.value[targetPort] = ''
     setNotice(`Đã đổi vị trí anchor giữa '${port}' và '${targetPort}'.`, 'success')
   } catch (error: any) {
     anchorDrafts.value[port] = previousSource

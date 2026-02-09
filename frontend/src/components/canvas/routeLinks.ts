@@ -1168,7 +1168,8 @@ export function routeLinks(
         finalPath.forEach(point => pushPoint(points, point.x, point.y))
       }
 
-      if (grid && isInterArea && points.length >= 4 && !occupancyRecorded) {
+      const shouldRecordInterAreaOccupancy = !denseRouting || aStarCalls < Math.max(6, Math.floor(maxAStarCalls * 0.35))
+      if (grid && isInterArea && points.length >= 4 && !occupancyRecorded && shouldRecordInterAreaOccupancy) {
         const pathPoints: Array<{ x: number; y: number }> = []
         for (let i = 0; i + 1 < points.length; i += 2) {
           pathPoints.push({ x: points[i], y: points[i + 1] })

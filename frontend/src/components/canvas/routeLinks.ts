@@ -270,8 +270,10 @@ function computePadCorridors(
   const laneSpacing = Math.max(8, (renderTuning.bundle_gap ?? 0) * scale * 2.8)
   const laneSnapStep = Math.max(8, laneSpacing * 0.5)
   const pairKey = (a: string, b: string) => a < b ? `${a}|${b}` : `${b}|${a}`
-  const linksPerChannel = Math.max(1, Math.round(renderTuning.inter_area_links_per_channel ?? 4))
-  const maxChannels = Math.max(1, Math.round(renderTuning.inter_area_max_channels ?? 4))
+  const linksPerChannelRaw = Number(renderTuning.inter_area_links_per_channel ?? 4)
+  const maxChannelsRaw = Number(renderTuning.inter_area_max_channels ?? 4)
+  const linksPerChannel = clamp(Number.isFinite(linksPerChannelRaw) ? Math.round(linksPerChannelRaw) : 4, 1, 24)
+  const maxChannels = clamp(Number.isFinite(maxChannelsRaw) ? Math.round(maxChannelsRaw) : 4, 1, 8)
 
   const pairCounts = new Map<string, number>()
   for (const meta of linkMetas) {
@@ -419,22 +421,6 @@ export function routeLinks(
     return hits
   }
 
-  const estimateOccupancyCost = (pts: Array<{ x: number; y: number }>) => {
-    if (!grid || pts.length < 2) return 0
-    const path = polylineToGridPath(pts, grid)
-    if (path.length < 2) return 0
-    let load = 0
-    for (let i = 1; i < path.length; i += 1) {
-      const a = path[i - 1]
-      const b = path[i]
-      const aKey = `${a.gx},${a.gy}`
-      const bKey = `${b.gx},${b.gy}`
-      const key = aKey < bKey ? `${aKey}|${bKey}` : `${bKey}|${aKey}`
-      load += occupancy.get(key) || 0
-    }
-    return load
-  }
-
   const hasSignificantDiagonal = (pts: number[], minDiagonal: number) => {
     if (pts.length < 4) return false
     for (let i = 2; i + 1 < pts.length; i += 2) {
@@ -559,6 +545,7 @@ export function routeLinks(
     return { dx: offset, dy: 0 }
   }
   const occupancy = new Map<string, number>()
+  const corridorLoad = new Map<string, Map<number, number>>()
   const cache = new Map<string, {
     points: number[]
     fromAnchor: { x: number; y: number; side?: string }
@@ -823,7 +810,8 @@ export function routeLinks(
           const laneNudge = localTotal > 1
             ? (localIndex - (localTotal - 1) / 2) * laneNudgeGap
             : 0
-          const occupancyWeight = Math.max(0, renderTuning.inter_area_occupancy_weight ?? 1)
+          const occupancyWeightRaw = Number(renderTuning.inter_area_occupancy_weight ?? 1)
+          const occupancyWeight = clamp(Number.isFinite(occupancyWeightRaw) ? occupancyWeightRaw : 1, 0, 5)
 
           const channelOrder = corridorPlan.channels
             .map((channel, idx) => ({
@@ -841,6 +829,7 @@ export function routeLinks(
             score: number
             hits: number
             path: Array<{ x: number; y: number }>
+            channelIndex: number
           } | null = null
 
           for (const candidate of channelOrder) {
@@ -861,17 +850,22 @@ export function routeLinks(
             const simplified = simplifyOrthogonalPath(corridorPath)
             const hits = computePathHits(simplified, obstacles, clearance)
             const length = computePolylineLength(simplified)
-            const occupancyCost = estimateOccupancyCost(simplified) * occupancyWeight * Math.max(1, grid?.size ?? 1)
+            const pairLoad = corridorLoad.get(pairKey)
+            const channelLoad = pairLoad?.get(candidate.idx) || 0
+            const occupancyCost = channelLoad * occupancyWeight * Math.max(1, corridorPlan.laneSpacing * 0.35)
             const channelPenalty = candidate.distance * corridorPlan.laneSpacing * 1.6
             const score = hits * 100000 + length + occupancyCost + channelPenalty
             if (!bestRoute || score < bestRoute.score) {
-              bestRoute = { score, hits, path: simplified }
+              bestRoute = { score, hits, path: simplified, channelIndex: candidate.idx }
             }
           }
 
           if (bestRoute && bestRoute.hits === 0) {
             points = []
             bestRoute.path.forEach(point => pushPoint(points, point.x, point.y))
+            const pairLoad = corridorLoad.get(pairKey) || new Map<number, number>()
+            pairLoad.set(bestRoute.channelIndex, (pairLoad.get(bestRoute.channelIndex) || 0) + 1)
+            corridorLoad.set(pairKey, pairLoad)
             routed = true
           }
         }
@@ -1158,7 +1152,7 @@ export function routeLinks(
         finalPath.forEach(point => pushPoint(points, point.x, point.y))
       }
 
-      if (grid && points.length >= 4 && !occupancyRecorded) {
+      if (grid && isInterArea && points.length >= 4 && !occupancyRecorded) {
         const pathPoints: Array<{ x: number; y: number }> = []
         for (let i = 0; i + 1 < points.length; i += 2) {
           pathPoints.push({ x: points[i], y: points[i + 1] })

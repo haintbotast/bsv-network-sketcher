@@ -22,6 +22,10 @@ DEFAULT_ADMIN_CONFIG: Dict[str, Any] = {
         "max_nodes_per_row": 8,
         "row_gap": 0.9,
         "row_stagger": 0.5,
+        "adaptive_area_gap_factor": 0.06,
+        "adaptive_area_gap_cap": 0.8,
+        "inter_area_gap_per_link": 0.04,
+        "inter_area_gap_cap": 0.35,
     },
     "render_tuning": {
         "port_edge_inset": 6,
@@ -33,6 +37,9 @@ DEFAULT_ADMIN_CONFIG: Dict[str, Any] = {
         "label_gap_x": 8,
         "label_gap_y": 6,
         "corridor_gap": 64,
+        "inter_area_links_per_channel": 4,
+        "inter_area_max_channels": 4,
+        "inter_area_occupancy_weight": 1.0,
     },
 }
 

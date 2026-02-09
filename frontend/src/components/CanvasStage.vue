@@ -1264,7 +1264,10 @@ const DEFAULT_RENDER_TUNING = {
   area_anchor_offset: 26,
   label_gap_x: 8,
   label_gap_y: 6,
-  corridor_gap: 64
+  corridor_gap: 64,
+  inter_area_links_per_channel: 4,
+  inter_area_max_channels: 4,
+  inter_area_occupancy_weight: 1.0
 }
 const renderTuning = computed(() => ({
   ...DEFAULT_RENDER_TUNING,

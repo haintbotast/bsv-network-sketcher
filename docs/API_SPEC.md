@@ -239,6 +239,7 @@ POST /admin/config/versions/{version_id}/restore
 **Phạm vi cấu hình:** preset layout/style, validation rules + layout checks, export defaults.
 **Schema:** xem `docs/ADMIN_CONFIG_SCHEMA.md`.
 **Bổ sung:** `layout_tuning` và `render_tuning` dùng để điều chỉnh auto-layout & routing/label trên UI.
+Các tham số mới cho chất lượng liên‑area gồm: `adaptive_area_gap_factor`, `inter_area_gap_per_link`, `inter_area_links_per_channel`, `inter_area_max_channels`, `inter_area_occupancy_weight`.
 
 ---
 

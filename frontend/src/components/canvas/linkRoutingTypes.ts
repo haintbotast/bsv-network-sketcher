@@ -27,6 +27,9 @@ export type RenderTuning = {
   label_gap_x?: number
   label_gap_y?: number
   corridor_gap?: number
+  inter_area_links_per_channel?: number
+  inter_area_max_channels?: number
+  inter_area_occupancy_weight?: number
 }
 
 export type LinkMeta = {

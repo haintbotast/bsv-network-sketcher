@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-01-23  
+> **Cập nhật:** 2026-02-09  
 > **Mục tiêu:** Đảm bảo hệ thống đạt mức tối thiểu để phát hành ổn định, đúng logic và dễ vận hành.
 
 ---
@@ -29,6 +29,8 @@
 ### 2.3 UI/UX tối thiểu
 - Tạo project → thêm area/device/link → export được qua UI.
 - Có thông báo lỗi rõ ràng khi validate thất bại.
+- L1 liên‑area không tạo spaghetti nghiêm trọng: cùng cặp Area có thể tách multi-channel corridor.
+- Tuyến fallback liên‑area không đi ngoài đường bao sơ đồ.
 
 ### 2.4 Ổn định & giới hạn
 - Không crash khi xử lý small/medium.
@@ -78,6 +80,8 @@
 - [ ] UI flow tạo project → nhập dữ liệu → export chạy trơn tru.
 - [ ] Audit log hoạt động cho thao tác quản trị.
 - [ ] Line jump/arc hiển thị đúng tại giao điểm link (intra-area và inter-area).
+- [ ] Cặp Area có mật độ link cao được tách multi-channel corridor và không dồn vào 1 lane duy nhất.
+- [ ] Không có tuyến fallback liên‑area chạy ngoài vùng thiết kế sơ đồ.
 - [ ] Backup DB trước khi phát hành.
 
 ---

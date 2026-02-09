@@ -33,6 +33,8 @@ def compute_waypoint_center(
 
     overlap_x = min(right_a, right_b) - max(left_a, left_b)
     overlap_y = min(bottom_a, bottom_b) - max(top_a, top_b)
+    horizontal_gap = max(0.0, max(left_a, left_b) - min(right_a, right_b))
+    vertical_gap = max(0.0, max(top_a, top_b) - min(bottom_a, bottom_b))
 
     if right_a <= left_b:
         cx = (right_a + left_b) / 2
@@ -54,6 +56,12 @@ def compute_waypoint_center(
     bcy = (top_b + bottom_b) / 2
     dx = bcx - acx
     dy = bcy - acy
+
+    # Khoảng trống giữa 2 area quá hẹp thì đẩy waypoint ra phía ngoài để tránh chen vào object.
+    if horizontal_gap > 0 and horizontal_gap < (wp_width + clearance * 2):
+        cy = max(bottom_a, bottom_b) + wp_height / 2 + clearance if dy >= 0 else min(top_a, top_b) - wp_height / 2 - clearance
+    if vertical_gap > 0 and vertical_gap < (wp_height + clearance * 2):
+        cx = max(right_a, right_b) + wp_width / 2 + clearance if dx >= 0 else min(left_a, left_b) - wp_width / 2 - clearance
 
     if overlap_x > 0 and overlap_y > 0:
         if abs(dx) >= abs(dy):
@@ -104,15 +112,15 @@ async def create_or_update_waypoint_areas(
     area_name_map = {a.id: a.name for a in areas}
 
     # Tìm unique inter-area pairs
-    inter_pairs: set[tuple[str, str]] = set()
+    inter_pair_counts: dict[tuple[str, str], int] = {}
     for link in links:
         fa = device_area.get(link.from_device_id)
         ta = device_area.get(link.to_device_id)
         if fa and ta and fa != ta:
             pair = tuple(sorted([fa, ta]))
-            inter_pairs.add(pair)
+            inter_pair_counts[pair] = inter_pair_counts.get(pair, 0) + 1
 
-    if not inter_pairs:
+    if not inter_pair_counts:
         return
 
     # Area layout lookup (từ compute_layout_l1)
@@ -131,10 +139,7 @@ async def create_or_update_waypoint_areas(
         "stroke_width": 0.5,
     })
 
-    wp_width = 0.6
-    wp_height = 0.4
-
-    for aid_a, aid_b in inter_pairs:
+    for (aid_a, aid_b), link_count in inter_pair_counts.items():
         names = sorted([area_name_map.get(aid_a, ""), area_name_map.get(aid_b, "")])
         wp_name = f"{names[0]}_{names[1]}_wp_"
 
@@ -143,8 +148,13 @@ async def create_or_update_waypoint_areas(
         if not la or not lb:
             continue
 
+        density = max(1, int(link_count))
+        wp_width = min(1.6, 0.6 + max(0, density - 1) * 0.08)
+        wp_height = min(1.0, 0.4 + max(0, density - 1) * 0.05)
+        wp_clearance = 0.15 + min(0.35, max(0, density - 1) * 0.03)
+
         # Waypoint đặt ở hành lang giữa 2 area (ưu tiên giữa biên)
-        center_x, center_y = compute_waypoint_center(la, lb, wp_width, wp_height)
+        center_x, center_y = compute_waypoint_center(la, lb, wp_width, wp_height, clearance=wp_clearance)
         mid_x = center_x - wp_width / 2
         mid_y = center_y - wp_height / 2
 

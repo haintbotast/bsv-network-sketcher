@@ -44,6 +44,11 @@ def compute_layout_l1(
     AREA_PADDING = float(tuning.get("area_padding", 0.3))
     LABEL_BAND = float(tuning.get("label_band", 0.45))
     MAX_ROW_WIDTH_BASE = float(tuning.get("max_row_width_base", 12.0))
+    ADAPTIVE_AREA_GAP_FACTOR = max(0.0, float(tuning.get("adaptive_area_gap_factor", 0.06)))
+    ADAPTIVE_AREA_GAP_CAP = max(0.0, float(tuning.get("adaptive_area_gap_cap", 0.8)))
+    INTER_AREA_GAP_PER_LINK = max(0.0, float(tuning.get("inter_area_gap_per_link", 0.04)))
+    INTER_AREA_GAP_CAP = max(0.0, float(tuning.get("inter_area_gap_cap", 0.35)))
+    macro_area_gap = AREA_GAP
 
     # Tier characteristics for enhanced layout (11 tiers: 0-10)
     TIER_CHARACTERISTICS = {
@@ -68,7 +73,7 @@ def compute_layout_l1(
         label = normalize(name)
         floor_marker_re = re.compile(r"(?:^|[^a-z0-9])(?:b?\d{1,2}\s*f)(?:$|[^a-z0-9])")
         tier_hints = [
-            (0, ["router", "rtr", "edge", "wan", "internet", "isp"]),
+            (0, ["router", "rtr", "edge", "wan", "internet", "isp", "cloud", "office365", "o365", "saas", "external"]),
             (1, ["security", "firewall", "fw", "ids", "ips", "waf", "vpn", "soc"]),
             (2, ["dmz", "proxy", "datacenter", "data center", "dc"]),
             (3, ["core"]),
@@ -103,7 +108,7 @@ def compute_layout_l1(
             if server_sw_token_re.search(name):
                 return 4
         tier_keywords = [
-            (0, ["router", "rtr", "edge", "wan", "internet", "isp"]),
+            (0, ["router", "rtr", "edge", "wan", "internet", "isp", "cloud", "office365", "o365", "saas", "external"]),
             (1, ["firewall", "fw", "ids", "ips", "waf", "security", "vpn", "soc"]),
             (2, ["dmz", "proxy"]),
             (3, ["core"]),
@@ -136,6 +141,13 @@ def compute_layout_l1(
             return 10
         return 7
 
+    def dynamic_area_gap(left_area_id: str | None = None, right_area_id: str | None = None) -> float:
+        gap = macro_area_gap
+        if left_area_id and right_area_id and left_area_id != right_area_id:
+            weight = area_link_weights.get(left_area_id, {}).get(right_area_id, 0)
+            gap += min(weight * INTER_AREA_GAP_PER_LINK, INTER_AREA_GAP_CAP)
+        return gap
+
     def compute_max_row_width_per_tier(area_ids: list[str], tier: int) -> float:
         if not area_ids:
             return MAX_ROW_WIDTH_BASE
@@ -150,7 +162,7 @@ def compute_layout_l1(
         widths_sorted = sorted(widths, reverse=True)
 
         if len(widths_sorted) >= 2:
-            min_width_for_two = widths_sorted[0] + widths_sorted[1] + AREA_GAP
+            min_width_for_two = widths_sorted[0] + widths_sorted[1] + macro_area_gap
         else:
             min_width_for_two = widths_sorted[0] if widths_sorted else AREA_MIN_WIDTH
 
@@ -158,7 +170,7 @@ def compute_layout_l1(
 
         avg_width = sum(widths) / len(widths)
         target_cols = min(tier_config["max_areas_per_row"], len(area_ids))
-        suggested_width = avg_width * target_cols + AREA_GAP * (target_cols - 1)
+        suggested_width = avg_width * target_cols + macro_area_gap * (target_cols - 1)
 
         return max(base_width, min_width_for_two, suggested_width)
 
@@ -169,13 +181,14 @@ def compute_layout_l1(
         current_width = 0.0
         for aid in area_ids:
             width = area_meta[aid]["computed_width"]
-            if current and current_width + AREA_GAP + width > max_width:
+            gap = dynamic_area_gap(current[-1], aid) if current else 0.0
+            if current and current_width + gap + width > max_width:
                 rows.append(current)
                 current = [aid]
                 current_width = width
             else:
                 if current:
-                    current_width += AREA_GAP + width
+                    current_width += gap + width
                 else:
                     current_width = width
                 current.append(aid)
@@ -186,7 +199,12 @@ def compute_layout_l1(
     def row_width(row: list[str]) -> float:
         if not row:
             return 0.0
-        return sum(area_meta[aid]["computed_width"] for aid in row) + AREA_GAP * (len(row) - 1)
+        total = sum(area_meta[aid]["computed_width"] for aid in row)
+        if len(row) <= 1:
+            return total
+        for idx in range(len(row) - 1):
+            total += dynamic_area_gap(row[idx], row[idx + 1])
+        return total
 
     def row_height(row: list[str]) -> float:
         if not row:
@@ -220,12 +238,14 @@ def compute_layout_l1(
             row_y = current_y
             for row, height in zip(rows, row_heights):
                 current_row_x = 0.0
-                for aid in row:
+                for idx, aid in enumerate(row):
                     positions[aid] = (current_row_x, row_y)
-                    current_row_x += area_meta[aid]["computed_width"] + AREA_GAP
-                row_y += height + AREA_GAP
-            tier_height = sum(row_heights) + AREA_GAP * max(0, len(row_heights) - 1)
-            current_y += tier_height + AREA_GAP
+                    current_row_x += area_meta[aid]["computed_width"]
+                    if idx < len(row) - 1:
+                        current_row_x += dynamic_area_gap(aid, row[idx + 1])
+                row_y += height + macro_area_gap
+            tier_height = sum(row_heights) + macro_area_gap * max(0, len(row_heights) - 1)
+            current_y += tier_height + macro_area_gap
 
         return positions
 
@@ -263,6 +283,13 @@ def compute_layout_l1(
         area_link_weights[to_area][from_area] = area_link_weights[to_area].get(from_area, 0) + 1
         area_external_links[from_area] += 1
         area_external_links[to_area] += 1
+
+    inter_area_densities = sorted(v for v in area_external_links.values() if v > 0)
+    if inter_area_densities:
+        p75_idx = min(len(inter_area_densities) - 1, int(round((len(inter_area_densities) - 1) * 0.75)))
+        p75_density = inter_area_densities[p75_idx]
+        adaptive_extra = min(p75_density * ADAPTIVE_AREA_GAP_FACTOR, ADAPTIVE_AREA_GAP_CAP)
+        macro_area_gap = AREA_GAP + adaptive_extra
 
     # Micro layout config
     layer_gap = max(0.0, config.layer_gap + port_label_band)
@@ -453,13 +480,13 @@ def compute_layout_l1(
         for col in col_values:
             slot_width = col_slot_widths[col]
             col_centers[col] = cursor_x + (slot_width / 2.0)
-            cursor_x += slot_width + AREA_GAP
+            cursor_x += slot_width + macro_area_gap
 
         row_offsets: dict[int, float] = {}
         cursor_y = 0.0
         for row in row_values:
             row_offsets[row] = cursor_y
-            cursor_y += row_heights[row] + AREA_GAP
+            cursor_y += row_heights[row] + macro_area_gap
 
         occupied_cell_counts: dict[tuple[int, int], int] = {}
         area_ids_sorted = sorted(
@@ -485,12 +512,12 @@ def compute_layout_l1(
             x = col_centers[col] - (area_w / 2.0)
             if index_in_cell > 0:
                 # Cell trùng nhau: dàn nhẹ theo đường chéo để tránh chồng lấn tuyệt đối.
-                x += index_in_cell * AREA_GAP * 0.35
+                x += index_in_cell * macro_area_gap * 0.35
             # Căn giữa dọc trong row nếu area thấp hơn row height.
             y_offset = (row_heights[row] - area_h) / 2 if area_h < row_heights[row] else 0
             y = row_offsets[row] + y_offset
             if index_in_cell > 0:
-                y += index_in_cell * AREA_GAP * 0.35
+                y += index_in_cell * macro_area_gap * 0.35
             positions[aid] = (x, y)
 
         # Final pass: prevent overlap between neighboring columns in the same row.
@@ -501,7 +528,7 @@ def compute_layout_l1(
 
         for row, ids in row_area_ids.items():
             ids_sorted = sorted(ids, key=lambda aid: positions[aid][0])
-            min_gap = AREA_GAP * 0.2
+            min_gap = macro_area_gap * 0.2
             prev_right = None
             for aid in ids_sorted:
                 x, y = positions[aid]

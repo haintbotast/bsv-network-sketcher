@@ -31,7 +31,10 @@ export const DEFAULT_RENDER_TUNING: RenderTuning = {
   area_anchor_offset: 26,   // Offset điểm neo từ cạnh area
   label_gap_x: 8,           // Gap label theo chiều ngang
   label_gap_y: 6,           // Gap label theo chiều dọc
-  corridor_gap: 64          // Khoảng cách corridor bên ngoài bounds
+  corridor_gap: 64,         // Khoảng cách corridor bên ngoài bounds
+  inter_area_links_per_channel: 4, // Số link tối đa trước khi tách thêm corridor channel
+  inter_area_max_channels: 4,      // Số channel corridor liên-area tối đa mỗi cặp area
+  inter_area_occupancy_weight: 1.0 // Trọng số tránh đường đã đông khi chọn channel
 }
 
 export const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']

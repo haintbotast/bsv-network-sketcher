@@ -92,6 +92,9 @@
 - **RB-206:** Area Server ưu tiên đặt **cùng hàng hoặc ngay dưới DMZ** (cảnh báo nếu thấp hơn quá 1 tier).
 - **RB-207:** Với L1 auto-anchor (không có override thủ công), **uplink phải neo ở top** và **non-uplink phải neo ở bottom**.
 - **RB-208:** `grid_range` của Area/Device phải đúng định dạng Excel (`A1` hoặc `A1:B2`) và đồng bộ được về tọa độ logic.
+- **RB-209:** Liên‑area routing phải hỗ trợ tách nhiều corridor channel theo cặp Area khi số link vượt ngưỡng `inter_area_links_per_channel`.
+- **RB-210:** Occupancy phải được cập nhật cho cả tuyến A\* và tuyến pad/fallback; route sau phải có chi phí cao hơn khi đi trùng lane đã đông.
+- **RB-211:** Tuyến fallback liên‑area không được đi ra ngoài đường bao sơ đồ (`areaBounds` tổng).
 
 ---
 

@@ -10,6 +10,7 @@ import { resolveLinkPurposeColor } from '../../composables/canvasConstants'
 import {
   addOccupancy,
   connectOrthogonal,
+  polylineToGridPath,
   routeAnyAnglePath,
   routeOrthogonalPath,
   smoothAnyAnglePath,
@@ -150,10 +151,15 @@ interface AreaPadInfo {
   inset: number
 }
 
-interface PadCorridor {
+interface PadCorridorChannel {
   side: PadSide
   coord: number
+}
+
+interface PadCorridorPlan {
   laneSpacing: number
+  channels: PadCorridorChannel[]
+  linkCount: number
 }
 
 function computeAreaPadInfo(
@@ -259,20 +265,29 @@ function computePadCorridors(
   deviceRects: DeviceRectEntry[],
   renderTuning: RenderTuning,
   scale: number,
-): Map<string, PadCorridor> {
-  const result = new Map<string, PadCorridor>()
+): Map<string, PadCorridorPlan> {
+  const result = new Map<string, PadCorridorPlan>()
   const laneSpacing = Math.max(8, (renderTuning.bundle_gap ?? 0) * scale * 2.8)
   const laneSnapStep = Math.max(8, laneSpacing * 0.5)
   const pairKey = (a: string, b: string) => a < b ? `${a}|${b}` : `${b}|${a}`
+  const linksPerChannel = Math.max(1, Math.round(renderTuning.inter_area_links_per_channel ?? 4))
+  const maxChannels = Math.max(1, Math.round(renderTuning.inter_area_max_channels ?? 4))
 
-  const pairs = new Set<string>()
+  const pairCounts = new Map<string, number>()
   for (const meta of linkMetas) {
     if (!meta) continue
     if (!meta.fromAreaId || !meta.toAreaId || meta.fromAreaId === meta.toAreaId) continue
-    pairs.add(pairKey(meta.fromAreaId, meta.toAreaId))
+    const key = pairKey(meta.fromAreaId, meta.toAreaId)
+    pairCounts.set(key, (pairCounts.get(key) || 0) + 1)
   }
 
-  for (const key of pairs) {
+  const alternatingRank = (index: number) => {
+    if (index <= 0) return 0
+    const step = Math.ceil(index / 2)
+    return index % 2 === 1 ? step : -step
+  }
+
+  for (const [key, linkCount] of pairCounts.entries()) {
     const [idA, idB] = key.split('|')
     const areaA = areaViewMap.get(idA)
     const areaB = areaViewMap.get(idB)
@@ -320,13 +335,36 @@ function computePadCorridors(
     const pickLeft = leftScore.hits === rightScore.hits
       ? leftScore.length <= rightScore.length
       : leftScore.hits < rightScore.hits
-    const rawCoord = pickLeft ? leftCoord : rightCoord
-    const snappedCoord = Math.round(rawCoord / laneSnapStep) * laneSnapStep
-    result.set(key, {
-      side: pickLeft ? 'left' : 'right',
-      coord: snappedCoord,
-      laneSpacing
-    })
+    const primary = pickLeft
+      ? { side: 'left' as PadSide, coord: leftCoord }
+      : { side: 'right' as PadSide, coord: rightCoord }
+    const secondary = pickLeft
+      ? { side: 'right' as PadSide, coord: rightCoord }
+      : { side: 'left' as PadSide, coord: leftCoord }
+
+    const channelCount = Math.max(1, Math.min(maxChannels, Math.ceil(linkCount / linksPerChannel)))
+    const channels: PadCorridorChannel[] = []
+    const channelStep = Math.max(8, laneSpacing * 1.15)
+
+    for (let channelIndex = 0; channelIndex < channelCount; channelIndex += 1) {
+      const sidePlan = channelIndex % 2 === 0 ? primary : secondary
+      const bandIndex = Math.floor(channelIndex / 2)
+      const offsetRank = alternatingRank(bandIndex)
+      const rawCoord = sidePlan.coord + offsetRank * channelStep
+      const corridorCoord = resolvePadCorridorCoord(
+        sidePlan.side,
+        rawCoord,
+        padA,
+        padB,
+      )
+      const snappedCoord = Math.round(corridorCoord / laneSnapStep) * laneSnapStep
+      channels.push({
+        side: sidePlan.side,
+        coord: snappedCoord,
+      })
+    }
+
+    result.set(key, { laneSpacing, channels, linkCount })
   }
 
   return result
@@ -357,6 +395,44 @@ export function routeLinks(
       if (last && last.x === point.x && last.y === point.y) return
       arr.push(point)
     })
+  }
+
+  const computePolylineLength = (pts: Array<{ x: number; y: number }>) => {
+    let length = 0
+    for (let i = 1; i < pts.length; i += 1) {
+      const a = pts[i - 1]
+      const b = pts[i]
+      length += Math.abs(b.x - a.x) + Math.abs(b.y - a.y)
+    }
+    return length
+  }
+
+  const computePathHits = (pts: Array<{ x: number; y: number }>, obstacles: Rect[], clearanceValue: number) => {
+    let hits = 0
+    for (let i = 1; i < pts.length; i += 1) {
+      const a = pts[i - 1]
+      const b = pts[i]
+      obstacles.forEach(rect => {
+        if (segmentIntersectsRect(a, b, rect, clearanceValue)) hits += 1
+      })
+    }
+    return hits
+  }
+
+  const estimateOccupancyCost = (pts: Array<{ x: number; y: number }>) => {
+    if (!grid || pts.length < 2) return 0
+    const path = polylineToGridPath(pts, grid)
+    if (path.length < 2) return 0
+    let load = 0
+    for (let i = 1; i < path.length; i += 1) {
+      const a = path[i - 1]
+      const b = path[i]
+      const aKey = `${a.gx},${a.gy}`
+      const bKey = `${b.gx},${b.gy}`
+      const key = aKey < bKey ? `${aKey}|${bKey}` : `${bKey}|${aKey}`
+      load += occupancy.get(key) || 0
+    }
+    return load
   }
 
   const hasSignificantDiagonal = (pts: number[], minDiagonal: number) => {
@@ -540,13 +616,11 @@ export function routeLinks(
       const bundleOffset = bundle && bundle.total > 1
         ? (bundle.index - (bundle.total - 1) / 2) * ((renderTuning.bundle_gap ?? 0) * scale)
         : 0
-      // Increased multiplier for better corridor separation
-      const interAreaBundleGap = (renderTuning.bundle_gap ?? 0) * scale
-        * (areaBundle && areaBundle.total > 4 ? 3.2 : 2.8)
+      const interAreaNudgeGap = Math.max(6, (renderTuning.bundle_gap ?? 0) * scale * 0.35)
       const areaBundleOffset = areaBundle && areaBundle.total > 1
-        ? (areaBundle.index - (areaBundle.total - 1) / 2) * interAreaBundleGap
+        ? (areaBundle.index - (areaBundle.total - 1) / 2) * interAreaNudgeGap
         : 0
-      const interBundleOffset = areaBundleOffset + bundleOffset * 0.5
+      const interBundleOffset = areaBundleOffset + bundleOffset * 0.35
       const anchorOffset = ((renderTuning.area_anchor_offset ?? 0) + (renderTuning.area_clearance ?? 0)) * scale
       const baseExitStub = Math.max(renderTuning.bundle_stub ?? 0, renderTuning.area_clearance ?? 0) * scale
 
@@ -630,6 +704,7 @@ export function routeLinks(
       const isPeerControlLink = isL1 && !!peerPurpose && isIntraArea
 
       let routed = false
+      let occupancyRecorded = false
 
       if (isPeerControlLink && !routed) {
         const rowThreshold = Math.max(fromView.height, toView.height) * 0.85
@@ -732,39 +807,73 @@ export function routeLinks(
       // Hành lang pad cho tuyến liên-area (ép trái/phải trong vùng đệm)
       if (!routed && isL1 && isInterArea && fromAreaId && toAreaId && fromArea && toArea) {
         const pairKey = getPairKey(fromAreaId, toAreaId)
-        const corridor = padCorridors.get(pairKey)
+        const corridorPlan = padCorridors.get(pairKey)
         const padFrom = areaPadMap.get(fromAreaId)
         const padTo = areaPadMap.get(toAreaId)
-        if (corridor && padFrom && padTo) {
-          const laneOffset = areaBundle && areaBundle.total > 1
-            ? (areaBundle.index - (areaBundle.total - 1) / 2) * corridor.laneSpacing
+        if (corridorPlan && corridorPlan.channels.length && padFrom && padTo) {
+          const channelCount = corridorPlan.channels.length
+          const bundleTotal = Math.max(1, areaBundle?.total ?? corridorPlan.linkCount)
+          const bundleIndex = Math.max(0, areaBundle?.index ?? 0)
+          const linksPerChannel = Math.max(1, Math.ceil(bundleTotal / channelCount))
+          const preferredChannel = Math.min(channelCount - 1, Math.floor(bundleIndex / linksPerChannel))
+          const localStart = preferredChannel * linksPerChannel
+          const localTotal = Math.max(1, Math.min(linksPerChannel, bundleTotal - localStart))
+          const localIndex = Math.max(0, Math.min(localTotal - 1, bundleIndex - localStart))
+          const laneNudgeGap = Math.max(4, corridorPlan.laneSpacing * 0.24)
+          const laneNudge = localTotal > 1
+            ? (localIndex - (localTotal - 1) / 2) * laneNudgeGap
             : 0
-          const laneCoord = resolvePadCorridorCoord(
-            corridor.side,
-            corridor.coord + laneOffset,
-            padFrom,
-            padTo,
-          )
+          const occupancyWeight = Math.max(0, renderTuning.inter_area_occupancy_weight ?? 1)
 
-          const fromAreaAnchor = computePadAnchor(fromArea, fromExit, corridor.side, laneOffset, padFrom)
-          const toAreaAnchor = computePadAnchor(toArea, toExit, corridor.side, laneOffset, padTo)
+          const channelOrder = corridorPlan.channels
+            .map((channel, idx) => ({
+              channel,
+              idx,
+              distance: Math.abs(idx - preferredChannel),
+            }))
+            .sort((a, b) => {
+              const primary = a.distance - b.distance
+              if (primary !== 0) return primary
+              return a.idx - b.idx
+            })
 
-          const corridorPath: Array<{ x: number; y: number }> = [
-            fromAnchor, fromBase, fromExit, fromAreaAnchor,
-          ]
-          corridorPath.push({ x: laneCoord, y: fromAreaAnchor.y })
-          corridorPath.push({ x: laneCoord, y: toAreaAnchor.y })
-          corridorPath.push(toAreaAnchor, toExit, toBase, toAnchor)
-          points = []
-          corridorPath.forEach(p => pushPoint(points, p.x, p.y))
-          const pathPoints: Array<{ x: number; y: number }> = []
-          for (let i = 0; i + 1 < points.length; i += 2) {
-            pathPoints.push({ x: points[i], y: points[i + 1] })
+          let bestRoute: {
+            score: number
+            hits: number
+            path: Array<{ x: number; y: number }>
+          } | null = null
+
+          for (const candidate of channelOrder) {
+            const laneCoord = resolvePadCorridorCoord(
+              candidate.channel.side,
+              candidate.channel.coord + laneNudge,
+              padFrom,
+              padTo,
+            )
+            const fromAreaAnchor = computePadAnchor(fromArea, fromExit, candidate.channel.side, laneNudge, padFrom)
+            const toAreaAnchor = computePadAnchor(toArea, toExit, candidate.channel.side, laneNudge, padTo)
+            const corridorPath: Array<{ x: number; y: number }> = [
+              fromAnchor, fromBase, fromExit, fromAreaAnchor,
+              { x: laneCoord, y: fromAreaAnchor.y },
+              { x: laneCoord, y: toAreaAnchor.y },
+              toAreaAnchor, toExit, toBase, toAnchor,
+            ]
+            const simplified = simplifyOrthogonalPath(corridorPath)
+            const hits = computePathHits(simplified, obstacles, clearance)
+            const length = computePolylineLength(simplified)
+            const occupancyCost = estimateOccupancyCost(simplified) * occupancyWeight * Math.max(1, grid?.size ?? 1)
+            const channelPenalty = candidate.distance * corridorPlan.laneSpacing * 1.6
+            const score = hits * 100000 + length + occupancyCost + channelPenalty
+            if (!bestRoute || score < bestRoute.score) {
+              bestRoute = { score, hits, path: simplified }
+            }
           }
-          const simplified = simplifyOrthogonalPath(pathPoints)
-          points = []
-          simplified.forEach(point => pushPoint(points, point.x, point.y))
-          routed = true
+
+          if (bestRoute && bestRoute.hits === 0) {
+            points = []
+            bestRoute.path.forEach(point => pushPoint(points, point.x, point.y))
+            routed = true
+          }
         }
       }
 
@@ -833,7 +942,10 @@ export function routeLinks(
             appendPoints(assembled, [fromAnchor, fromBase, fromExit])
             routeSegments.forEach(segment => {
               appendPoints(assembled, segment.points)
-              if (segment.gridPath.length) addOccupancy(occupancy, segment.gridPath)
+              if (segment.gridPath.length) {
+                addOccupancy(occupancy, segment.gridPath)
+                occupancyRecorded = true
+              }
             })
             appendPoints(assembled, [toExit, toBase, toAnchor])
 
@@ -862,6 +974,7 @@ export function routeLinks(
             const smoothed = smoothAnyAnglePath(assembled, obstacles, clearance, cornerRadius, minSegment)
             smoothed.forEach(point => pushPoint(points, point.x, point.y))
             addOccupancy(occupancy, route.gridPath)
+            occupancyRecorded = true
             routed = true
           }
         }
@@ -903,59 +1016,30 @@ export function routeLinks(
           } else {
             const fromAreaAnchor = computeAreaAnchor(fromArea, fromExit, toExit, interBundleOffset, anchorOffset)
             const toAreaAnchor = computeAreaAnchor(toArea, toExit, fromExit, interBundleOffset, anchorOffset)
-            if (areaBounds) {
-              const corridorGap = (renderTuning.corridor_gap ?? 0) + (renderTuning.area_clearance ?? 0) + Math.abs(interBundleOffset)
-              const dx = toAnchor.x - fromAnchor.x
-              const dy = toAnchor.y - fromAnchor.y
-              if (Math.abs(dx) >= Math.abs(dy)) {
-                const topY = areaBounds.minY - corridorGap
-                const bottomY = areaBounds.maxY + corridorGap
-                const midY = (fromAnchor.y + toAnchor.y) / 2
-                const corridorBaseY = Math.abs(midY - topY) <= Math.abs(midY - bottomY) ? topY : bottomY
-                const corridorY = corridorBaseY + interBundleOffset
-                points = []
-                pushPoint(points, fromAnchor.x, fromAnchor.y)
-                pushPoint(points, fromBase.x, fromBase.y)
-                pushPoint(points, fromExit.x, fromExit.y)
-                pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-                pushPoint(points, fromAreaAnchor.x, corridorY)
-                pushPoint(points, toAreaAnchor.x, corridorY)
-                pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-                pushPoint(points, toExit.x, toExit.y)
-                pushPoint(points, toBase.x, toBase.y)
-                pushPoint(points, toAnchor.x, toAnchor.y)
-              } else {
-                const leftX = areaBounds.minX - corridorGap
-                const rightX = areaBounds.maxX + corridorGap
-                const midX = (fromAnchor.x + toAnchor.x) / 2
-                const corridorBaseX = Math.abs(midX - leftX) <= Math.abs(midX - rightX) ? leftX : rightX
-                const corridorX = corridorBaseX + interBundleOffset
-                points = []
-                pushPoint(points, fromAnchor.x, fromAnchor.y)
-                pushPoint(points, fromBase.x, fromBase.y)
-                pushPoint(points, fromExit.x, fromExit.y)
-                pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
-                pushPoint(points, corridorX, fromAreaAnchor.y)
-                pushPoint(points, corridorX, toAreaAnchor.y)
-                pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-                pushPoint(points, toExit.x, toExit.y)
-                pushPoint(points, toBase.x, toBase.y)
-                pushPoint(points, toAnchor.x, toAnchor.y)
-              }
-            } else {
-              const midX = (fromAnchor.x + toAnchor.x) / 2 + interBundleOffset
-              points = []
-              pushPoint(points, fromAnchor.x, fromAnchor.y)
-              pushPoint(points, fromBase.x, fromBase.y)
-              pushPoint(points, fromExit.x, fromExit.y)
-              pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+            const primaryAxis: 'x' | 'y' = Math.abs(toAreaAnchor.x - fromAreaAnchor.x) >= Math.abs(toAreaAnchor.y - fromAreaAnchor.y)
+              ? 'x'
+              : 'y'
+            const orth = connectOrthogonal(fromAreaAnchor, toAreaAnchor, obstacles, clearance, primaryAxis)
+            points = []
+            pushPoint(points, fromAnchor.x, fromAnchor.y)
+            pushPoint(points, fromBase.x, fromBase.y)
+            pushPoint(points, fromExit.x, fromExit.y)
+            pushPoint(points, fromAreaAnchor.x, fromAreaAnchor.y)
+            if (orth && orth.length) {
+              orth.forEach(p => pushPoint(points, p.x, p.y))
+            } else if (primaryAxis === 'x') {
+              const midX = (fromAreaAnchor.x + toAreaAnchor.x) / 2 + interBundleOffset * 0.35
               pushPoint(points, midX, fromAreaAnchor.y)
               pushPoint(points, midX, toAreaAnchor.y)
-              pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
-              pushPoint(points, toExit.x, toExit.y)
-              pushPoint(points, toBase.x, toBase.y)
-              pushPoint(points, toAnchor.x, toAnchor.y)
+            } else {
+              const midY = (fromAreaAnchor.y + toAreaAnchor.y) / 2 + interBundleOffset * 0.35
+              pushPoint(points, fromAreaAnchor.x, midY)
+              pushPoint(points, toAreaAnchor.x, midY)
             }
+            pushPoint(points, toAreaAnchor.x, toAreaAnchor.y)
+            pushPoint(points, toExit.x, toExit.y)
+            pushPoint(points, toBase.x, toBase.y)
+            pushPoint(points, toAnchor.x, toAnchor.y)
           }
         } else if (isL1) {
           const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
@@ -1072,6 +1156,18 @@ export function routeLinks(
         }
         points = []
         finalPath.forEach(point => pushPoint(points, point.x, point.y))
+      }
+
+      if (grid && points.length >= 4 && !occupancyRecorded) {
+        const pathPoints: Array<{ x: number; y: number }> = []
+        for (let i = 0; i + 1 < points.length; i += 2) {
+          pathPoints.push({ x: points[i], y: points[i + 1] })
+        }
+        const gridPath = polylineToGridPath(pathPoints, grid)
+        if (gridPath.length >= 2) {
+          addOccupancy(occupancy, gridPath)
+          occupancyRecorded = true
+        }
       }
 
       const neutralL1Purposes = new Set(['', 'DEFAULT', 'LAN'])

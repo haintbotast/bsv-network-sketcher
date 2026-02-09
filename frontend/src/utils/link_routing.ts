@@ -166,6 +166,29 @@ export const addOccupancy = (occupancy: Map<string, number>, gridPath: GridPoint
   }
 }
 
+export const polylineToGridPath = (points: Point[], grid: GridSpec): GridPoint[] => {
+  if (points.length < 2) return []
+
+  const toGrid = (point: Point): GridPoint => ({
+    gx: clamp(Math.round((point.x - grid.originX) / grid.size), 0, grid.cols - 1),
+    gy: clamp(Math.round((point.y - grid.originY) / grid.size), 0, grid.rows - 1),
+  })
+
+  const path: GridPoint[] = []
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const start = toGrid(points[i])
+    const end = toGrid(points[i + 1])
+    const segment = gridLine(start, end)
+    segment.forEach(node => {
+      const last = path[path.length - 1]
+      if (!last || last.gx !== node.gx || last.gy !== node.gy) {
+        path.push(node)
+      }
+    })
+  }
+  return path
+}
+
 export const connectOrthogonal = (
   start: Point,
   end: Point,

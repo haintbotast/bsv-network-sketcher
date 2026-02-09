@@ -51,6 +51,9 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-24:** Hệ tọa độ thủ công phải dùng **mốc chuẩn X/Y** (step mặc định 0.25 đv); thao tác drag hoặc nhập tay đều được chuẩn hóa về mốc này.
 - **FR-25:** Tab **Bố cục** phải có thành phần **khai báo nhanh peer-control** (`HA/STACK/HSRP`) và hiển thị **legend màu/nét/chú giải** để vận hành nhận biết đúng loại kết nối.
 - **FR-26:** L1 routing phải giữ khoảng cách an toàn với object (không xuyên device/area không liên quan), đồng thời bảo đảm điểm rẽ đầu tiên không dính sát port band ở sơ đồ mật độ cao.
+- **FR-27:** Routing liên‑area phải hỗ trợ **multi-channel corridor** theo cặp Area để giảm dồn/chồng link khi mật độ kết nối cao.
+- **FR-28:** Hệ thống phải ghi nhận **occupancy** cho cả tuyến A\* và tuyến pad/fallback để lựa chọn lane có độ tắc thấp hơn cho các link xử lý sau.
+- **FR-29:** Fallback liên‑area không được đi ra ngoài đường bao sơ đồ; mọi tuyến phải nằm trong vùng thiết kế.
 - **FR-27:** Micro layout trong Area phải **căn giữa các hàng thiết bị** khi layer tách nhiều hàng để tránh dồn trái và tăng độ đối xứng với sơ đồ chuẩn.
 - **FR-28:** Hệ tọa độ chuẩn phải hỗ trợ nhập/xuất theo **grid Excel** (`A1:B2`) cho Area và Device; `grid_range` là nguồn chuẩn, `position_x/y` duy trì để tương thích.
 - **FR-29:** Bổ sung CRUD **Device Port** độc lập theo từng Device (`name`, `side`, `offset_ratio`) để người dùng chủ động khai báo điểm kết nối trước khi vẽ link.

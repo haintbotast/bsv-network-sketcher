@@ -17,6 +17,7 @@ from app.services.device_sizing import (
     compute_device_port_counts,
     auto_resize_devices_by_ports,
 )
+from app.services.grid_sync import sync_device_grid_from_geometry
 from app.schemas.layout import (
     AutoLayoutOptions,
     LayoutResult,
@@ -279,6 +280,11 @@ async def compute_auto_layout(
                 if device:
                     device.position_x = layout.x
                     device.position_y = layout.y
+                    sync_device_grid_from_geometry(
+                        device,
+                        default_width=DEFAULT_DEVICE_WIDTH,
+                        default_height=DEFAULT_DEVICE_HEIGHT,
+                    )
             await db.commit()
 
     return LayoutResult(**response)

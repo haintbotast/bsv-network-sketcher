@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.layout import DeviceLayout, AreaLayout
 from .layout_constants import DEFAULT_DEVICE_WIDTH, DEFAULT_DEVICE_HEIGHT
+from app.services.grid_sync import sync_area_grid_from_geometry, sync_device_grid_from_geometry
 
 
 async def apply_layout_to_db(db: AsyncSession, device_layouts: list[dict]) -> None:
@@ -40,6 +41,11 @@ async def apply_layout_to_db(db: AsyncSession, device_layouts: list[dict]) -> No
         if device:
             device.position_x = x
             device.position_y = y
+            sync_device_grid_from_geometry(
+                device,
+                default_width=DEFAULT_DEVICE_WIDTH,
+                default_height=DEFAULT_DEVICE_HEIGHT,
+            )
 
             # Track devices by area for bounds calculation
             if device.area_id:
@@ -80,6 +86,11 @@ async def apply_layout_to_db(db: AsyncSession, device_layouts: list[dict]) -> No
             area.position_y = area_y
             area.width = area_width
             area.height = area_height
+            sync_area_grid_from_geometry(
+                area,
+                default_width=area_width,
+                default_height=area_height,
+            )
 
     await db.commit()
 
@@ -100,6 +111,11 @@ async def apply_grouped_layout_to_db(
         if device:
             device.position_x = layout.x
             device.position_y = layout.y
+            sync_device_grid_from_geometry(
+                device,
+                default_width=DEFAULT_DEVICE_WIDTH,
+                default_height=DEFAULT_DEVICE_HEIGHT,
+            )
 
     if layout_scope == "project" and area_layouts:
         for layout in area_layouts:
@@ -110,5 +126,10 @@ async def apply_grouped_layout_to_db(
                 area.position_y = layout.y
                 area.width = layout.width
                 area.height = layout.height
+                sync_area_grid_from_geometry(
+                    area,
+                    default_width=layout.width,
+                    default_height=layout.height,
+                )
 
     await db.commit()

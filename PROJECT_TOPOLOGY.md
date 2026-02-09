@@ -77,6 +77,7 @@ UI thao tác → REST API → Service → DB → phản hồi → UI render
 - Tọa độ thủ công được chuẩn hóa theo mốc chuẩn X/Y (step 0.25 đv) trước khi lưu DB để đồng nhất dữ liệu.
 - Tọa độ chuẩn bổ sung `grid_range` kiểu Excel (`A1:B2`) cho `Area`/`Device`; backend tự đồng bộ `grid_range` ↔ `position_x/position_y/width/height`.
 - Khi startup backend, dữ liệu cũ thiếu `grid_range` sẽ được backfill tự động từ tọa độ/kích thước hiện có để chuẩn hóa về cấu trúc grid mới.
+- Mọi luồng apply layout (L1/L2/L3 + waypoint) phải ghi đồng thời `position_*` và `grid_range` để tránh lệch dữ liệu render giữa frontend/backend.
 - Quy ước anchor L1: uplink đi ra từ **cạnh trên** object, non-uplink đi ra từ **cạnh dưới** object; override thủ công được ưu tiên.
 - Bổ sung thực thể `device_ports` (DB-driven) để khai báo port độc lập trước khi nối link; endpoint link phải tham chiếu port đã khai báo.
 - Render L1 dùng **port band gắn trực tiếp vào object** (top/bottom); kích thước object được nới theo số lượng/độ dài port.

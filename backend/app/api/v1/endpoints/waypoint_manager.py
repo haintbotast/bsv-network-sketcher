@@ -5,6 +5,7 @@ Waypoint area creation and management for inter-area links.
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.layout import AreaLayout
+from app.services.grid_sync import sync_area_grid_from_geometry
 
 
 def rect_bounds(layout: AreaLayout) -> tuple[float, float, float, float]:
@@ -151,6 +152,13 @@ async def create_or_update_waypoint_areas(
             wp = existing_wp[wp_name]
             wp.position_x = mid_x
             wp.position_y = mid_y
+            wp.width = wp_width
+            wp.height = wp_height
+            sync_area_grid_from_geometry(
+                wp,
+                default_width=wp_width,
+                default_height=wp_height,
+            )
             wp_id = wp.id
         else:
             wp_id = generate_uuid()
@@ -165,6 +173,11 @@ async def create_or_update_waypoint_areas(
                 width=wp_width,
                 height=wp_height,
                 style_json=wp_style,
+            )
+            sync_area_grid_from_geometry(
+                wp,
+                default_width=wp_width,
+                default_height=wp_height,
             )
             db.add(wp)
 

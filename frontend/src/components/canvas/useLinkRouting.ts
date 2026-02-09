@@ -218,7 +218,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     // Two-pass: metadata → route → anchor overrides → re-route
     const pass1 = buildLinkMetaData(metaParams)
     const pass1Result = routeLinks(pass1.linkMetas, pass1.laneIndex, pass1.labelObstacles, routeCtx)
-    const maxSecondPassLinks = 120
+    const maxSecondPassLinks = 80
     const canRunSecondPass = props.links.length <= maxSecondPassLinks
     const overrides = canRunSecondPass
       ? buildAnchorOverrides(pass1.linkMetas, pass1Result.cache, anchorCtx)
@@ -234,7 +234,8 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
   }
 
   const visibleLinks = computed(() => {
-    if (isPanning.value) return buildVisibleLinks(true).links
+    // Pan chỉ thay đổi transform layer; không cần dựng lại link list khi đang pan.
+    if (isPanning.value) return visibleLinkCache.value
     return visibleLinkCache.value
   })
 
@@ -646,8 +647,6 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       () => props.l2Assignments,
       () => props.portAnchorOverrides,
       () => layoutViewport.value.scale,
-      () => layoutViewport.value.offsetX,
-      () => layoutViewport.value.offsetY,
       renderTuning
     ],
     () => {

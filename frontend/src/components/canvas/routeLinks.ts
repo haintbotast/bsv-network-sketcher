@@ -388,6 +388,18 @@ export function routeLinks(
     debugRouteMode,
   } = ctx
   const debugOn = !!debugRouteMode
+  const totalLinks = linkMetas.length
+  const gridNodeCount = grid ? grid.cols * grid.rows : 0
+  const denseRouting = totalLinks >= 70 || gridNodeCount >= 22000
+  const maxAStarCalls = denseRouting
+    ? Math.max(8, Math.min(24, Math.ceil(totalLinks * 0.22)))
+    : Math.max(16, Math.min(60, Math.ceil(totalLinks * 0.45)))
+  const maxAStarIterations = grid
+    ? (denseRouting
+      ? Math.max(6000, Math.min(60000, Math.floor(gridNodeCount * 2.2)))
+      : Math.max(12000, Math.min(120000, Math.floor(gridNodeCount * 4.0))))
+    : 0
+  let aStarCalls = 0
   const getPairKey = (fromArea: string, toArea: string) =>
     fromArea < toArea ? `${fromArea}|${toArea}` : `${toArea}|${fromArea}`
 
@@ -873,7 +885,8 @@ export function routeLinks(
       }
 
       // Ưu tiên A*/orthogonal cho L1; non-L1 dùng any-angle.
-      if (allowAStar && !directAllowed && !routed && grid) {
+      if (allowAStar && !directAllowed && !routed && grid && aStarCalls < maxAStarCalls) {
+        aStarCalls += 1
         const preferAxis = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
         const bundleShift = preferAxis === 'x'
           ? { x: 0, y: bundleOffset }
@@ -897,7 +910,8 @@ export function routeLinks(
             occupancy,
             preferAxis,
             turnPenalty: grid.size * 1.2,
-            congestionPenalty: grid.size * 80
+            congestionPenalty: grid.size * 80,
+            maxIterations: maxAStarIterations,
           })
         }
 
@@ -956,7 +970,8 @@ export function routeLinks(
             clearance,
             grid,
             occupancy,
-            preferAxis
+            preferAxis,
+            maxIterations: maxAStarIterations,
           })
 
           if (route && route.points.length) {

@@ -60,6 +60,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-30:** Tạo/sửa link phải kiểm tra endpoint port đã được khai báo trên đúng device; chặn lưu nếu thiếu port.
 - **FR-31:** UI canvas phải render port band từ dữ liệu port đã khai báo (không chỉ suy diễn từ link), nhằm giữ object/port đồng nhất với sơ đồ chuẩn.
 - **FR-32:** Trong phần `Anchor port (override)` của bảng thuộc tính thiết bị, cho phép người dùng chọn 2 port cùng device để **đổi vị trí anchor nhanh** (swap `side + offset_ratio`) mà không ảnh hưởng port khác.
+- **FR-33:** L1 routing phải có cơ chế **guard hiệu năng** cho topology dày (giới hạn budget A\* + giới hạn iterations) để ngăn đơ UI, và tự fallback tuyến orthogonal khi chạm ngưỡng.
 
 ## 5. Yêu cầu phi chức năng (NFR)
 

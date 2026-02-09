@@ -60,6 +60,7 @@
 - Routing liên‑area phải dùng cơ chế **multi-channel corridor** theo cặp Area để tránh dồn toàn bộ link vào một hành lang đơn.
 - Tất cả tuyến đã chọn (kể cả tuyến không qua A*) phải ghi nhận **occupancy** để các tuyến xử lý sau ưu tiên tránh lane đã đông.
 - Fallback liên‑area phải giữ tuyến **nội vùng sơ đồ** (không đi ngoài đường bao diagram).
+- Với topology dày link, routing phải có **guard hiệu năng** (giới hạn số lượt A* và số vòng lặp tìm đường mỗi lượt) để tránh treo UI; khi vượt ngưỡng thì fallback sang tuyến orthogonal ổn định.
 - Điểm rẽ đầu tiên của link phải có khoảng cách tối thiểu đủ lớn so với port band để tránh dính sát nhãn port ở sơ đồ dày.
 - Với L1, khung Area hiển thị có thể ở dạng **compact theo cụm thiết bị** để giảm khoảng trắng; không thay đổi dữ liệu Area gốc.
 - Các link peer-control (`STACK/HA/HSRP`) phải có quy ước hiển thị riêng (màu/nét/lane) để tách khỏi uplink/data links và dễ truy vết.

@@ -40,6 +40,7 @@
 - **inter_area_multi_channel_policy:** cặp Area có nhiều link phải được tách thành nhiều corridor channel, không dồn toàn bộ vào một lane.
 - **inter_area_occupancy_policy:** tuyến pad/fallback sau khi chốt phải ghi occupancy để link kế tiếp tránh lane đã đông.
 - **inter_area_no_outside_bounds_policy:** fallback liên‑area không được đi ngoài đường bao sơ đồ.
+- **routing_performance_guard_policy:** khi topology dày (nhiều link hoặc grid lớn), engine phải giới hạn budget A\* và iterations; không được gây đứng UI.
 
 ### 1.2 Kiểm thử overview/L2/L3
 - Overview (nếu bật) chỉ L1/flow; L2/L3 không render nhãn trong overview.
@@ -253,6 +254,7 @@ test.describe('Diagram Editor', () => {
 - [ ] L1 routing: liên‑area/waypoint không đi ngoài đường bao sơ đồ; fallback luôn chọn tuyến nội vùng hợp lệ.
 - [ ] L1 routing: cặp area có nhiều link phải tách nhiều corridor channel, giảm dồn line chồng nhau.
 - [ ] L1 routing: occupancy của tuyến pad/fallback được ghi nhận và ảnh hưởng tới lựa chọn lane ở link xử lý sau.
+- [ ] L1 routing performance guard: topology dày vẫn phản hồi mượt, không treo tab; khi hết budget A\* phải fallback orthogonal hợp lệ.
 - [ ] Trigger policy: mở project chạy auto-layout đúng 1 lượt.
 - [ ] Trigger policy: CRUD area/device/link/port-link/anchor đều trigger auto-layout.
 - [ ] Trigger policy: pan/zoom/reset view không phát sinh request `/auto-layout`.

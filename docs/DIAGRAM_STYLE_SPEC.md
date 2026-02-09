@@ -1,8 +1,8 @@
 # Đặc tả Style sơ đồ (Diagram Style Spec)
 
-> **Phiên bản:** 1.0  
+> **Phiên bản:** 1.1  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-06  
+> **Cập nhật:** 2026-02-09  
 > **Mục tiêu:** Chuẩn hóa hình khối, nét vẽ, màu sắc, chữ và nền cho toàn hệ thống (UI + Konva + export).
 
 ---
@@ -382,3 +382,15 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 
 - Bộ quy tắc kiểm tra tối thiểu (không chồng lấn, khoảng cách tối thiểu, nhãn không đè, số lượng node/link, logic L1→L2→L3) được chuẩn hóa tại `docs/RULE_BASED_CHECKS.md`.
 - Style chung có thể override các tham số khoảng cách theo preset hoặc cấu hình admin.
+
+---
+
+## 15. Cập nhật style grid/port (2026-02-09)
+
+- Tọa độ chuẩn của Area/Device được mô tả bằng `grid_range` kiểu Excel (`A1:B2`), backend tự đồng bộ với tọa độ inch logic.
+- `Port label` là một phần của object: danh sách port hiển thị lấy từ dữ liệu `device_ports` (không chỉ suy diễn từ link).
+- Quy tắc side của port:
+  - `top`: ưu tiên uplink/peer-control.
+  - `bottom`: ưu tiên downlink.
+  - `left/right`: chỉ dùng khi cần bám hình học đặc thù hoặc người dùng override.
+- Khi render L1, nếu có xung đột giữa khai báo port và anchor override thủ công: **anchor override** có ưu tiên cao hơn.

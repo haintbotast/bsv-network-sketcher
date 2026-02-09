@@ -5,8 +5,22 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-LinkPurpose = Literal["WAN", "INTERNET", "DMZ", "LAN", "MGMT", "HA", "STORAGE", "BACKUP", "VPN", "DEFAULT"]
+LinkPurpose = Literal[
+    "WAN",
+    "INTERNET",
+    "DMZ",
+    "LAN",
+    "MGMT",
+    "HA",
+    "HSRP",
+    "STACK",
+    "STORAGE",
+    "BACKUP",
+    "VPN",
+    "DEFAULT",
+]
 LineStyle = Literal["solid", "dashed", "dotted"]
+PORT_NAME_RE = r"^[A-Za-z][A-Za-z0-9 _./-]*$"
 
 
 class L1LinkCreate(BaseModel):
@@ -22,14 +36,14 @@ class L1LinkCreate(BaseModel):
     @field_validator("from_port", "to_port")
     @classmethod
     def validate_port_format(cls, v: str) -> str:
-        """Port phải có khoảng trắng giữa loại và số (vd: Gi 0/1)."""
+        """Port phải là chuỗi interface hợp lệ (vd: Gi 0/1, Gi0/1, P1)."""
         import re
 
-        if not re.match(r"^[A-Za-z\-]+\s+.+$", v):
+        if not re.match(PORT_NAME_RE, v.strip()):
             raise ValueError(
-                f"Port '{v}' không hợp lệ. Phải có khoảng trắng giữa loại và số (vd: 'Gi 0/1')"
+                f"Port '{v}' không hợp lệ. Ví dụ hợp lệ: 'Gi 0/1', 'Gi0/1', 'P1'"
             )
-        return v
+        return v.strip()
 
 
 class L1LinkUpdate(BaseModel):
@@ -49,11 +63,11 @@ class L1LinkUpdate(BaseModel):
             return v
         import re
 
-        if not re.match(r"^[A-Za-z\-]+\s+.+$", v):
+        if not re.match(PORT_NAME_RE, v.strip()):
             raise ValueError(
-                f"Port '{v}' không hợp lệ. Phải có khoảng trắng giữa loại và số (vd: 'Gi 0/1')"
+                f"Port '{v}' không hợp lệ. Ví dụ hợp lệ: 'Gi 0/1', 'Gi0/1', 'P1'"
             )
-        return v
+        return v.strip()
 
 
 class L1LinkResponse(BaseModel):

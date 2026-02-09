@@ -5,6 +5,7 @@ from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.projects import router as projects_router
 from app.api.v1.endpoints.areas import router as areas_router
 from app.api.v1.endpoints.devices import router as devices_router
+from app.api.v1.endpoints.device_ports import router as device_ports_router
 from app.api.v1.endpoints.links import router as links_router
 from app.api.v1.endpoints.l2_segments import router as l2_segments_router
 from app.api.v1.endpoints.l2_assignments import router as l2_assignments_router
@@ -24,6 +25,7 @@ api_router.include_router(auth_router)
 api_router.include_router(projects_router)
 api_router.include_router(areas_router)
 api_router.include_router(devices_router)
+api_router.include_router(device_ports_router)
 api_router.include_router(links_router)
 api_router.include_router(l2_segments_router)
 api_router.include_router(l2_assignments_router)

@@ -25,6 +25,11 @@ from app.schemas.device import (
     DeviceBulkCreate,
     DeviceBulkResponse,
 )
+from app.schemas.device_port import (
+    DevicePortCreate,
+    DevicePortResponse,
+    DevicePortUpdate,
+)
 from app.schemas.link import (
     L1LinkCreate,
     L1LinkResponse,

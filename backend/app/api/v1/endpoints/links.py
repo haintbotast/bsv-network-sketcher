@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.api.deps import CurrentUser, DBSession
 from app.schemas.link import L1LinkBulkCreate, L1LinkBulkResponse, L1LinkCreate, L1LinkResponse, L1LinkUpdate
 from app.services.device import get_device_by_name
+from app.services.device_port import get_port_by_name
 from app.services.link import (
     check_link_exists,
     check_port_in_use,
@@ -29,6 +30,8 @@ PURPOSE_COLORS = {
     "LAN": [112, 173, 71],    # Green
     "MGMT": [0, 112, 192],    # Blue
     "HA": [112, 48, 160],     # Purple
+    "HSRP": [147, 112, 219],  # Violet
+    "STACK": [45, 140, 240],  # Azure
     "STORAGE": [165, 42, 42], # Brown
     "BACKUP": [128, 128, 128],  # Gray
     "VPN": [0, 176, 240],     # Cyan
@@ -191,6 +194,16 @@ async def _verify_project_access(db: DBSession, project_id: str, user_id: str):
     return project
 
 
+async def _validate_port_defined(db: DBSession, project_id: str, device, port_name: str, field: str) -> None:
+    port = await get_port_by_name(db, project_id, device.id, port_name)
+    if port:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"Port '{port_name}' chưa được khai báo trên device '{device.name}' ({field}).",
+    )
+
+
 def _link_to_response(link) -> L1LinkResponse:
     """Convert link model to response."""
     response = L1LinkResponse.model_validate(link)
@@ -239,6 +252,9 @@ async def create_new_link(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Device '{data.to_device}' không tồn tại",
         )
+
+    await _validate_port_defined(db, project_id, from_device, data.from_port, "from_port")
+    await _validate_port_defined(db, project_id, to_device, data.to_port, "to_port")
 
     # Check duplicate link
     if await check_link_exists(db, project_id, from_device.id, data.from_port, to_device.id, data.to_port):
@@ -360,6 +376,10 @@ async def update_existing_link(
     effective_to = to_device or link.to_device
     effective_from_port = data.from_port if data.from_port is not None else link.from_port
     effective_to_port = data.to_port if data.to_port is not None else link.to_port
+    if effective_from and effective_from_port:
+        await _validate_port_defined(db, project_id, effective_from, effective_from_port, "from_port")
+    if effective_to and effective_to_port:
+        await _validate_port_defined(db, project_id, effective_to, effective_to_port, "to_port")
     existing_links = await get_links(db, project_id)
     if effective_from and effective_to and _endpoint_uplink_violation(effective_from, effective_to):
         raise HTTPException(
@@ -500,6 +520,28 @@ async def bulk_create_links(
                     "field": "to_device",
                     "code": "DEVICE_NOT_FOUND",
                     "message": f"Device '{link_data.to_device}' không tồn tại",
+                })
+                continue
+
+            from_port = await get_port_by_name(db, project_id, from_device.id, link_data.from_port)
+            if not from_port:
+                errors.append({
+                    "entity": "link",
+                    "row": row,
+                    "field": "from_port",
+                    "code": "PORT_NOT_FOUND",
+                    "message": f"Port '{link_data.from_port}' chưa khai báo trên '{from_device.name}'",
+                })
+                continue
+
+            to_port = await get_port_by_name(db, project_id, to_device.id, link_data.to_port)
+            if not to_port:
+                errors.append({
+                    "entity": "link",
+                    "row": row,
+                    "field": "to_port",
+                    "code": "PORT_NOT_FOUND",
+                    "message": f"Port '{link_data.to_port}' chưa khai báo trên '{to_device.name}'",
                 })
                 continue
 

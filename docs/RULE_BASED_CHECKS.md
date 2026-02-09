@@ -1,8 +1,8 @@
 ﻿# Quy tắc kiểm tra rule-based (layout & logic)
 
-> **Phiên bản:** 1.0  
+> **Phiên bản:** 1.1  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-06  
+> **Cập nhật:** 2026-02-09  
 > **Mục tiêu:** Định nghĩa các kiểm tra tối thiểu thay cho golden files, đảm bảo đúng logic và không vỡ bố cục.
 
 ---
@@ -44,7 +44,7 @@
 
 ## 3. Quy tắc logic bắt buộc (ERROR)
 
-- **RB-001:** L1 link phải trỏ tới device/port tồn tại.
+- **RB-001:** L1 link phải trỏ tới device/port tồn tại; `from_port`/`to_port` bắt buộc nằm trong danh sách `device_ports` của đúng device.
 - **RB-002:** Port-channel phải có member hợp lệ, không trùng lặp.
 - **RB-003:** Virtual port không được xuất hiện trong L1 links.
 - **RB-004:** L2 assignment chỉ gán lên interface tồn tại.
@@ -91,6 +91,7 @@
 - **RB-205:** Nếu có **Area Data Center**, các thiết bị Edge/Security/DMZ/Core/Distribution phải nằm trong area này (cảnh báo nếu nằm ngoài).
 - **RB-206:** Area Server ưu tiên đặt **cùng hàng hoặc ngay dưới DMZ** (cảnh báo nếu thấp hơn quá 1 tier).
 - **RB-207:** Với L1 auto-anchor (không có override thủ công), **uplink phải neo ở top** và **non-uplink phải neo ở bottom**.
+- **RB-208:** `grid_range` của Area/Device phải đúng định dạng Excel (`A1` hoặc `A1:B2`) và đồng bộ được về tọa độ logic.
 
 ---
 

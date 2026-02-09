@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import (
     Area,
     Device,
+    DevicePort,
     InterfaceL2Assignment,
     L1Link,
     L2Segment,
@@ -129,6 +130,7 @@ async def _clear_project_data(db: AsyncSession, project_id: str) -> None:
     await db.execute(delete(PortChannel).where(PortChannel.project_id == project_id))
     await db.execute(delete(VirtualPort).where(VirtualPort.project_id == project_id))
     await db.execute(delete(L1Link).where(L1Link.project_id == project_id))
+    await db.execute(delete(DevicePort).where(DevicePort.project_id == project_id))
     await db.execute(delete(Device).where(Device.project_id == project_id))
     await db.execute(delete(Area).where(Area.project_id == project_id))
 
@@ -246,6 +248,7 @@ async def import_project_data(
         virtual_port_by_key: set[tuple[str, str]] = set()
         link_keys: set[tuple[str, str, str, str]] = set()
         ports_in_use: set[tuple[str, str]] = set()
+        device_port_keys: set[tuple[str, str]] = set()
         l2_assignment_keys: set[tuple[str, str]] = set()
         l3_address_keys: set[tuple[str, str, str, int]] = set()
 
@@ -284,6 +287,10 @@ async def import_project_data(
                 ports_in_use.add((link.from_device_id, link.from_port))
                 ports_in_use.add((link.to_device_id, link.to_port))
 
+            result = await db.execute(select(DevicePort).where(DevicePort.project_id == project_id))
+            for port in result.scalars().all():
+                device_port_keys.add((port.device_id, port.name))
+
             result = await db.execute(
                 select(InterfaceL2Assignment).where(
                     InterfaceL2Assignment.project_id == project_id
@@ -321,6 +328,7 @@ async def import_project_data(
                 name=area_data.name,
                 grid_row=area_data.grid_row,
                 grid_col=area_data.grid_col,
+                grid_range=area_data.grid_range,
                 position_x=area_data.position_x,
                 position_y=area_data.position_y,
                 width=area_data.width,
@@ -370,6 +378,7 @@ async def import_project_data(
                 area_id=area.id,
                 name=device_data.name,
                 device_type=device_data.device_type,
+                grid_range=device_data.grid_range,
                 position_x=device_data.position_x,
                 position_y=device_data.position_y,
                 width=device_data.width,
@@ -456,6 +465,23 @@ async def import_project_data(
             )
             db.add(link)
             await db.flush()
+            for device_id, port_name in (
+                (from_device.id, link_data.from_port),
+                (to_device.id, link_data.to_port),
+            ):
+                key_pair = (device_id, port_name)
+                if key_pair in device_port_keys:
+                    continue
+                db.add(
+                    DevicePort(
+                        project_id=project_id,
+                        device_id=device_id,
+                        name=port_name,
+                        side="bottom",
+                        offset_ratio=None,
+                    )
+                )
+                device_port_keys.add(key_pair)
             link_keys.add(key)
             ports_in_use.add((from_device.id, link_data.from_port))
             ports_in_use.add((to_device.id, link_data.to_port))

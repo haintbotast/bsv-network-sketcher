@@ -1,8 +1,8 @@
 # Chiến lược kiểm thử
 
-> **Phiên bản:** 1.1
+> **Phiên bản:** 1.2
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-02-06  
+> **Cập nhật:** 2026-02-09  
 > **Mục tiêu:** Quy định chiến lược kiểm thử và golden files.
 
 ## 1. Kiểm thử backend
@@ -410,3 +410,20 @@ def extract_excel_metadata(xlsx_path: str) -> dict:
 - `docs/RELEASE_CHECKLIST.md` - Checklist phát hành tối thiểu
 - `schemas/template.json` - JSON Schema chính thức
 - `templates/samples/` - Mẫu dữ liệu test
+
+---
+
+## 7. Bổ sung test regression (2026-02-09)
+
+- **Grid Excel canonical**
+  - [ ] `grid_range` Area/Device parse đúng (`A1`, `A1:B3`, đảo chiều `B3:A1`).
+  - [ ] Cập nhật `position_x/y/width/height` phải tự đồng bộ `grid_range`.
+- **Device Port CRUD**
+  - [ ] Tạo/sửa/xóa port theo device (`name`, `side`, `offset_ratio`).
+  - [ ] Chặn đổi tên/xóa port khi port đang được dùng trong link.
+- **Link endpoint validation theo port khai báo**
+  - [ ] Tạo/sửa link thất bại khi `from_port` hoặc `to_port` chưa khai báo trên đúng device.
+  - [ ] Port format chấp nhận `Gi 0/1`, `Gi0/1`, `P1`; từ chối chuỗi ký tự không hợp lệ.
+- **UI data flow**
+  - [ ] Load project phải tải đồng thời areas/devices/device_ports/links/anchor overrides.
+  - [ ] Canvas port band hiển thị theo `device_ports`, không phụ thuộc hoàn toàn vào links.

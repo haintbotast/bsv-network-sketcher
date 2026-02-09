@@ -32,6 +32,7 @@ export type AreaRecord = {
   name: string
   grid_row: number
   grid_col: number
+  grid_range?: string | null
   position_x?: number | null
   position_y?: number | null
   width: number
@@ -46,11 +47,22 @@ export type DeviceRecord = {
   area_id: string
   area_name?: string | null
   device_type: string
+  grid_range?: string | null
   position_x?: number | null
   position_y?: number | null
   width: number
   height: number
   color_rgb?: [number, number, number] | null
+}
+
+export type DevicePortRecord = {
+  id: string
+  project_id: string
+  device_id: string
+  device_name?: string | null
+  name: string
+  side: 'top' | 'bottom' | 'left' | 'right'
+  offset_ratio?: number | null
 }
 
 export type LinkRecord = {

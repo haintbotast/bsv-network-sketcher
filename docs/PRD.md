@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-06  
+> **Cập nhật:** 2026-02-09  
 > **Nguyên tắc:** Tối giản nhưng chính xác tuyệt đối, UX tiện dụng, không CLI.
 
 ---
@@ -52,6 +52,10 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-25:** Tab **Bố cục** phải có thành phần **khai báo nhanh peer-control** (`HA/STACK/HSRP`) và hiển thị **legend màu/nét/chú giải** để vận hành nhận biết đúng loại kết nối.
 - **FR-26:** L1 routing phải giữ khoảng cách an toàn với object (không xuyên device/area không liên quan), đồng thời bảo đảm điểm rẽ đầu tiên không dính sát port band ở sơ đồ mật độ cao.
 - **FR-27:** Micro layout trong Area phải **căn giữa các hàng thiết bị** khi layer tách nhiều hàng để tránh dồn trái và tăng độ đối xứng với sơ đồ chuẩn.
+- **FR-28:** Hệ tọa độ chuẩn phải hỗ trợ nhập/xuất theo **grid Excel** (`A1:B2`) cho Area và Device; `grid_range` là nguồn chuẩn, `position_x/y` duy trì để tương thích.
+- **FR-29:** Bổ sung CRUD **Device Port** độc lập theo từng Device (`name`, `side`, `offset_ratio`) để người dùng chủ động khai báo điểm kết nối trước khi vẽ link.
+- **FR-30:** Tạo/sửa link phải kiểm tra endpoint port đã được khai báo trên đúng device; chặn lưu nếu thiếu port.
+- **FR-31:** UI canvas phải render port band từ dữ liệu port đã khai báo (không chỉ suy diễn từ link), nhằm giữ object/port đồng nhất với sơ đồ chuẩn.
 
 ## 5. Yêu cầu phi chức năng (NFR)
 

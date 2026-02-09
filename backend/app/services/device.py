@@ -9,6 +9,12 @@ from sqlalchemy.orm import selectinload
 
 from app.db.models import Area, Device
 from app.schemas.device import DeviceCreate, DeviceUpdate
+from app.services.grid_excel import (
+    GRID_CELL_UNITS,
+    excel_range_to_rect_units,
+    normalize_excel_range,
+    rect_units_to_excel_range,
+)
 
 
 async def get_devices(db: AsyncSession, project_id: str) -> list[Device]:
@@ -51,15 +57,34 @@ async def create_device(
     if data.color_rgb:
         color_rgb_json = json.dumps(data.color_rgb)
 
+    position_x = data.position_x
+    position_y = data.position_y
+    width = data.width
+    height = data.height
+    grid_range = data.grid_range
+
+    if grid_range:
+        grid_range = normalize_excel_range(grid_range)
+        rect = excel_range_to_rect_units(grid_range)
+        position_x = rect["x"]
+        position_y = rect["y"]
+        width = rect["width"]
+        height = rect["height"]
+    else:
+        fallback_x = position_x if position_x is not None else (max(1, int(area.grid_col)) - 1) * GRID_CELL_UNITS
+        fallback_y = position_y if position_y is not None else (max(1, int(area.grid_row)) - 1) * GRID_CELL_UNITS
+        grid_range = rect_units_to_excel_range(fallback_x, fallback_y, width, height)
+
     device = Device(
         project_id=project_id,
         area_id=area.id,
         name=data.name,
         device_type=data.device_type,
-        position_x=data.position_x,
-        position_y=data.position_y,
-        width=data.width,
-        height=data.height,
+        grid_range=grid_range,
+        position_x=position_x,
+        position_y=position_y,
+        width=width,
+        height=height,
         color_rgb_json=color_rgb_json,
     )
     db.add(device)
@@ -91,8 +116,23 @@ async def update_device(
         else:
             device.color_rgb_json = None
 
+    if "grid_range" in update_data:
+        grid_range = update_data.pop("grid_range")
+        if grid_range:
+            normalized = normalize_excel_range(grid_range)
+            rect = excel_range_to_rect_units(normalized)
+            update_data["grid_range"] = normalized
+            update_data["position_x"] = rect["x"]
+            update_data["position_y"] = rect["y"]
+            update_data["width"] = rect["width"]
+            update_data["height"] = rect["height"]
+
     for field, value in update_data.items():
         setattr(device, field, value)
+
+    fallback_x = device.position_x if device.position_x is not None else 0.0
+    fallback_y = device.position_y if device.position_y is not None else 0.0
+    device.grid_range = rect_units_to_excel_range(fallback_x, fallback_y, device.width, device.height)
 
     await db.commit()
     await db.refresh(device)

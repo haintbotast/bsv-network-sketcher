@@ -69,6 +69,9 @@ class Project(Base):
     owner: Mapped["User"] = relationship(back_populates="projects")
     areas: Mapped[list["Area"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     devices: Mapped[list["Device"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    device_ports: Mapped[list["DevicePort"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
     l1_links: Mapped[list["L1Link"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     port_channels: Mapped[list["PortChannel"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     virtual_ports: Mapped[list["VirtualPort"]] = relationship(back_populates="project", cascade="all, delete-orphan")
@@ -96,6 +99,7 @@ class Area(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     grid_row: Mapped[int] = mapped_column(Integer, nullable=False)
     grid_col: Mapped[int] = mapped_column(Integer, nullable=False)
+    grid_range: Mapped[Optional[str]] = mapped_column(String(32))
     position_x: Mapped[Optional[float]] = mapped_column(Float)
     position_y: Mapped[Optional[float]] = mapped_column(Float)
     width: Mapped[float] = mapped_column(Float, default=3.0)
@@ -115,6 +119,7 @@ class Area(Base):
 
 
 DEVICE_TYPES = ["Router", "Switch", "Firewall", "Server", "AP", "PC", "Storage", "Unknown"]
+PORT_SIDES = ["top", "bottom", "left", "right"]
 
 
 class Device(Base):
@@ -127,6 +132,7 @@ class Device(Base):
     device_type: Mapped[str] = mapped_column(String(20), default="Unknown")
     position_x: Mapped[Optional[float]] = mapped_column(Float)
     position_y: Mapped[Optional[float]] = mapped_column(Float)
+    grid_range: Mapped[Optional[str]] = mapped_column(String(32))
     width: Mapped[float] = mapped_column(Float, default=1.2)
     height: Mapped[float] = mapped_column(Float, default=0.5)
     color_rgb_json: Mapped[Optional[str]] = mapped_column(Text)  # [R, G, B] as JSON
@@ -135,6 +141,7 @@ class Device(Base):
     # Relationships
     project: Mapped["Project"] = relationship(back_populates="devices")
     area: Mapped["Area"] = relationship(back_populates="devices")
+    ports: Mapped[list["DevicePort"]] = relationship(back_populates="device", cascade="all, delete-orphan")
     port_channels: Mapped[list["PortChannel"]] = relationship(back_populates="device")
     virtual_ports: Mapped[list["VirtualPort"]] = relationship(back_populates="device")
     port_anchor_overrides: Mapped[list["PortAnchorOverride"]] = relationship(
@@ -142,12 +149,45 @@ class Device(Base):
     )
 
 
+class DevicePort(Base):
+    __tablename__ = "device_ports"
+    __table_args__ = (
+        UniqueConstraint("project_id", "device_id", "name", name="uq_device_port"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    project_id: Mapped[str] = mapped_column(String(36), ForeignKey("projects.id"), nullable=False)
+    device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    side: Mapped[str] = mapped_column(String(10), nullable=False, default="bottom")
+    offset_ratio: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    project: Mapped["Project"] = relationship(back_populates="device_ports")
+    device: Mapped["Device"] = relationship(back_populates="ports")
+
+
 # ============================================================================
 # L1 Link
 # ============================================================================
 
 
-LINK_PURPOSES = ["WAN", "INTERNET", "DMZ", "LAN", "MGMT", "HA", "STORAGE", "BACKUP", "VPN", "DEFAULT"]
+LINK_PURPOSES = [
+    "WAN",
+    "INTERNET",
+    "DMZ",
+    "LAN",
+    "MGMT",
+    "HA",
+    "HSRP",
+    "STACK",
+    "STORAGE",
+    "BACKUP",
+    "VPN",
+    "DEFAULT",
+]
 LINE_STYLES = ["solid", "dashed", "dotted"]
 
 

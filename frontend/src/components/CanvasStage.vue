@@ -146,6 +146,7 @@ const props = defineProps<{
   l2Assignments?: L2AssignmentRecord[]
   l3Addresses?: L3AddressRecord[]
   portAnchorOverrides?: PortAnchorOverrideMap
+  devicePortsMap?: Map<string, Array<{ name: string; side: 'top' | 'bottom' | 'left' | 'right' }>>
   autoLayoutCoords?: Map<string, { x: number; y: number }> // Auto-layout coords (logical units/inches)
   renderTuning?: {
     port_edge_inset?: number
@@ -733,6 +734,12 @@ const devicePortBands = computed(() => {
   props.portAnchorOverrides?.forEach((ports, deviceId) => {
     ports.forEach((override, portName) => {
       addPort(deviceId, portName, normalizedOverrideSide(override.side))
+    })
+  })
+
+  props.devicePortsMap?.forEach((ports, deviceId) => {
+    ports.forEach(port => {
+      addPort(deviceId, port.name, normalizedOverrideSide(port.side))
     })
   })
 

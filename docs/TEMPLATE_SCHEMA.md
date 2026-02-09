@@ -1,8 +1,8 @@
 ﻿# Template Schema - Dữ liệu nhập liệu chuẩn
 
-> **Phiên bản:** 1.2
+> **Phiên bản:** 1.3
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-01-23
+> **Cập nhật:** 2026-02-09
 > **Mục tiêu:** Chuẩn hóa schema template JSON, thứ tự phụ thuộc và validation.
 
 ---
@@ -689,6 +689,32 @@ class TemplateValidator:
     def is_valid(self, template_data: dict) -> bool:
         """Quick check if template is valid"""
         return self.validator.is_valid(template_data)
+```
+
+### 8.4 Trường mới theo grid Excel + device ports (2026-02-09)
+
+- `areas[].grid_range`:
+  - Kiểu: `string`
+  - Định dạng: `A1` hoặc `A1:B8`
+  - Ý nghĩa: vùng tọa độ chuẩn theo lưới Excel; backend tự đồng bộ với `grid_row/grid_col/position_x/position_y/width/height`.
+- `devices[].grid_range`:
+  - Kiểu: `string`
+  - Định dạng: `B10:F12`
+  - Ý nghĩa: vị trí/kích thước chuẩn của thiết bị trên lưới logic.
+- `device_ports[]` (khuyến nghị thêm vào template):
+  - `device_name`: tên thiết bị sở hữu port.
+  - `name`: tên port (vd: `Gi 0/1`, `Gi0/1`, `P1`).
+  - `side`: `top|bottom|left|right`.
+  - `offset_ratio`: `0..1` hoặc `null`.
+
+Ví dụ:
+```json
+{
+  "device_ports": [
+    { "device_name": "Core-SW-1", "name": "Gi 0/1", "side": "top", "offset_ratio": null },
+    { "device_name": "Core-SW-1", "name": "Gi 0/24", "side": "bottom", "offset_ratio": null }
+  ]
+}
 ```
 
 ---

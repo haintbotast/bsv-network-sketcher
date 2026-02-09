@@ -1,8 +1,20 @@
-import { computed, ref, onBeforeUnmount } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import type { AreaModel, DeviceModel, LinkModel } from '../models/types'
-import type { AreaRecord, DeviceRecord, LinkRecord, PortAnchorOverrideRecord } from '../models/api'
+import type {
+  AreaRecord,
+  DevicePortRecord,
+  DeviceRecord,
+  LinkRecord,
+  PortAnchorOverrideRecord,
+} from '../models/api'
 import { listAreas, createArea, updateArea, deleteArea } from '../services/areas'
 import { listDevices, createDevice, updateDevice, deleteDevice } from '../services/devices'
+import {
+  listProjectPorts,
+  createDevicePort,
+  updateDevicePort,
+  deleteDevicePort,
+} from '../services/devicePorts'
 import { listLinks, createLink, updateLink, deleteLink } from '../services/links'
 import { listPortAnchorOverrides, upsertPortAnchorOverrides, deletePortAnchorOverride } from '../services/portAnchors'
 import {
@@ -13,10 +25,21 @@ import {
   defaultAreaStyle,
   rgbToHex,
 } from './canvasConstants'
+import { excelRangeToRectUnits, rectUnitsToExcelRange } from '../utils/excelGrid'
 
 export type AreaRow = AreaRecord & { __temp?: boolean }
 export type DeviceRow = DeviceRecord & { __temp?: boolean }
+export type DevicePortRow = DevicePortRecord & { __temp?: boolean }
 export type LinkRow = LinkRecord & { __temp?: boolean }
+
+function resolveGridRect(gridRange?: string | null) {
+  if (!gridRange) return null
+  try {
+    return excelRangeToRectUnits(gridRange)
+  } catch {
+    return null
+  }
+}
 
 export function useCanvasData(
   selectedProjectId: { value: string | null },
@@ -28,8 +51,23 @@ export function useCanvasData(
 ) {
   const areas = ref<AreaRow[]>([])
   const devices = ref<DeviceRow[]>([])
+  const devicePorts = ref<DevicePortRow[]>([])
   const links = ref<LinkRow[]>([])
   const portAnchorOverrides = ref<PortAnchorOverrideRecord[]>([])
+
+  const devicePortMap = computed(() => {
+    const map = new Map<string, DevicePortRow[]>()
+    devicePorts.value.forEach(port => {
+      const list = map.get(port.device_id) || []
+      list.push(port)
+      map.set(port.device_id, list)
+    })
+    map.forEach((list, deviceId) => {
+      list.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+      map.set(deviceId, list)
+    })
+    return map
+  })
 
   const portAnchorOverrideMap = computed(() => {
     const map = new Map<string, Map<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number | null }>>()
@@ -47,10 +85,11 @@ export function useCanvasData(
   const canvasAreas = computed<AreaModel[]>(() => {
     return areas.value.map(area => {
       const style = area.style || defaultAreaStyle
-      const xUnits = area.position_x ?? (area.grid_col - 1) * GRID_FALLBACK_X
-      const yUnits = area.position_y ?? (area.grid_row - 1) * GRID_FALLBACK_Y
-      const widthUnits = area.width || 3
-      const heightUnits = area.height || 1.5
+      const rect = resolveGridRect(area.grid_range)
+      const xUnits = rect?.x ?? area.position_x ?? (area.grid_col - 1) * GRID_FALLBACK_X
+      const yUnits = rect?.y ?? area.position_y ?? (area.grid_row - 1) * GRID_FALLBACK_Y
+      const widthUnits = rect?.width ?? area.width ?? 3
+      const heightUnits = rect?.height ?? area.height ?? 1.5
       return {
         id: area.id,
         name: area.name,
@@ -66,16 +105,19 @@ export function useCanvasData(
 
   const canvasDevices = computed<DeviceModel[]>(() => {
     return devices.value.map(device => {
-      const xUnits = device.position_x ?? 0
-      const yUnits = device.position_y ?? 0
+      const rect = resolveGridRect(device.grid_range)
+      const xUnits = rect?.x ?? device.position_x ?? 0
+      const yUnits = rect?.y ?? device.position_y ?? 0
+      const widthUnits = rect?.width ?? device.width ?? 1.2
+      const heightUnits = rect?.height ?? device.height ?? 0.5
       return {
         id: device.id,
         areaId: device.area_id,
         name: device.name,
         x: xUnits * UNIT_PX,
         y: yUnits * UNIT_PX,
-        width: (device.width || 1.2) * UNIT_PX,
-        height: (device.height || 0.5) * UNIT_PX,
+        width: widthUnits * UNIT_PX,
+        height: heightUnits * UNIT_PX,
         type: device.device_type || 'Unknown'
       }
     })
@@ -104,14 +146,16 @@ export function useCanvasData(
 
   async function loadProjectData(projectId: string) {
     try {
-      const [areasData, devicesData, linksData, overridesData] = await Promise.all([
+      const [areasData, devicesData, portsData, linksData, overridesData] = await Promise.all([
         listAreas(projectId),
         listDevices(projectId),
+        listProjectPorts(projectId),
         listLinks(projectId),
         listPortAnchorOverrides(projectId)
       ])
       areas.value = areasData
       devices.value = devicesData
+      devicePorts.value = portsData
       links.value = linksData
       portAnchorOverrides.value = overridesData
     } catch (error: any) {
@@ -152,6 +196,7 @@ export function useCanvasData(
         name: row.name,
         grid_row: row.grid_row,
         grid_col: row.grid_col,
+        grid_range: row.grid_range || undefined,
         position_x: row.position_x,
         position_y: row.position_y,
         width: row.width,
@@ -179,6 +224,7 @@ export function useCanvasData(
           name: payload.row.name,
           grid_row: payload.row.grid_row,
           grid_col: payload.row.grid_col,
+          grid_range: payload.row.grid_range || undefined,
           position_x: payload.row.position_x,
           position_y: payload.row.position_y,
           width: payload.row.width,
@@ -221,6 +267,7 @@ export function useCanvasData(
         name: row.name,
         area_name: row.area_name,
         device_type: row.device_type,
+        grid_range: row.grid_range || undefined,
         position_x: row.position_x,
         position_y: row.position_y,
         width: row.width,
@@ -248,6 +295,7 @@ export function useCanvasData(
           name: payload.row.name,
           area_name: payload.row.area_name || undefined,
           device_type: payload.row.device_type,
+          grid_range: payload.row.grid_range || undefined,
           position_x: payload.row.position_x,
           position_y: payload.row.position_y,
           width: payload.row.width,
@@ -269,9 +317,52 @@ export function useCanvasData(
     if (row.__temp) return
     try {
       await deleteDevice(projectId, row.id)
+      devicePorts.value = devicePorts.value.filter(port => port.device_id !== row.id)
+      portAnchorOverrides.value = portAnchorOverrides.value.filter(override => override.device_id !== row.id)
       scheduleAutoLayout(projectId, { force: true, reason: 'device-crud' })
     } catch (error: any) {
       setNotice(error?.message || 'Xóa device thất bại.', 'error')
+    }
+  }
+
+  async function createDevicePortRow(
+    projectId: string,
+    deviceId: string,
+    payload: {
+      name: string
+      side?: 'top' | 'bottom' | 'left' | 'right'
+      offset_ratio?: number | null
+    }
+  ) {
+    const created = await createDevicePort(projectId, deviceId, payload)
+    devicePorts.value.push(created)
+    return created
+  }
+
+  async function updateDevicePortRow(
+    projectId: string,
+    deviceId: string,
+    portId: string,
+    payload: {
+      name?: string
+      side?: 'top' | 'bottom' | 'left' | 'right'
+      offset_ratio?: number | null
+    }
+  ) {
+    const updated = await updateDevicePort(projectId, deviceId, portId, payload)
+    const index = devicePorts.value.findIndex(port => port.id === portId)
+    if (index >= 0) devicePorts.value[index] = updated
+    return updated
+  }
+
+  async function deleteDevicePortRow(projectId: string, deviceId: string, portId: string) {
+    const port = devicePorts.value.find(item => item.id === portId)
+    await deleteDevicePort(projectId, deviceId, portId)
+    devicePorts.value = devicePorts.value.filter(item => item.id !== portId)
+    if (port) {
+      portAnchorOverrides.value = portAnchorOverrides.value.filter(
+        item => !(item.device_id === deviceId && item.port_name === port.name)
+      )
     }
   }
 
@@ -380,10 +471,12 @@ export function useCanvasData(
     const normalizedY = snapUnitsToStandard(positionY)
 
     const previous = areas.value[index]
+    const optimisticGridRange = rectUnitsToExcelRange(normalizedX, normalizedY, previous.width || 3, previous.height || 1.5)
     const optimistic: AreaRow = {
       ...previous,
       position_x: normalizedX,
       position_y: normalizedY,
+      grid_range: optimisticGridRange,
     }
     areas.value[index] = optimistic
 
@@ -391,6 +484,7 @@ export function useCanvasData(
       const updated = await updateArea(projectId, areaId, {
         position_x: normalizedX,
         position_y: normalizedY,
+        grid_range: optimisticGridRange,
       })
       const nextIndex = areas.value.findIndex(area => area.id === areaId)
       if (nextIndex >= 0) {
@@ -415,10 +509,12 @@ export function useCanvasData(
     const normalizedY = snapUnitsToStandard(positionY)
 
     const previous = devices.value[index]
+    const optimisticGridRange = rectUnitsToExcelRange(normalizedX, normalizedY, previous.width || 1.2, previous.height || 0.5)
     const optimistic: DeviceRow = {
       ...previous,
       position_x: normalizedX,
       position_y: normalizedY,
+      grid_range: optimisticGridRange,
     }
     devices.value[index] = optimistic
 
@@ -426,6 +522,7 @@ export function useCanvasData(
       const updated = await updateDevice(projectId, deviceId, {
         position_x: normalizedX,
         position_y: normalizedY,
+        grid_range: optimisticGridRange,
       })
       const nextIndex = devices.value.findIndex(device => device.id === deviceId)
       if (nextIndex >= 0) {
@@ -444,6 +541,8 @@ export function useCanvasData(
   return {
     areas,
     devices,
+    devicePorts,
+    devicePortMap,
     links,
     portAnchorOverrides,
     portAnchorOverrideMap,
@@ -457,6 +556,9 @@ export function useCanvasData(
     handleDeviceAdd,
     handleDeviceChange,
     handleDeviceRemove,
+    createDevicePortRow,
+    updateDevicePortRow,
+    deleteDevicePortRow,
     handleLinkAdd,
     handleLinkChange,
     handleLinkRemove,

@@ -1,8 +1,8 @@
 ﻿# API Spec (tối giản) - Web Network Sketcher
 
-> **Phiên bản:** 1.1
+> **Phiên bản:** 1.2
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-02-03
+> **Cập nhật:** 2026-02-09
 > **Mục tiêu:** Đặc tả API phục vụ nhập liệu trực tiếp, quản lý dự án và xuất dữ liệu.
 
 ---
@@ -66,6 +66,8 @@ POST   /templates/{id}/apply
 ```
 /projects/{project_id}/areas
 /projects/{project_id}/devices
+/projects/{project_id}/ports
+/projects/{project_id}/devices/{device_id}/ports
 /projects/{project_id}/interfaces
 /projects/{project_id}/links
 /projects/{project_id}/port-channels
@@ -361,6 +363,7 @@ Request:
   "name": "Core",
   "grid_row": 1,
   "grid_col": 1,
+  "grid_range": "A1:P10",
   "width": 4.0,
   "height": 2.5
 }
@@ -374,6 +377,7 @@ Response (201 Created):
   "name": "Core",
   "grid_row": 1,
   "grid_col": 1,
+  "grid_range": "A1:P10",
   "position_x": 0.5,
   "position_y": 0.5,
   "width": 4.0,
@@ -413,6 +417,7 @@ Request:
   "name": "Core-SW-1",
   "area_name": "Core",
   "device_type": "Switch",
+  "grid_range": "B3:F4",
   "position_x": 1.5,
   "position_y": 1.0
 }
@@ -427,6 +432,7 @@ Response (201 Created):
   "area_id": "area_1a2b3c4d-5e6f-7890-abcd-ef1234567890",
   "area_name": "Core",
   "device_type": "Switch",
+  "grid_range": "B3:F4",
   "position_x": 1.5,
   "position_y": 1.0,
   "width": 1.2,
@@ -492,7 +498,58 @@ Response (200 OK - partial success):
 
 ---
 
-### 10.5 Links
+### 10.5 Device Ports
+
+**GET /api/v1/projects/{project_id}/ports**
+
+Response (200 OK):
+```json
+[
+  {
+    "id": "prt_1a2b3c4d-5e6f-7890-abcd-ef1234567890",
+    "project_id": "prj_f1e2d3c4-b5a6-7890-1234-567890abcdef",
+    "device_id": "dev_2b3c4d5e-6f78-9012-3456-7890abcdef12",
+    "device_name": "Core-SW-1",
+    "name": "Gi 0/1",
+    "side": "top",
+    "offset_ratio": null,
+    "created_at": "2026-02-09T09:00:00Z",
+    "updated_at": "2026-02-09T09:00:00Z"
+  }
+]
+```
+
+**POST /api/v1/projects/{project_id}/devices/{device_id}/ports**
+
+Request:
+```json
+{
+  "name": "Gi 0/24",
+  "side": "bottom",
+  "offset_ratio": null
+}
+```
+
+**PUT /api/v1/projects/{project_id}/devices/{device_id}/ports/{port_id}**
+
+Request:
+```json
+{
+  "name": "Gi 0/48",
+  "side": "top",
+  "offset_ratio": null
+}
+```
+
+**DELETE /api/v1/projects/{project_id}/devices/{device_id}/ports/{port_id}**
+
+Ghi chú:
+- Không cho đổi tên/xóa port đang được dùng trong `l1_links`.
+- `side` hỗ trợ: `top`, `bottom`, `left`, `right`.
+
+---
+
+### 10.6 Links
 
 **POST /api/v1/projects/{project_id}/links**
 
@@ -533,7 +590,21 @@ Response (400 Bad Request - port format sai):
       "entity": "link",
       "field": "from_port",
       "code": "PORT_FORMAT_INVALID",
-      "message": "Port 'Gi0/1' không hợp lệ. Phải có khoảng trắng giữa loại và số (vd: 'Gi 0/1')"
+      "message": "Port 'Gi0/1?' không hợp lệ. Ví dụ hợp lệ: 'Gi 0/1', 'Gi0/1', 'P1'"
+    }
+  ]
+}
+```
+
+Response (400 Bad Request - port chưa khai báo):
+```json
+{
+  "errors": [
+    {
+      "entity": "link",
+      "field": "from_port",
+      "code": "PORT_NOT_FOUND",
+      "message": "Port 'Gi 0/1' chưa khai báo trên 'Core-SW-1'"
     }
   ]
 }
@@ -589,7 +660,7 @@ Các mã lỗi liên quan khác có thể gặp:
 
 ---
 
-### 10.6 Export
+### 10.7 Export
 
 **POST /api/v1/projects/{project_id}/export/l1-diagram**
 
@@ -664,7 +735,7 @@ Response (200 OK - failed):
 
 ---
 
-### 10.7 WebSocket Events
+### 10.8 WebSocket Events
 
 **Kết nối:** `WS /ws/projects/{project_id}`
 

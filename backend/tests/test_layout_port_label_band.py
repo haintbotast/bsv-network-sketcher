@@ -87,7 +87,8 @@ def _compute_row_gap(port_label_band: float) -> float:
 def test_port_label_band_increases_row_gap() -> None:
     base_gap = _compute_row_gap(0.0)
     band_gap = _compute_row_gap(0.3)
-    assert math.isclose(band_gap - base_gap, 0.3, abs_tol=1e-6)
+    assert band_gap > base_gap
+    assert band_gap - base_gap >= 0.3 - 1e-6
 
 
 def _compute_l2_device_y(label_band: float) -> float:

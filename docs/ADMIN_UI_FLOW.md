@@ -1,8 +1,8 @@
 ﻿# Admin UI Flow (tối giản)
 
-> **Phiên bản:** 1.0  
+> **Phiên bản:** 1.1  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-06  
+> **Cập nhật:** 2026-02-09  
 > **Mục tiêu:** Gợi ý luồng UI cho trang quản trị cấu hình và lịch sử phiên bản topology.
 
 ---
@@ -16,10 +16,11 @@
 4) Dùng cụm điều khiển ở **main navigator panel** (`zoom/reset/L1/L2/L3/Sửa vị trí`) để chuyển chế độ xem/chỉnh; cụm này hiển thị **canh giữa theo panel**
 5) (Tuỳ chọn) Bấm **Chạy lại auto-layout** để áp dụng lại bố cục
 6) (Tuỳ chọn) Khai báo nhanh link peer-control (`STACK/HA/HSRP`) từ tab **Bố cục** và đối chiếu legend màu/nét/chú giải
-7) (Tuỳ chọn) Bật **Sửa vị trí** trên canvas để kéo‑thả `Area/Device` và lưu tọa độ thủ công (có guide/snap alignment, tọa độ chuẩn theo step 0.25 đv)
-8) Sửa giá trị → **Validate** → **Save**
-9) Hiển thị diff + audit log entry
-10) Lưu **config version** mới và cho phép khôi phục
+7) (Tuỳ chọn) Bật **Sửa vị trí** trên canvas để kéo‑thả `Area/Device` và lưu tọa độ thủ công (có guide/snap alignment, tọa độ chuẩn theo step 0.25 đv, đồng bộ `grid_range` kiểu Excel)
+8) (Tuỳ chọn) Quản lý **Device Port** theo từng thiết bị (`name/side/offset_ratio`) trước khi tạo link
+9) Sửa giá trị → **Validate** → **Save**
+10) Hiển thị diff + audit log entry
+11) Lưu **config version** mới và cho phép khôi phục
 
 **Ngoại lệ bắt buộc:**
 - Thao tác viewport để xem sơ đồ (`pan`, `zoom`, `reset view`) **không được trigger auto-layout**.

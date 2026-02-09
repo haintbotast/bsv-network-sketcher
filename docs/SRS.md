@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-06  
+> **Cập nhật:** 2026-02-09  
 > **Mục tiêu:** Đặc tả yêu cầu kỹ thuật để triển khai web app theo style chung (chuẩn nội bộ).
 
 ---
@@ -46,6 +46,9 @@
 - Luồng kéo‑thả chỉnh vị trí thủ công **không trigger auto-layout** để tránh ghi đè bố cục người dùng vừa tinh chỉnh.
 - Khi kéo‑thả trong chế độ sửa vị trí, UI hiển thị **đường gióng căn chỉnh** và hỗ trợ **snap nhẹ** theo object liên quan (device cùng area hoặc area cùng cấp).
 - Tọa độ `position_x/position_y` phải được chuẩn hóa theo **bảng vị trí chuẩn X/Y** với bước mặc định **0.25 đv** để tránh số lẻ khó kiểm soát.
+- Hệ tọa độ chuẩn hỗ trợ khai báo theo **grid Excel** (`A1:B2`); với Area/Device, `grid_range` là trường chuẩn, `position_x/position_y` giữ vai trò tương thích ngược.
+- API/UI phải cho phép CRUD **Device Port** độc lập theo thiết bị (`name`, `side`, `offset_ratio`) để tách rõ mô hình port khỏi link.
+- Khi tạo/sửa link L1, endpoint (`from_port`, `to_port`) bắt buộc phải tồn tại trong danh sách port đã khai báo của đúng thiết bị.
 - Tab **Bố cục** cần có thành phần khai báo nhanh kết nối peer-control (`HA/STACK/HSRP`) và hiển thị legend màu/nét/chú giải tương ứng.
 - Với L1, điểm nối port tự động phải theo quy ước: **uplink ở cạnh trên (top)**, **kết nối không phải uplink ở cạnh dưới (bottom)**; chỉ cho phép lệch quy ước khi có **override thủ công**.
 - Với L1, **nhãn port là một phần của object** (port band trên/dưới), không render nhãn nổi giữa đường link.

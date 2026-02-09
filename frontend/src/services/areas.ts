@@ -11,6 +11,7 @@ export function createArea(
     name: string
     grid_row: number
     grid_col: number
+    grid_range?: string | null
     position_x?: number | null
     position_y?: number | null
     width: number
@@ -31,6 +32,7 @@ export function updateArea(
     name?: string
     grid_row?: number
     grid_col?: number
+    grid_range?: string | null
     position_x?: number | null
     position_y?: number | null
     width?: number

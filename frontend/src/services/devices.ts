@@ -11,6 +11,7 @@ export function createDevice(
     name: string
     area_name: string
     device_type: string
+    grid_range?: string | null
     position_x?: number | null
     position_y?: number | null
     width: number
@@ -31,6 +32,7 @@ export function updateDevice(
     name?: string
     area_name?: string
     device_type?: string
+    grid_range?: string | null
     position_x?: number | null
     position_y?: number | null
     width?: number

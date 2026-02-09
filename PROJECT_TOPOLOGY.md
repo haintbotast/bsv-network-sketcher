@@ -1,8 +1,8 @@
 # Topology dự án Web Network Sketcher
 
-> **Phiên bản:** 1.0  
+> **Phiên bản:** 1.1  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-06  
+> **Cập nhật:** 2026-02-09  
 > **Trạng thái:** Tài liệu kiến trúc vận hành  
 > **Nguyên tắc:** Dự án web tham chiếu Network Sketcher gốc (logic), **không triển khai CLI**; ưu tiên đúng logic và UX tối giản nhưng dùng được ngay.
 
@@ -75,7 +75,9 @@ UI thao tác → REST API → Service → DB → phản hồi → UI render
 - Kéo‑thả thủ công `Area/Device` (khi bật chế độ sửa vị trí) lưu trực tiếp `position_x/position_y` về DB tại `drag-end` và không trigger auto-layout.
 - Control viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) tập trung ở main navigator panel và canh giữa theo panel; khi drag object có guide + snap alignment theo object liên quan để chỉnh tay nhanh.
 - Tọa độ thủ công được chuẩn hóa theo mốc chuẩn X/Y (step 0.25 đv) trước khi lưu DB để đồng nhất dữ liệu.
+- Tọa độ chuẩn bổ sung `grid_range` kiểu Excel (`A1:B2`) cho `Area`/`Device`; backend tự đồng bộ `grid_range` ↔ `position_x/position_y/width/height`.
 - Quy ước anchor L1: uplink đi ra từ **cạnh trên** object, non-uplink đi ra từ **cạnh dưới** object; override thủ công được ưu tiên.
+- Bổ sung thực thể `device_ports` (DB-driven) để khai báo port độc lập trước khi nối link; endpoint link phải tham chiếu port đã khai báo.
 - Render L1 dùng **port band gắn trực tiếp vào object** (top/bottom); kích thước object được nới theo số lượng/độ dài port.
 - Render routing L1 theo phong cách kỹ thuật (orthogonal/góc vuông rõ, ưu tiên màu trung tính cho link LAN/DEFAULT).
 - UI L1 render khung Area theo dạng compact quanh cụm thiết bị để giảm khoảng trắng hiển thị (không đổi dữ liệu Area gốc).

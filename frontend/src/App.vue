@@ -95,7 +95,8 @@
           :position-edit-enabled="positionEditEnabled"
           :l2-assignments="l2Assignments"
           :l3-addresses="l3Addresses"
-          :port-anchor-overrides="portAnchorOverrideMap"
+          :port-anchor-overrides="effectivePortAnchorMap"
+          :device-ports-map="devicePortMap"
           :render-tuning="renderTuning"
           @select="handleSelect"
           @update:viewport="handleViewportUpdate"
@@ -302,6 +303,10 @@
               <label>Tên</label>
               <input type="text" v-model="selectedDraft.name" @change="handleSelectedObjectChange" />
             </div>
+            <div class="form-group">
+              <label>Grid range (Excel)</label>
+              <input type="text" v-model="selectedDraft.grid_range" placeholder="vd: A1:L8" @change="handleSelectedObjectChange" />
+            </div>
             <div class="form-row">
               <div class="form-group">
                 <label>Hàng lưới</label>
@@ -352,6 +357,10 @@
                 <option v-for="type in deviceTypes" :key="type" :value="type">{{ type }}</option>
               </select>
             </div>
+            <div class="form-group">
+              <label>Grid range (Excel)</label>
+              <input type="text" v-model="selectedDraft.grid_range" placeholder="vd: B10:F12" @change="handleSelectedObjectChange" />
+            </div>
             <div class="form-row">
               <div class="form-group">
                 <label>X (đv)</label>
@@ -370,6 +379,49 @@
               <div class="form-group">
                 <label>Height (đv)</label>
                 <input type="number" step="0.1" v-model.number="selectedDraft.height" @change="handleSelectedObjectChange" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Port của thiết bị</label>
+              <div class="port-editor">
+                <div v-if="selectedDevicePortRows.length === 0" class="hint small">
+                  Chưa có port. Thêm port trước khi tạo link.
+                </div>
+                <div v-else class="port-editor-list">
+                  <div v-for="port in selectedDevicePortRows" :key="port.id" class="port-editor-row">
+                    <template v-if="portDrafts[port.id]">
+                      <input
+                        type="text"
+                        v-model="portDrafts[port.id].name"
+                        placeholder="Tên port (vd: Gi 0/1)"
+                      />
+                      <select v-model="portDrafts[port.id].side">
+                        <option value="top">top</option>
+                        <option value="bottom">bottom</option>
+                        <option value="left">left</option>
+                        <option value="right">right</option>
+                      </select>
+                      <button type="button" class="secondary" @click="saveDevicePort(port.id)">
+                        Lưu port
+                      </button>
+                      <button type="button" class="ghost" @click="removeDevicePort(port.id)">
+                        Xóa
+                      </button>
+                    </template>
+                  </div>
+                </div>
+                <div class="port-editor-create">
+                  <input type="text" v-model="newPortDraft.name" placeholder="Port mới (vd: Gi 0/24)" />
+                  <select v-model="newPortDraft.side">
+                    <option value="top">top</option>
+                    <option value="bottom">bottom</option>
+                    <option value="left">left</option>
+                    <option value="right">right</option>
+                  </select>
+                  <button type="button" class="primary" @click="createDevicePortEntry">
+                    Thêm port
+                  </button>
+                </div>
               </div>
             </div>
             <div class="form-group">
@@ -574,11 +626,12 @@ import {
   linkPurposes,
 } from './composables/canvasConstants'
 import { comparePorts, extractPortIndex } from './components/canvas/linkRoutingUtils'
+import { formatExcelCell } from './utils/excelGrid'
 import { useViewport } from './composables/useViewport'
 import { useAuth } from './composables/useAuth'
 import { useProjects } from './composables/useProjects'
 import { useCanvasData } from './composables/useCanvasData'
-import type { AreaRow, DeviceRow, LinkRow } from './composables/useCanvasData'
+import type { AreaRow, DevicePortRow, DeviceRow, LinkRow } from './composables/useCanvasData'
 import { useAutoLayout } from './composables/useAutoLayout'
 import type { ScheduleAutoLayoutOptions } from './composables/useAutoLayout'
 import { useViewMode } from './composables/useViewMode'
@@ -621,12 +674,13 @@ const canvasData = useCanvasData(
   (projectId: string, options: ScheduleAutoLayoutOptions) => scheduleAutoLayout(projectId, options),
 )
 const {
-  areas, devices, links,
+  areas, devices, devicePorts, devicePortMap, links,
   portAnchorOverrides, portAnchorOverrideMap,
   canvasAreas, canvasDevices, canvasLinks,
   loadProjectData,
   handleAreaAdd, handleAreaChange, handleAreaRemove,
   handleDeviceAdd, handleDeviceChange, handleDeviceRemove,
+  createDevicePortRow, updateDevicePortRow, deleteDevicePortRow,
   handleLinkAdd, handleLinkChange, handleLinkRemove,
   upsertAnchorOverride, removeAnchorOverride,
   assignDeviceArea,
@@ -643,6 +697,23 @@ let syncingDraft = false
 const anchorDrafts = ref<Record<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number; autoOffset: boolean }>>({})
 const positionEditEnabled = ref(false)
 const positionSaveSeq = new Map<string, number>()
+
+const effectivePortAnchorMap = computed(() => {
+  const map = new Map<string, Map<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number | null }>>()
+  devicePorts.value.forEach(port => {
+    const deviceMap = map.get(port.device_id) || new Map()
+    deviceMap.set(port.name, { side: port.side, offsetRatio: port.offset_ratio ?? null })
+    map.set(port.device_id, deviceMap)
+  })
+  portAnchorOverrideMap.value.forEach((ports, deviceId) => {
+    const deviceMap = map.get(deviceId) || new Map()
+    ports.forEach((override, portName) => {
+      deviceMap.set(portName, override)
+    })
+    map.set(deviceId, deviceMap)
+  })
+  return map
+})
 
 
 // Viewport state (from composable)
@@ -774,6 +845,7 @@ const selectedDevicePorts = computed(() => {
   if (selectedObjectType.value !== 'Device' || !selectedObject.value) return []
   const deviceId = (selectedObject.value as DeviceRow).id
   const ports = new Set<string>()
+  ;(devicePortMap.value.get(deviceId) || []).forEach(port => ports.add(port.name))
   links.value.forEach(link => {
     if (link.from_device_id === deviceId && link.from_port) ports.add(link.from_port)
     if (link.to_device_id === deviceId && link.to_port) ports.add(link.to_port)
@@ -795,14 +867,30 @@ const selectedDeviceOverrideMap = computed(() => {
   return map
 })
 
-watch([selectedDevicePorts, selectedDeviceOverrideMap], () => {
+const selectedDevicePortDefinitionMap = computed(() => {
+  const map = new Map<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number | null }>()
+  if (selectedObjectType.value !== 'Device' || !selectedObject.value) {
+    return map
+  }
+  const deviceId = (selectedObject.value as DeviceRow).id
+  const ports = devicePortMap.value.get(deviceId) || []
+  ports.forEach(port => {
+    map.set(port.name, {
+      side: port.side,
+      offsetRatio: port.offset_ratio ?? null,
+    })
+  })
+  return map
+})
+
+watch([selectedDevicePorts, selectedDeviceOverrideMap, selectedDevicePortDefinitionMap], () => {
   if (selectedDevicePorts.value.length === 0) {
     anchorDrafts.value = {}
     return
   }
   const next: Record<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number; autoOffset: boolean }> = {}
   selectedDevicePorts.value.forEach(port => {
-    const existing = selectedDeviceOverrideMap.value.get(port)
+    const existing = selectedDeviceOverrideMap.value.get(port) || selectedDevicePortDefinitionMap.value.get(port)
     if (existing) {
       next[port] = {
         side: existing.side,
@@ -842,11 +930,81 @@ async function clearAnchorOverride(port: string) {
   const deviceId = (selectedObject.value as DeviceRow).id
   try {
     await removeAnchorOverride(selectedProjectId.value, deviceId, port)
-    anchorDrafts.value[port] = { side: 'right', offsetRatio: 0.5, autoOffset: true }
+    const base = selectedDevicePortDefinitionMap.value.get(port)
+    anchorDrafts.value[port] = {
+      side: base?.side || 'right',
+      offsetRatio: base?.offsetRatio ?? 0.5,
+      autoOffset: base?.offsetRatio == null
+    }
     scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'anchor-crud' })
     setNotice('Đã xóa override anchor.', 'success')
   } catch (error: any) {
     setNotice(error?.message || 'Xóa override anchor thất bại.', 'error')
+  }
+}
+
+async function createDevicePortEntry() {
+  if (!selectedProjectId.value || !selectedDeviceId.value) return
+  const name = newPortDraft.value.name.trim()
+  if (!name) {
+    setNotice('Cần nhập tên port.', 'error')
+    return
+  }
+  const duplicated = selectedDevicePortRows.value.some(port => port.name === name)
+  if (duplicated) {
+    setNotice(`Port '${name}' đã tồn tại trên thiết bị.`, 'error')
+    return
+  }
+  try {
+    await createDevicePortRow(selectedProjectId.value, selectedDeviceId.value, {
+      name,
+      side: newPortDraft.value.side,
+      offset_ratio: null,
+    })
+    newPortDraft.value = { name: '', side: 'bottom' }
+    scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'device-crud' })
+    setNotice('Đã thêm port.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Thêm port thất bại.', 'error')
+  }
+}
+
+async function saveDevicePort(portId: string) {
+  if (!selectedProjectId.value || !selectedDeviceId.value) return
+  const draft = portDrafts.value[portId]
+  if (!draft) return
+  const name = draft.name.trim()
+  if (!name) {
+    setNotice('Tên port không được để trống.', 'error')
+    return
+  }
+  const duplicated = selectedDevicePortRows.value.some(port => port.id !== portId && port.name === name)
+  if (duplicated) {
+    setNotice(`Port '${name}' đã tồn tại trên thiết bị.`, 'error')
+    return
+  }
+  try {
+    await updateDevicePortRow(selectedProjectId.value, selectedDeviceId.value, portId, {
+      name,
+      side: draft.side,
+      offset_ratio: null,
+    })
+    scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'device-crud' })
+    setNotice('Đã lưu port.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Lưu port thất bại.', 'error')
+  }
+}
+
+async function removeDevicePort(portId: string) {
+  if (!selectedProjectId.value || !selectedDeviceId.value) return
+  if (!confirm('Bạn có chắc muốn xóa port này?')) return
+  try {
+    await deleteDevicePortRow(selectedProjectId.value, selectedDeviceId.value, portId)
+    scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'device-crud' })
+    setNotice('Đã xóa port.', 'success')
+  } catch (error: any) {
+    setNotice(error?.message || 'Xóa port thất bại.', 'error')
   }
 }
 
@@ -871,6 +1029,28 @@ const selectedDeviceId = computed(() => {
 const selectedDeviceName = computed(() => {
   if (selectedObjectType.value !== 'Device' || !selectedObject.value) return null
   return (selectedObject.value as DeviceRow).name
+})
+
+const selectedDevicePortRows = computed<DevicePortRow[]>(() => {
+  if (!selectedDeviceId.value) return []
+  return devicePortMap.value.get(selectedDeviceId.value) || []
+})
+
+const portDrafts = ref<Record<string, { name: string; side: 'top' | 'bottom' | 'left' | 'right' }>>({})
+const newPortDraft = ref<{ name: string; side: 'top' | 'bottom' | 'left' | 'right' }>({
+  name: '',
+  side: 'bottom',
+})
+
+watch(selectedDevicePortRows, rows => {
+  const next: Record<string, { name: string; side: 'top' | 'bottom' | 'left' | 'right' }> = {}
+  rows.forEach(port => {
+    next[port.id] = {
+      name: port.name,
+      side: port.side,
+    }
+  })
+  portDrafts.value = next
 })
 
 const deviceNameById = computed(() => {
@@ -914,6 +1094,7 @@ const linkLineStyleOptions = linkLineStyles.map(style => ({ value: style, label:
 
 const areaColumns: ColumnDef[] = [
   { key: 'name', label: 'Tên' },
+  { key: 'grid_range', label: 'Grid range', width: '160px' },
   { key: 'grid_row', label: 'Hàng', type: 'number', width: '72px' },
   { key: 'grid_col', label: 'Cột', type: 'number', width: '72px' },
   { key: 'width', label: 'Rộng', type: 'number', width: '80px' },
@@ -924,6 +1105,7 @@ const deviceColumns = computed<ColumnDef[]>(() => [
   { key: 'name', label: 'Tên' },
   { key: 'area_name', label: 'Area', type: 'select', options: areaNameOptions.value },
   { key: 'device_type', label: 'Loại', type: 'select', options: deviceTypeOptions },
+  { key: 'grid_range', label: 'Grid range', width: '160px' },
   { key: 'width', label: 'Rộng', type: 'number', width: '80px' },
   { key: 'height', label: 'Cao', type: 'number', width: '80px' },
 ])
@@ -938,6 +1120,20 @@ const linkColumns = computed<ColumnDef[]>(() => [
 ])
 
 const nextPortForDevice = (deviceId: string, offset = 0) => {
+  const declared = (devicePortMap.value.get(deviceId) || []).map(port => port.name).sort(comparePorts)
+  if (declared.length > 0) {
+    const used = new Set<string>()
+    links.value.forEach(link => {
+      if (link.from_device_id === deviceId) used.add(link.from_port)
+      if (link.to_device_id === deviceId) used.add(link.to_port)
+    })
+    const available = declared.filter(port => !used.has(port))
+    if (available.length > 0) {
+      return available[Math.min(offset, available.length - 1)]
+    }
+    return declared[Math.min(offset, declared.length - 1)]
+  }
+
   let maxIndex = 0
   links.value.forEach(link => {
     if (link.from_device_id === deviceId) {
@@ -954,6 +1150,12 @@ const nextPortForDevice = (deviceId: string, offset = 0) => {
 }
 
 const defaultAreaRow = computed(() => ({
+  ...(function () {
+    const row = Math.max(1, areas.value.length + 1)
+    const start = formatExcelCell(1, row)
+    const end = formatExcelCell(14, row + 5)
+    return { grid_range: `${start}:${end}` }
+  })(),
   name: `Area ${areas.value.length + 1}`,
   grid_row: Math.max(1, areas.value.length + 1),
   grid_col: 1,
@@ -963,6 +1165,14 @@ const defaultAreaRow = computed(() => ({
 }))
 
 const defaultDeviceRow = computed(() => ({
+  ...(function () {
+    const idx = devices.value.length
+    const colStart = 1 + (idx % 8) * 3
+    const rowStart = 1 + Math.floor(idx / 8) * 3
+    const start = formatExcelCell(colStart, rowStart)
+    const end = formatExcelCell(colStart + 3, rowStart + 1)
+    return { grid_range: `${start}:${end}` }
+  })(),
   name: `Device ${devices.value.length + 1}`,
   area_name: areas.value[0]?.name || '',
   device_type: 'Switch',
@@ -1100,6 +1310,10 @@ watch(selectedDeviceId, () => {
     purpose: 'DEFAULT',
     lineStyle: 'solid'
   }
+  newPortDraft.value = {
+    name: '',
+    side: 'bottom'
+  }
 })
 
 function isPortInUse(deviceId: string, port: string, excludeLinkId?: string) {
@@ -1135,7 +1349,13 @@ function isDuplicateLink(
 }
 
 function validatePortFormat(port: string) {
-  return /^[A-Za-z\\-]+\\s+.+$/.test(port.trim())
+  return /^[A-Za-z][A-Za-z0-9 _./-]*$/.test(port.trim())
+}
+
+function isDeclaredPort(deviceId: string, port: string) {
+  const normalized = port.trim()
+  const declared = devicePortMap.value.get(deviceId) || []
+  return declared.some(item => item.name === normalized)
 }
 
 function validateLinkDraft(params: {
@@ -1151,6 +1371,12 @@ function validateLinkDraft(params: {
   if (!toPort.trim()) return 'Cần nhập port đích.'
   if (!validatePortFormat(fromPort)) return 'Port nguồn không hợp lệ (vd: Gi 0/1).'
   if (!validatePortFormat(toPort)) return 'Port đích không hợp lệ (vd: Gi 0/24).'
+  if (!isDeclaredPort(fromDeviceId, fromPort)) {
+    return `Port nguồn '${fromPort.trim()}' chưa khai báo trên thiết bị.`
+  }
+  if (!isDeclaredPort(toDeviceId, toPort)) {
+    return `Port đích '${toPort.trim()}' chưa khai báo trên thiết bị.`
+  }
   if (fromDeviceId === toDeviceId && fromPort.trim() === toPort.trim()) {
     return 'Không thể nối cùng một port.'
   }
@@ -1413,6 +1639,7 @@ function handleLogout() {
       selectedProjectId.value = null
       areas.value = []
       devices.value = []
+      devicePorts.value = []
       links.value = []
     }
   })
@@ -1451,6 +1678,7 @@ async function saveSelectedObject() {
         name: selectedDraft.value.name,
         grid_row: selectedDraft.value.grid_row,
         grid_col: selectedDraft.value.grid_col,
+        grid_range: selectedDraft.value.grid_range || undefined,
         position_x: normalizedPositionX,
         position_y: normalizedPositionY,
         width: selectedDraft.value.width,
@@ -1466,6 +1694,7 @@ async function saveSelectedObject() {
         name: selectedDraft.value.name,
         area_name: selectedDraft.value.area_name || undefined,
         device_type: selectedDraft.value.device_type,
+        grid_range: selectedDraft.value.grid_range || undefined,
         position_x: normalizedPositionX,
         position_y: normalizedPositionY,
         width: selectedDraft.value.width,
@@ -1539,6 +1768,7 @@ watch(selectedProjectId, async (projectId) => {
   } else {
     areas.value = []
     devices.value = []
+    devicePorts.value = []
     links.value = []
   }
 })
@@ -2049,6 +2279,30 @@ onMounted(() => {
   margin: 0;
   font-size: 12px;
   color: var(--muted);
+}
+
+.port-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.port-editor-list {
+  display: grid;
+  gap: 8px;
+}
+
+.port-editor-row {
+  display: grid;
+  grid-template-columns: 1fr 120px auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.port-editor-create {
+  display: grid;
+  grid-template-columns: 1fr 120px auto;
+  gap: 8px;
+  align-items: center;
 }
 
 .anchor-override-list {

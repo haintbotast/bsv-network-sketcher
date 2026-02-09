@@ -3,7 +3,9 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.services.grid_excel import normalize_excel_range
 
 
 class AreaStyle(BaseModel):
@@ -18,26 +20,42 @@ class AreaCreate(BaseModel):
     """Schema tạo area mới."""
 
     name: str = Field(..., min_length=1, max_length=100, pattern="^[A-Za-z0-9_\\-\\s]+$")
-    grid_row: int = Field(..., ge=1, le=100)
-    grid_col: int = Field(..., ge=1, le=100)
+    grid_row: int = Field(1, ge=1, le=9999)
+    grid_col: int = Field(1, ge=1, le=9999)
+    grid_range: Optional[str] = Field(None, min_length=2, max_length=32)
     position_x: Optional[float] = Field(None, ge=0)
     position_y: Optional[float] = Field(None, ge=0)
     width: float = Field(3.0, ge=0.5, le=50)
     height: float = Field(1.5, ge=0.5, le=50)
     style: Optional[AreaStyle] = None
 
+    @field_validator("grid_range")
+    @classmethod
+    def validate_grid_range(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or not value.strip():
+            return None
+        return normalize_excel_range(value)
+
 
 class AreaUpdate(BaseModel):
     """Schema cập nhật area."""
 
     name: Optional[str] = Field(None, min_length=1, max_length=100, pattern="^[A-Za-z0-9_\\-\\s]+$")
-    grid_row: Optional[int] = Field(None, ge=1, le=100)
-    grid_col: Optional[int] = Field(None, ge=1, le=100)
+    grid_row: Optional[int] = Field(None, ge=1, le=9999)
+    grid_col: Optional[int] = Field(None, ge=1, le=9999)
+    grid_range: Optional[str] = Field(None, min_length=2, max_length=32)
     position_x: Optional[float] = Field(None, ge=0)
     position_y: Optional[float] = Field(None, ge=0)
     width: Optional[float] = Field(None, ge=0.5, le=50)
     height: Optional[float] = Field(None, ge=0.5, le=50)
     style: Optional[AreaStyle] = None
+
+    @field_validator("grid_range")
+    @classmethod
+    def validate_grid_range(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or not value.strip():
+            return None
+        return normalize_excel_range(value)
 
 
 class AreaResponse(BaseModel):
@@ -48,6 +66,7 @@ class AreaResponse(BaseModel):
     name: str
     grid_row: int
     grid_col: int
+    grid_range: Optional[str] = None
     position_x: Optional[float] = None
     position_y: Optional[float] = None
     width: float = 3.0

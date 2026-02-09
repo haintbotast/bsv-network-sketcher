@@ -10,7 +10,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.db.models import Device, L1Link, InterfaceL2Assignment
+from app.db.models import Device, DevicePort, InterfaceL2Assignment, L1Link
 
 
 # Base dimensions (inches)
@@ -85,6 +85,15 @@ async def compute_device_port_counts(db: AsyncSession, project_id: str) -> dict[
     for assignment in l2_assignments:
         if assignment.device_id in port_counts and assignment.interface_name:
             port_counts[assignment.device_id].add(assignment.interface_name.strip())
+
+    # Count declared device ports (canonical source)
+    result = await db.execute(
+        select(DevicePort).where(DevicePort.project_id == project_id)
+    )
+    declared_ports = result.scalars().all()
+    for port in declared_ports:
+        if port.device_id in port_counts and port.name:
+            port_counts[port.device_id].add(port.name.strip())
 
     # Convert sets to counts + max port label length
     stats: dict[str, dict[str, int]] = {}

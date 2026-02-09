@@ -31,7 +31,7 @@
 - **manual_position_edit_policy:** khi bật chế độ sửa vị trí, kéo‑thả `Area/Device` phải lưu `position_x/position_y` về DB ở `drag-end` và không trigger `/auto-layout`.
 - **drag_alignment_policy:** trong chế độ sửa vị trí phải hiển thị guide ngang/dọc và snap nhẹ khi object gần mốc align của object liên quan.
 - **position_standard_table_policy:** `position_x/position_y` sau drag hoặc nhập tay phải nằm trên mốc chuẩn (bội số step 0.25 đv).
-- **layout_db_grid_sync_policy:** khi apply auto-layout vào DB (L1/L2/L3 + waypoint), phải đồng bộ `position_*` và `grid_range`; với Area phải đồng bộ thêm `grid_row/grid_col`.
+- **layout_db_grid_sync_policy:** khi apply auto-layout vào DB (L1/L2/L3 + waypoint), phải đồng bộ chặt `position_*` và `grid_range`; `grid_row/grid_col` của Area được giữ như placement map logic (không bị auto-layout ghi đè).
 - **peer_control_quick_create_policy:** tab Bố cục có form khai báo nhanh peer-control (`STACK/HA/HSRP`), tạo link đúng purpose/line_style và trigger auto-layout theo reason `link-crud`.
 - **peer_control_legend_policy:** legend peer-control hiển thị đúng mapping màu/nét/chú giải cho `STACK/HA/HSRP`.
 - **link_update_validation:** cập nhật link phải chặn **trùng link** và **port đã dùng** (kể cả khi chỉ đổi đầu còn lại).
@@ -420,7 +420,7 @@ def extract_excel_metadata(xlsx_path: str) -> dict:
   - [ ] `grid_range` Area/Device parse đúng (`A1`, `A1:B3`, đảo chiều `B3:A1`).
   - [ ] Cập nhật `position_x/y/width/height` phải tự đồng bộ `grid_range`.
   - [ ] Sau khi chạy `/auto-layout` với `apply_to_db=true`, `Area/Device` không được lệch giữa dữ liệu `position_*` và `grid_range`.
-  - [ ] Waypoint area (`_wp_`) tạo/cập nhật sau auto-layout phải có `grid_range`, `grid_row`, `grid_col` hợp lệ.
+  - [ ] Waypoint area (`_wp_`) tạo/cập nhật sau auto-layout phải có `grid_range` hợp lệ và giữ `grid_row/grid_col = 99`.
 - **Device Port CRUD**
   - [ ] Tạo/sửa/xóa port theo device (`name`, `side`, `offset_ratio`).
   - [ ] Chặn đổi tên/xóa port khi port đang được dùng trong link.

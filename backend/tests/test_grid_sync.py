@@ -45,7 +45,7 @@ def test_sync_area_grid_from_geometry_updates_row_col() -> None:
         width=1.75,
         height=1.5,
     )
-    sync_area_grid_from_geometry(area, default_width=1.75, default_height=1.5)
+    sync_area_grid_from_geometry(area, default_width=1.75, default_height=1.5, update_grid_index=True)
     assert area.grid_range == "E9:K14"
     assert area.grid_row == 9
     assert area.grid_col == 5
@@ -60,7 +60,7 @@ def test_sync_area_grid_from_geometry_fallback_position() -> None:
         grid_row=3,
         grid_col=4,
     )
-    sync_area_grid_from_geometry(area, default_width=0.5, default_height=0.5)
+    sync_area_grid_from_geometry(area, default_width=0.5, default_height=0.5, update_grid_index=True)
     assert area.grid_range == "D3:E4"
     assert area.grid_row == 3
     assert area.grid_col == 4

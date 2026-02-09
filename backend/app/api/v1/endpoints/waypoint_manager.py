@@ -154,10 +154,13 @@ async def create_or_update_waypoint_areas(
             wp.position_y = mid_y
             wp.width = wp_width
             wp.height = wp_height
+            wp.grid_row = 99
+            wp.grid_col = 99
             sync_area_grid_from_geometry(
                 wp,
                 default_width=wp_width,
                 default_height=wp_height,
+                update_grid_index=False,
             )
             wp_id = wp.id
         else:
@@ -178,6 +181,7 @@ async def create_or_update_waypoint_areas(
                 wp,
                 default_width=wp_width,
                 default_height=wp_height,
+                update_grid_index=False,
             )
             db.add(wp)
 

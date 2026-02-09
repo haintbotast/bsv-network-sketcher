@@ -743,9 +743,31 @@ const devicePortBands = computed(() => {
     })
   })
 
-  map.forEach(entry => {
-    entry.top.sort(comparePorts)
-    entry.bottom.sort(comparePorts)
+  map.forEach((entry, deviceId) => {
+    const overrides = props.portAnchorOverrides?.get(deviceId)
+    const sortSide = (ports: string[]) => {
+      if (!overrides || overrides.size === 0) {
+        ports.sort(comparePorts)
+        return
+      }
+      // Tính effective ratio cho TẤT CẢ port:
+      // - Port có override: dùng offsetRatio
+      // - Port không override: dùng auto-slot ratio theo thứ tự comparePorts
+      const natural = [...ports].sort(comparePorts)
+      const total = natural.length
+      const effectiveRatio = new Map<string, number>()
+      natural.forEach((port, index) => {
+        const override = overrides.get(port)
+        if (override?.offsetRatio != null) {
+          effectiveRatio.set(port, override.offsetRatio)
+        } else {
+          effectiveRatio.set(port, (index + 1) / (total + 1))
+        }
+      })
+      ports.sort((a, b) => (effectiveRatio.get(a) ?? 0.5) - (effectiveRatio.get(b) ?? 0.5))
+    }
+    sortSide(entry.top)
+    sortSide(entry.bottom)
   })
 
   return map

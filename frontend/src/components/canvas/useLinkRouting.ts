@@ -216,16 +216,19 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     }
 
     // Two-pass: metadata → route → anchor overrides → re-route
+    // Pass 2 chỉ chạy khi link ít (≤50) để tránh lag trên sơ đồ lớn.
+    // User anchor overrides luôn được áp dụng ở pass 1 qua metaParams.userAnchorOverrides.
     const pass1 = buildLinkMetaData(metaParams)
     const pass1Result = routeLinks(pass1.linkMetas, pass1.laneIndex, pass1.labelObstacles, routeCtx)
-    const maxSecondPassLinks = 80
+    const maxSecondPassLinks = 50
+    const hasUserOverrides = userPortAnchorOverrides.value.size > 0
     const canRunSecondPass = props.links.length <= maxSecondPassLinks
     const overrides = canRunSecondPass
       ? buildAnchorOverrides(pass1.linkMetas, pass1Result.cache, anchorCtx)
       : new Map()
 
     let finalResult = pass1Result
-    if (overrides.size > 0 || userPortAnchorOverrides.value.size > 0) {
+    if (overrides.size > 0 || (hasUserOverrides && canRunSecondPass)) {
       const pass2 = buildLinkMetaData(metaParams, overrides)
       finalResult = routeLinks(pass2.linkMetas, pass2.laneIndex, pass2.labelObstacles, routeCtx)
     }
@@ -532,47 +535,6 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
         )
       }
     })
-
-    // Single-pass collision avoidance per device-side
-    const allowLabelShift = false
-    if (allowLabelShift) {
-      const bySide = new Map<string, typeof rawLabels>()
-      rawLabels.forEach(label => {
-        const key = `${label.deviceId}-${label.side}`
-        const list = bySide.get(key) || []
-        list.push(label)
-        bySide.set(key, list)
-      })
-
-      const maxDisplacement = 60 * labelScale
-
-      bySide.forEach(list => {
-        if (list.length < 2) return
-        const side = list[0].side
-        const originals = list.map(l => l.originalDistance)
-
-        const isVertical = side === 'left' || side === 'right'
-        const sizeFor = (label: (typeof list)[number]) => (isVertical ? label.height : label.width)
-        list.sort((a, b) => a.distance - b.distance)
-        let cursor = list[0].distance
-        list.forEach((label, idx) => {
-          if (idx === 0) return
-          const minGap = (sizeFor(list[idx - 1]) + sizeFor(label)) / 2 + 2 * labelScale
-          if (label.distance < cursor + minGap) {
-            label.distance = cursor + minGap
-          }
-          cursor = label.distance
-        })
-
-        list.forEach((label, idx) => {
-          const orig = originals[idx]
-          const delta = label.distance - orig
-          if (Math.abs(delta) > maxDisplacement) {
-            label.distance = orig + Math.sign(delta) * maxDisplacement
-          }
-        })
-      })
-    }
 
     rawLabels.forEach(label => {
       const point = resolvePointAlongPath(label.path, label.distance, label.fromStart)

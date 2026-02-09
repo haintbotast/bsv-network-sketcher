@@ -58,47 +58,8 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     waypointAreaMap,
   } = useLinkBundles({ props, deviceAreaMap, areaViewMap })
 
-  const buildVisibleLinks = (useCache: boolean) => {
+  const buildVisibleLinks = () => {
     const scale = clamp(layoutViewport.value.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
-    if (useCache) {
-      const cachedViewport = linkRouteCacheViewport.value
-      if (cachedViewport && cachedViewport.scale === layoutViewport.value.scale) {
-        const cached = linkRouteCache.value
-        const dx = layoutViewport.value.offsetX - cachedViewport.offsetX
-        const dy = layoutViewport.value.offsetY - cachedViewport.offsetY
-        let canUseCache = cached.size === props.links.length && cached.size > 0
-        const shifted = props.links
-          .map(link => {
-            const entry = cached.get(link.id)
-            if (!entry) {
-              canUseCache = false
-              return null
-            }
-            const points = entry.points.map((value, idx) => value + (idx % 2 === 0 ? dx : dy))
-            return {
-              id: link.id,
-              fromAnchor: { x: entry.fromAnchor.x + dx, y: entry.fromAnchor.y + dy, side: entry.fromAnchor.side },
-              toAnchor: { x: entry.toAnchor.x + dx, y: entry.toAnchor.y + dy, side: entry.toAnchor.side },
-              fromCenter: { x: entry.fromCenter.x + dx, y: entry.fromCenter.y + dy },
-              toCenter: { x: entry.toCenter.x + dx, y: entry.toCenter.y + dy },
-              points,
-              config: {
-                points,
-                stroke: '#2b2a28',
-                strokeWidth: 1.5,
-                lineCap: 'round',
-                lineJoin: 'round',
-                dash: link.style === 'dashed' ? [8, 6] : link.style === 'dotted' ? [2, 4] : [],
-                opacity: 0.8
-              }
-            }
-          })
-          .filter(Boolean) as RenderLink[]
-
-        if (canUseCache) return { links: shifted, cache: null }
-      }
-    }
-
     const isL1View = (props.viewMode || 'L1') === 'L1'
     const debugRouteMode = (() => {
       if (typeof window === 'undefined') return false
@@ -579,14 +540,70 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     }))
   })
 
+  // --- Data version: tăng khi data props thay đổi, không tăng khi chỉ zoom ---
+  let lastRoutedDataVersion = -1
+  const dataVersion = ref(0)
+
   const refreshLinkCache = () => {
     if (isPanning.value) return
-    const result = buildVisibleLinks(false)
+    const result = buildVisibleLinks()
     visibleLinkCache.value = result.links
     if (result.cache) {
       linkRouteCache.value = result.cache
       linkRouteCacheViewport.value = { ...layoutViewport.value }
     }
+    lastRoutedDataVersion = dataVersion.value
+  }
+
+  // Affine transform cached points khi chỉ viewport thay đổi (zoom).
+  // old_view = logical * S1 + O1 → new_view = old_view * ratio + translate
+  const transformCacheForScale = () => {
+    if (isPanning.value) return
+    const cachedVp = linkRouteCacheViewport.value
+    const cached = visibleLinkCache.value
+    if (!cachedVp || !cached.length) {
+      refreshLinkCache()
+      return
+    }
+    const currentVp = layoutViewport.value
+    const ratio = currentVp.scale / cachedVp.scale
+    const tx = currentVp.offsetX - cachedVp.offsetX * ratio
+    const ty = currentVp.offsetY - cachedVp.offsetY * ratio
+    const xf = (x: number) => x * ratio + tx
+    const yf = (y: number) => y * ratio + ty
+
+    visibleLinkCache.value = cached.map(link => {
+      const points = link.points.map((v, i) => i % 2 === 0 ? xf(v) : yf(v))
+      return {
+        ...link,
+        points,
+        fromAnchor: { ...link.fromAnchor, x: xf(link.fromAnchor.x), y: yf(link.fromAnchor.y) },
+        toAnchor: { ...link.toAnchor, x: xf(link.toAnchor.x), y: yf(link.toAnchor.y) },
+        fromCenter: { x: xf(link.fromCenter.x), y: yf(link.fromCenter.y) },
+        toCenter: { x: xf(link.toCenter.x), y: yf(link.toCenter.y) },
+        config: { ...link.config, points },
+      }
+    })
+
+    // Cập nhật route cache để transform tiếp nếu zoom liên tục
+    const newRouteCache = new Map<string, {
+      points: number[]
+      fromAnchor: { x: number; y: number; side?: string }
+      toAnchor: { x: number; y: number; side?: string }
+      fromCenter: { x: number; y: number }
+      toCenter: { x: number; y: number }
+    }>()
+    visibleLinkCache.value.forEach(link => {
+      newRouteCache.set(link.id, {
+        points: link.points,
+        fromAnchor: link.fromAnchor,
+        toAnchor: link.toAnchor,
+        fromCenter: link.fromCenter,
+        toCenter: link.toCenter,
+      })
+    })
+    linkRouteCache.value = newRouteCache
+    linkRouteCacheViewport.value = { ...currentVp }
   }
 
   let refreshLinkRaf = 0
@@ -600,6 +617,17 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     })
   }
 
+  // Debounced full re-route sau khi zoom dừng (correction chính xác)
+  let scaleDebounceTimer = 0
+  const scheduleScaleCorrection = () => {
+    if (scaleDebounceTimer) clearTimeout(scaleDebounceTimer)
+    scaleDebounceTimer = window.setTimeout(() => {
+      scaleDebounceTimer = 0
+      refreshLinkCache()
+    }, 400)
+  }
+
+  // Watch DATA deps → tăng version
   watch(
     [
       () => props.links,
@@ -608,11 +636,26 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       () => props.viewMode,
       () => props.l2Assignments,
       () => props.portAnchorOverrides,
-      () => layoutViewport.value.scale,
       renderTuning
     ],
+    () => { dataVersion.value++ }
+  )
+
+  // Watch version + scale → quyết định route mới hoặc transform cache
+  watch(
+    [dataVersion, () => layoutViewport.value.scale],
     () => {
-      scheduleRefreshLinkCache()
+      if (isPanning.value) return
+      if (dataVersion.value !== lastRoutedDataVersion) {
+        // Data thay đổi → full re-route
+        scheduleRefreshLinkCache()
+      } else if (visibleLinkCache.value.length > 0) {
+        // Chỉ scale thay đổi → affine transform (instant) + debounced correction
+        transformCacheForScale()
+        scheduleScaleCorrection()
+      } else {
+        scheduleRefreshLinkCache()
+      }
     },
     { immediate: true }
   )
@@ -621,6 +664,10 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     if (refreshLinkRaf) {
       cancelAnimationFrame(refreshLinkRaf)
       refreshLinkRaf = 0
+    }
+    if (scaleDebounceTimer) {
+      clearTimeout(scaleDebounceTimer)
+      scaleDebounceTimer = 0
     }
   })
 

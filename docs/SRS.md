@@ -57,10 +57,10 @@
 - Khoảng cách giữa thiết bị trong auto-layout **tính cả phần mở rộng theo port band** để tránh chồng lấn.
 - Render L1 ưu tiên kiểu kỹ thuật: đường orthogonal/góc vuông rõ, giảm dùng màu nhấn cho link LAN/DEFAULT để hạn chế rối.
 - L1 routing phải **không xuyên qua object khác** (device/area không liên quan); nếu tuyến chuẩn hóa gây va chạm thì phải fallback sang tuyến orthogonal tránh vật cản.
-- Routing liên‑area phải dùng cơ chế **multi-channel corridor** theo cặp Area để tránh dồn toàn bộ link vào một hành lang đơn.
-- Tất cả tuyến đã chọn (kể cả tuyến không qua A*) phải ghi nhận **occupancy** để các tuyến xử lý sau ưu tiên tránh lane đã đông; trong chế độ guard hiệu năng dày-link cho phép giảm tần suất ghi occupancy của fallback inter-area để giữ phản hồi UI.
+- Routing liên‑area dùng cơ chế **hành lang orthogonal đơn giản theo cặp Area** + lane offset nhẹ theo bundle index để giữ đường đi dễ đọc.
+- Routing L1 dùng pipeline **single-pass, không A\***: dựng stub từ anchor port, nối orthogonal và fallback orthogonal ổn định khi gặp vật cản.
 - Fallback liên‑area phải giữ tuyến **nội vùng sơ đồ** (không đi ngoài đường bao diagram).
-- Với topology dày link, routing phải có **guard hiệu năng** (giới hạn số lượt A* và số vòng lặp tìm đường mỗi lượt) để tránh treo UI; khi vượt ngưỡng thì fallback sang tuyến orthogonal ổn định.
+- Ưu tiên độ mượt UI: tránh các thuật toán tối ưu toàn cục chi phí cao trong vòng lặp render.
 - Điểm rẽ đầu tiên của link phải có khoảng cách tối thiểu đủ lớn so với port band để tránh dính sát nhãn port ở sơ đồ dày.
 - Với L1, khung Area hiển thị có thể ở dạng **compact theo cụm thiết bị** để giảm khoảng trắng; không thay đổi dữ liệu Area gốc.
 - Các link peer-control (`STACK/HA/HSRP`) phải có quy ước hiển thị riêng (màu/nét/lane) để tách khỏi uplink/data links và dễ truy vết.

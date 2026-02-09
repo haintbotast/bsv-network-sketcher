@@ -51,17 +51,17 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-24:** Hệ tọa độ thủ công phải dùng **mốc chuẩn X/Y** (step mặc định 0.25 đv); thao tác drag hoặc nhập tay đều được chuẩn hóa về mốc này.
 - **FR-25:** Tab **Bố cục** phải có thành phần **khai báo nhanh peer-control** (`HA/STACK/HSRP`) và hiển thị **legend màu/nét/chú giải** để vận hành nhận biết đúng loại kết nối.
 - **FR-26:** L1 routing phải giữ khoảng cách an toàn với object (không xuyên device/area không liên quan), đồng thời bảo đảm điểm rẽ đầu tiên không dính sát port band ở sơ đồ mật độ cao.
-- **FR-27:** Routing liên‑area phải hỗ trợ **multi-channel corridor** theo cặp Area để giảm dồn/chồng link khi mật độ kết nối cao.
-- **FR-28:** Hệ thống phải ghi nhận **occupancy** cho cả tuyến A\* và tuyến pad/fallback để lựa chọn lane có độ tắc thấp hơn cho các link xử lý sau.
+- **FR-27:** Routing liên‑area dùng cơ chế **hành lang orthogonal đơn giản theo cặp Area** và lane offset nhẹ theo bundle index.
+- **FR-28:** Pipeline routing L1 chạy **single-pass, không A\*** để giữ phản hồi UI ổn định trên sơ đồ dày.
 - **FR-29:** Fallback liên‑area không được đi ra ngoài đường bao sơ đồ; mọi tuyến phải nằm trong vùng thiết kế.
-- **FR-27:** Micro layout trong Area phải **căn giữa các hàng thiết bị** khi layer tách nhiều hàng để tránh dồn trái và tăng độ đối xứng với sơ đồ chuẩn.
-- **FR-28:** Hệ tọa độ chuẩn phải hỗ trợ nhập/xuất theo **grid Excel** (`A1:B2`) cho Area và Device; `grid_range` là nguồn chuẩn, `position_x/y` duy trì để tương thích.
-- **FR-29:** Bổ sung CRUD **Device Port** độc lập theo từng Device (`name`, `side`, `offset_ratio`) để người dùng chủ động khai báo điểm kết nối trước khi vẽ link.
-- **FR-30:** Tạo/sửa link phải kiểm tra endpoint port đã được khai báo trên đúng device; chặn lưu nếu thiếu port.
-- **FR-31:** UI canvas phải render port band từ dữ liệu port đã khai báo (không chỉ suy diễn từ link), nhằm giữ object/port đồng nhất với sơ đồ chuẩn.
-- **FR-32:** Trong phần `Anchor port (override)` của bảng thuộc tính thiết bị, cho phép người dùng chọn 2 port cùng device để **đổi vị trí anchor nhanh** (swap `side + offset_ratio`) mà không ảnh hưởng port khác.
-- **FR-33:** L1 routing phải có cơ chế **guard hiệu năng** cho topology dày (giới hạn budget A\* + giới hạn iterations) để ngăn đơ UI, và tự fallback tuyến orthogonal khi chạm ngưỡng.
-- **FR-34:** Trong chế độ guard hiệu năng, hệ thống được phép **giảm tần suất ghi occupancy của fallback inter-area** để ưu tiên độ mượt, nhưng vẫn phải giữ tuyến hợp lệ và ổn định.
+- **FR-30:** Micro layout trong Area phải **căn giữa các hàng thiết bị** khi layer tách nhiều hàng để tránh dồn trái và tăng độ đối xứng với sơ đồ chuẩn.
+- **FR-31:** Hệ tọa độ chuẩn phải hỗ trợ nhập/xuất theo **grid Excel** (`A1:B2`) cho Area và Device; `grid_range` là nguồn chuẩn, `position_x/y` duy trì để tương thích.
+- **FR-32:** Bổ sung CRUD **Device Port** độc lập theo từng Device (`name`, `side`, `offset_ratio`) để người dùng chủ động khai báo điểm kết nối trước khi vẽ link.
+- **FR-33:** Tạo/sửa link phải kiểm tra endpoint port đã được khai báo trên đúng device; chặn lưu nếu thiếu port.
+- **FR-34:** UI canvas phải render port band từ dữ liệu port đã khai báo (không chỉ suy diễn từ link), nhằm giữ object/port đồng nhất với sơ đồ chuẩn.
+- **FR-35:** Trong phần `Anchor port (override)` của bảng thuộc tính thiết bị, cho phép người dùng chọn 2 port cùng device để **đổi vị trí anchor nhanh** (swap `side + offset_ratio`) mà không ảnh hưởng port khác.
+- **FR-36:** L1 routing ưu tiên thuật toán tuyến tính/địa phương (orthogonal + fallback) thay cho tối ưu toàn cục để giảm độ phức tạp vận hành.
+- **FR-37:** Quy tắc peer-control (`HA/STACK/HSRP`) phải chọn lane theo hướng side của anchor (`top/top`, `bottom/bottom`, khác side) để tránh route tự xuyên cụm thiết bị.
 
 ## 5. Yêu cầu phi chức năng (NFR)
 

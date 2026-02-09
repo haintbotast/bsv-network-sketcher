@@ -30,7 +30,7 @@
 **Hiển thị tối thiểu:**
 - `layout.default_mode`, `layout.allowed_modes` (cố định `standard`)
 - `layout_tuning` (layer_gap, node_spacing, port_label_band, area_gap, area_padding, label_band, max_row_width_base, max_nodes_per_row, row_gap, row_stagger)
-- `render_tuning` (bundle_gap, bundle_stub, area_clearance, area_anchor_offset, port_label_offset, label_gap_x/y, corridor_gap, inter_area_links_per_channel, inter_area_max_channels, inter_area_occupancy_weight)
+- `render_tuning` (bundle_gap, bundle_stub, area_clearance, area_anchor_offset, port_label_offset, label_gap_x/y, corridor_gap)
 - `peer_control` quick editor + legend (`STACK/HA/HSRP`, màu/nét/chú giải)
 - `style.default_theme`, preset size
 - `validation` rule cơ bản + `validation.layout_checks`
@@ -41,7 +41,7 @@
 - Tăng `layout_tuning.adaptive_area_gap_factor` (hoặc `inter_area_gap_per_link`) khi cặp area có quá nhiều tuyến liên‑area.
 - Tăng `render_tuning.bundle_stub` và `render_tuning.port_label_offset` để điểm rẽ đầu tiên rời xa port band.
 - Tăng `render_tuning.area_clearance` và `render_tuning.corridor_gap` để giảm tuyến xuyên vùng object khi mật độ cao.
-- Giảm `render_tuning.inter_area_links_per_channel` hoặc tăng `render_tuning.inter_area_max_channels` để tách thêm corridor channel cho các cặp area quá dày link.
+- Giữ `render_tuning.bundle_gap` ở mức vừa phải để lane offset theo bundle không dính nhau khi cụm link dày.
 
 **Lịch sử cấu hình:**
 - Bảng `version`, `created_at`, `created_by`, `note`

@@ -66,21 +66,17 @@
 
 **Liên kết liên‑area:**
 - Bắt buộc đi qua **Waypoint area** (đuôi `_wp_`), không nối Area‑Area trực tiếp.
-- Link đi qua **anchor trong vùng đệm (pad)** của Area, **ép trái/phải** để giảm cắt xuyên.
-- Liên‑area đi trong **pad trái/phải** của mỗi Area; hành lang chỉ băng qua **khoảng trống giữa Area** khi cần, **không dùng corridor global ngoài biên Area**.
-- Mỗi cặp Area có thể có **nhiều corridor channel** (không ép một corridor duy nhất); lane được phân cụm theo mật độ link.
-- Chọn channel phải xét đồng thời: va chạm vật cản, chiều dài tuyến và tải occupancy hiện tại.
+- Link đi qua **anchor trong vùng đệm (pad)** của Area; hành lang liên‑area ưu tiên tuyến Manhattan (ngang/dọc) đơn giản.
+- Liên‑area đi trong **khoảng trống giữa Area** khi cần, **không dùng corridor global ngoài biên Area**.
+- Mỗi cặp Area dùng hành lang orthogonal đơn giản, chỉ thêm **lane offset nhẹ** theo bundle index để giảm chồng.
 - **Không cho phép tuyến liên‑area/waypoint đi ra ngoài đường bao sơ đồ**; nếu thiếu chỗ thì tăng `area_padding` hoặc nới layout.
 - **Liên‑area qua waypoint:**  
-  - **L1:** giữ **Manhattan (ngang/dọc)**, **không shortcut chéo**; ưu tiên **góc vuông rõ ràng** (technical style).  
-  - **L2/L3:** ưu tiên **any‑angle (Theta\*) + bo góc nhẹ**; nếu không tìm được đường thì fallback hành lang.
-- Routing link ưu tiên **tránh vật cản** (area/device/**port cell**) và **giảm chồng lấn**:  
-- **L1:** giữ **orthogonal**; nếu không bị cản thì đường thẳng ngắn nhất, nếu bị cản thì **A\*** theo lưới và **không tạo đoạn chéo**.  
-- **L2/L3:** có thể dùng **any‑angle (Theta\*)** để ưu tiên đường chéo và **bo góc nhẹ**.
-- Sau bước chuẩn hóa orthogonal, nếu tuyến mới cắt qua object thì phải fallback sang tuyến orthogonal tránh vật cản (ưu tiên tuyến trước đó nếu an toàn hơn).
-- **Lưới routing (A\*):** kích thước ô lưới **tự tăng** theo kích thước sơ đồ để **giới hạn số node**, tránh vô hiệu hóa A\* ở sơ đồ lớn.
-- **Occupancy thống nhất:** không chỉ A\* mà cả tuyến pad/fallback sau khi chốt cũng phải ghi occupancy để các link sau tránh chồng cùng lane.
-- **Anchor port tối ưu 2‑pass:** pass 1 định tuyến để lấy hướng/điểm tham chiếu, pass 2 sắp xếp lại anchor theo side + thứ tự để giãn cách hợp lý và bám tuyến ngắn nhất.
+  - **L1/L2/L3:** giữ **Manhattan (ngang/dọc)**, ưu tiên góc vuông rõ ràng; không dùng shortcut chéo.
+- Routing link ưu tiên **tránh vật cản** (area/device/**port cell**) và dùng pipeline **single-pass**:
+  - Dựng stub từ anchor port.
+  - Nối orthogonal bằng thuật toán tuyến tính.
+  - Nếu bị cản thì fallback orthogonal đơn giản (không dùng tối ưu toàn cục/A\*).
+- Sau bước chuẩn hóa orthogonal, nếu tuyến cắt qua object thì fallback tuyến orthogonal thay thế để bảo toàn tính hợp lệ.
 - **Pair alignment:** với nhiều link giữa 2 thiết bị kề nhau, anchor được **xếp đồng bộ theo thứ tự port phía đối diện** để giảm chéo.
 - **Same-row alignment:** link giữa **2 thiết bị cùng hàng/cùng cột** sẽ ưu tiên **canh thẳng anchor + ô port** (ngang hoặc dọc). Chỉ áp dụng khi **đường thẳng không bị vật cản**; nếu bị cản thì giữ routing tránh vật cản.
 - **Stub theo port band (L1):** đoạn link đi ra khỏi thiết bị phải đủ dài để tách rõ khỏi biên object/ô port và tránh gãy góc ngay sát mép thiết bị.

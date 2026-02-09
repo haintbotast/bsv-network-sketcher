@@ -37,11 +37,10 @@
 - **peer_control_legend_policy:** legend peer-control hiển thị đúng mapping màu/nét/chú giải cho `STACK/HA/HSRP`.
 - **link_update_validation:** cập nhật link phải chặn **trùng link** và **port đã dùng** (kể cả khi chỉ đổi đầu còn lại).
 - **inter‑area:** link khác Area bắt buộc qua Waypoint area (`_wp_`).
-- **inter_area_multi_channel_policy:** cặp Area có nhiều link phải được tách thành nhiều corridor channel, không dồn toàn bộ vào một lane.
-- **inter_area_occupancy_policy:** tuyến pad/fallback sau khi chốt phải ghi occupancy để link kế tiếp tránh lane đã đông.
+- **inter_area_simple_corridor_policy:** cặp Area dùng hành lang orthogonal đơn giản + lane offset nhẹ theo bundle index, không tạo spaghetti lane.
 - **inter_area_no_outside_bounds_policy:** fallback liên‑area không được đi ngoài đường bao sơ đồ.
-- **routing_performance_guard_policy:** khi topology dày (nhiều link hoặc grid lớn), engine phải giới hạn budget A\* và iterations; không được gây đứng UI.
-- **routing_performance_guard_occupancy_policy:** khi guard hiệu năng kích hoạt, occupancy fallback inter-area có thể giảm tần suất ghi nhưng không được làm sai tuyến hoặc gây route invalid.
+- **routing_single_pass_policy:** pipeline routing L1 phải chạy single-pass (không A\*, không pass-2 anchor refinement) và vẫn trả tuyến hợp lệ.
+- **peer_lane_side_policy:** với link peer-control, lane phải bám theo side anchor (`bottom/bottom` đi dưới, `top/top` đi trên) để tránh cắt xuyên thân thiết bị.
 
 ### 1.2 Kiểm thử overview/L2/L3
 - Overview (nếu bật) chỉ L1/flow; L2/L3 không render nhãn trong overview.
@@ -253,10 +252,9 @@ test.describe('Diagram Editor', () => {
 - [ ] RB-101..RB-104: không chồng lấn; device nằm trong area; link không xuyên node.
 - [ ] L1 routing: khi đường thẳng bị cản bởi area/device, link phải bẻ hướng để tránh vật cản.
 - [ ] L1 routing: liên‑area/waypoint không đi ngoài đường bao sơ đồ; fallback luôn chọn tuyến nội vùng hợp lệ.
-- [ ] L1 routing: cặp area có nhiều link phải tách nhiều corridor channel, giảm dồn line chồng nhau.
-- [ ] L1 routing: occupancy của tuyến pad/fallback được ghi nhận và ảnh hưởng tới lựa chọn lane ở link xử lý sau.
-- [ ] L1 routing performance guard: topology dày vẫn phản hồi mượt, không treo tab; khi hết budget A\* phải fallback orthogonal hợp lệ.
-- [ ] L1 routing performance guard occupancy: ở ngưỡng dày-link, giảm tần suất ghi occupancy fallback không làm phát sinh tuyến xuyên object hoặc route invalid.
+- [ ] L1 routing: cặp area có nhiều link vẫn bám hành lang orthogonal đơn giản, lane offset theo bundle đủ để tránh dính sát nhau.
+- [ ] L1 routing: pipeline single-pass (không A\*) vẫn trả tuyến hợp lệ, không tạo vòng lặp dựng đường.
+- [ ] L1 routing: link peer-control `top/top` đi trên và `bottom/bottom` đi dưới thiết bị, không cắt xuyên thân thiết bị.
 - [ ] Trigger policy: mở project chạy auto-layout đúng 1 lượt.
 - [ ] Trigger policy: CRUD area/device/link/port-link/anchor đều trigger auto-layout.
 - [ ] Trigger policy: pan/zoom/reset view không phát sinh request `/auto-layout`.

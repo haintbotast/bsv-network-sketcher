@@ -80,8 +80,8 @@ UI thao tác → REST API → Service → DB → phản hồi → UI render
 - Mọi luồng apply layout (L1/L2/L3 + waypoint) phải ghi đồng thời `position_*` và `grid_range` để tránh lệch dữ liệu render giữa frontend/backend.
 - `grid_row/grid_col` của Area là placement map logic (phục vụ macro layout), không tự ghi đè theo tọa độ tuyệt đối sau mỗi lần auto-layout.
 - Quy ước anchor L1: uplink đi ra từ **cạnh trên** object, non-uplink đi ra từ **cạnh dưới** object; override thủ công được ưu tiên.
-- Routing liên‑area L1 dùng **multi-channel corridor** theo cặp Area (không ép 1 corridor duy nhất) để giảm spaghetti khi mật độ link cao.
-- Occupancy phải được ghi nhận cho cả tuyến A\* và tuyến pad/fallback để các link xử lý sau tự tránh lane đã đông.
+- Routing liên‑area L1 dùng **hành lang orthogonal đơn giản theo cặp Area** với lane offset nhẹ theo bundle index để giảm chồng lấn.
+- Routing L1 dùng pipeline **single-pass, không A\***; ưu tiên thuật toán tuyến tính/địa phương để giữ UI mượt và ổn định.
 - Fallback liên‑area chỉ đi trong phạm vi đường bao sơ đồ, không dùng tuyến vòng ngoài canvas.
 - Bổ sung thực thể `device_ports` (DB-driven) để khai báo port độc lập trước khi nối link; endpoint link phải tham chiếu port đã khai báo.
 - Render L1 dùng **port band gắn trực tiếp vào object** (top/bottom); kích thước object được nới theo số lượng/độ dài port.

@@ -1,6 +1,5 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Viewport } from '../../models/types'
-import { buildGridSpec } from '../../utils/link_routing'
 import { computeCrossings, drawPolylineWithJumps } from '../../utils/line_crossings'
 import type { Crossing } from '../../utils/line_crossings'
 import type { Rect, RenderLink, UseLinkRoutingParams, PortAnchorOverrideMap } from './linkRoutingTypes'
@@ -13,7 +12,6 @@ import { useLinkBundles } from './useLinkBundles'
 
 // Import extracted standalone functions
 import { buildLinkMetaData } from './buildLinkMetaData'
-import { buildAnchorOverrides } from './buildAnchorOverrides'
 import { routeLinks } from './routeLinks'
 
 const PORT_LABEL_HEIGHT = 16
@@ -23,7 +21,7 @@ const LABEL_SCALE_MAX = 1.15
 const ARC_RADIUS = 5
 
 export function useLinkRouting(params: UseLinkRoutingParams) {
-  const { props, layoutViewport, renderTuning, deviceViewMap, areaViewMap, deviceAreaMap, areaBounds, isPanning } = params
+  const { props, layoutViewport, renderTuning, deviceViewMap, areaViewMap, deviceAreaMap, isPanning } = params
 
   const linkRouteCache = ref(new Map<string, {
     points: number[]
@@ -41,8 +39,6 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
   const {
     devicePortList,
     devicePortOrder,
-    devicePortNeighbors,
-    devicePortSideMap,
     resolvePortAnchorWithOverrides,
   } = usePortAnchors({
     props,
@@ -54,59 +50,15 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
   // Link bundles sub-composable
   const {
     linkBundleIndex,
-    areaBundleIndex,
-    waypointAreaMap,
   } = useLinkBundles({ props, deviceAreaMap, areaViewMap })
 
   const buildVisibleLinks = () => {
     const scale = clamp(layoutViewport.value.scale, LABEL_SCALE_MIN, LABEL_SCALE_MAX)
     const isL1View = (props.viewMode || 'L1') === 'L1'
-    const debugRouteMode = (() => {
-      if (typeof window === 'undefined') return false
-      return new URLSearchParams(window.location.search).get('debugRoute') === '1'
-    })()
     const clearance = (renderTuning.value.area_clearance ?? 0) * scale
-    const gridBase = Math.max(6, Math.round((renderTuning.value.area_clearance ?? 0) * 0.5 * scale))
-    const minSegment = Math.max(4, Math.round(6 * scale))
-    const maxRouteLinks = 400
-    const maxGridNodes = 30000
-
-    let minX = Number.POSITIVE_INFINITY
-    let minY = Number.POSITIVE_INFINITY
-    let maxX = Number.NEGATIVE_INFINITY
-    let maxY = Number.NEGATIVE_INFINITY
-
-    areaViewMap.value.forEach(rect => {
-      minX = Math.min(minX, rect.x)
-      minY = Math.min(minY, rect.y)
-      maxX = Math.max(maxX, rect.x + rect.width)
-      maxY = Math.max(maxY, rect.y + rect.height)
-    })
-    deviceViewMap.value.forEach(rect => {
-      minX = Math.min(minX, rect.x)
-      minY = Math.min(minY, rect.y)
-      maxX = Math.max(maxX, rect.x + rect.width)
-      maxY = Math.max(maxY, rect.y + rect.height)
-    })
-
-    const padding = (renderTuning.value.corridor_gap ?? 0) * scale + clearance + gridBase * 2
-    const gridBounds = Number.isFinite(minX)
-      ? { minX: minX - padding, minY: minY - padding, maxX: maxX + padding, maxY: maxY + padding }
-      : null
-    const grid = (() => {
-      if (!gridBounds) return null
-      const width = Math.max(1, gridBounds.maxX - gridBounds.minX)
-      const height = Math.max(1, gridBounds.maxY - gridBounds.minY)
-      const targetCell = Math.ceil(Math.sqrt((width * height) / maxGridNodes))
-      const cellSize = Math.max(gridBase, targetCell)
-      return buildGridSpec(gridBounds, cellSize)
-    })()
 
     const areaRects = Array.from(areaViewMap.value.entries()).map(([id, rect]) => ({ id, rect }))
     const deviceRects = Array.from(deviceViewMap.value.entries()).map(([id, rect]) => ({ id, rect }))
-
-    const gridNodeCount = grid ? grid.cols * grid.rows : 0
-    const allowAStar = isL1View && grid && props.links.length <= maxRouteLinks && gridNodeCount > 0
 
     const areaCenters = new Map<string, { x: number; y: number }>()
     areaRects.forEach(({ id, rect }) => {
@@ -120,11 +72,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     const daMap = deviceAreaMap.value
     const dpList = devicePortList.value
     const dpOrder = devicePortOrder.value
-    const dpNeighbors = devicePortNeighbors.value
-    const dpSideMap = devicePortSideMap.value
     const lbIndex = linkBundleIndex.value
-    const abIndex = areaBundleIndex.value
-    const wpMap = waypointAreaMap.value
 
     const metaParams = {
       links: props.links,
@@ -144,57 +92,16 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       isL1View,
       scale,
       clearance,
-      minSegment,
-      grid,
-      allowAStar: !!allowAStar,
       areaRects,
       deviceRects,
       renderTuning: tuning,
-      areaViewMap: avMap,
-      deviceAreaMap: daMap,
-      areaBounds: areaBounds.value,
       linkBundleIndex: lbIndex,
-      areaBundleIndex: abIndex,
-      waypointAreaMap: wpMap,
-      areaCenters,
-      debugRouteMode,
     }
 
-    const anchorCtx = {
-      isL1View,
-      scale,
-      clearance,
-      areaRects,
-      deviceRects,
-      renderTuning: tuning,
-      deviceViewMap: dvMap,
-      devicePortList: dpList,
-      devicePortSideMap: dpSideMap,
-      devicePortOrder: dpOrder,
-      devicePortNeighbors: dpNeighbors,
-      linkBundleIndex: lbIndex,
-      userAnchorOverrides: userPortAnchorOverrides.value,
-    }
-
-    // Two-pass: metadata → route → anchor overrides → re-route
-    // Pass 2 chỉ chạy khi link ít (≤50) để tránh lag trên sơ đồ lớn.
-    // User anchor overrides luôn được áp dụng ở pass 1 qua metaParams.userAnchorOverrides.
+    // Single-pass: metadata → route để giữ pipeline nhẹ và ổn định trên sơ đồ dày.
     const pass1 = buildLinkMetaData(metaParams)
-    const pass1Result = routeLinks(pass1.linkMetas, pass1.laneIndex, pass1.labelObstacles, routeCtx)
-    const maxSecondPassLinks = 50
-    const hasUserOverrides = userPortAnchorOverrides.value.size > 0
-    const canRunSecondPass = props.links.length <= maxSecondPassLinks
-    const overrides = canRunSecondPass
-      ? buildAnchorOverrides(pass1.linkMetas, pass1Result.cache, anchorCtx)
-      : new Map()
-
-    let finalResult = pass1Result
-    if (overrides.size > 0 || (hasUserOverrides && canRunSecondPass)) {
-      const pass2 = buildLinkMetaData(metaParams, overrides)
-      finalResult = routeLinks(pass2.linkMetas, pass2.laneIndex, pass2.labelObstacles, routeCtx)
-    }
-
-    return { links: finalResult.links, cache: finalResult.cache }
+    const result = routeLinks(pass1.linkMetas, pass1.laneIndex, pass1.labelObstacles, routeCtx)
+    return { links: result.links, cache: result.cache }
   }
 
   const visibleLinks = computed(() => {

@@ -218,7 +218,11 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     // Two-pass: metadata → route → anchor overrides → re-route
     const pass1 = buildLinkMetaData(metaParams)
     const pass1Result = routeLinks(pass1.linkMetas, pass1.laneIndex, pass1.labelObstacles, routeCtx)
-    const overrides = buildAnchorOverrides(pass1.linkMetas, pass1Result.cache, anchorCtx)
+    const maxSecondPassLinks = 120
+    const canRunSecondPass = props.links.length <= maxSecondPassLinks
+    const overrides = canRunSecondPass
+      ? buildAnchorOverrides(pass1.linkMetas, pass1Result.cache, anchorCtx)
+      : new Map()
 
     let finalResult = pass1Result
     if (overrides.size > 0 || userPortAnchorOverrides.value.size > 0) {
@@ -238,6 +242,14 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     if (isPanning.value) return new Map()
     const links = visibleLinks.value
     if (!links || links.length < 2) return new Map()
+    const maxCrossingLinks = 140
+    const maxCrossingSegments = 1600
+    if (links.length > maxCrossingLinks) return new Map()
+    let segmentCount = 0
+    for (const link of links) {
+      segmentCount += Math.max(0, link.points.length / 2 - 1)
+      if (segmentCount > maxCrossingSegments) return new Map()
+    }
     return computeCrossings(links.map(l => ({ id: l.id, points: l.points })))
   })
 

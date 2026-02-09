@@ -824,6 +824,7 @@ export function routeLinks(
               if (primary !== 0) return primary
               return a.idx - b.idx
             })
+          const maxChannelCandidates = 3
 
           let bestRoute: {
             score: number
@@ -832,7 +833,7 @@ export function routeLinks(
             channelIndex: number
           } | null = null
 
-          for (const candidate of channelOrder) {
+          for (const candidate of channelOrder.slice(0, maxChannelCandidates)) {
             const laneCoord = resolvePadCorridorCoord(
               candidate.channel.side,
               candidate.channel.coord + laneNudge,

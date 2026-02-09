@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0",
-  "template_version": "1.1",
+  "template_version": "1.2",
   "metadata": {
     "name": "Phục dựng Network diagram",
-    "description": "Phục dựng sơ đồ từ docs/Network diagram.pdf – v1.1: sửa area assignment, thêm port_channels & L2 segments",
+    "description": "Phục dựng sơ đồ từ docs/Network diagram.pdf – v1.2: sửa area assignment (TK-ICT1→Core, TK-SV1/SV2→Server) theo PDF chuẩn",
     "created_at": "2026-02-06T10:00:00Z",
     "author": "recovery"
   },
@@ -44,15 +44,15 @@
     { "name": "TK-FW2", "area_name": "Security-TK", "device_type": "Firewall" },
     { "name": "SmartSensor", "area_name": "Security-TK", "device_type": "Server" },
     { "name": "TK-CMC-SS", "area_name": "Security-TK", "device_type": "Switch" },
-    { "name": "TK-ICT1", "area_name": "Security-TK", "device_type": "Switch" },
+    { "name": "TK-ICT1", "area_name": "Core", "device_type": "Switch" },
 
     { "name": "TK-CR1", "area_name": "Core", "device_type": "Switch" },
     { "name": "TK-CR2", "area_name": "Core", "device_type": "Switch" },
 
     { "name": "YH-DS1", "area_name": "Distribution", "device_type": "Switch" },
     { "name": "YH-DS2", "area_name": "Distribution", "device_type": "Switch" },
-    { "name": "TK-SV1", "area_name": "Distribution", "device_type": "Switch" },
-    { "name": "TK-SV2", "area_name": "Distribution", "device_type": "Switch" },
+    { "name": "TK-SV1", "area_name": "Server", "device_type": "Switch" },
+    { "name": "TK-SV2", "area_name": "Server", "device_type": "Switch" },
 
     { "name": "ESX1-HP", "area_name": "Server", "device_type": "Server" },
     { "name": "ESX2-HP", "area_name": "Server", "device_type": "Server" },

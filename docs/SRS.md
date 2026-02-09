@@ -64,6 +64,7 @@
 - Với L1, khung Area hiển thị có thể ở dạng **compact theo cụm thiết bị** để giảm khoảng trắng; không thay đổi dữ liệu Area gốc.
 - Các link peer-control (`STACK/HA/HSRP`) phải có quy ước hiển thị riêng (màu/nét/lane) để tách khỏi uplink/data links và dễ truy vết.
 - Cho phép người dùng **override anchor per-port** bằng `side + offset_ratio` (cho phép `offset_ratio = null` để giữ auto offset); override **được lưu DB** và **không bị auto-layout ghi đè**.
+- Trong bảng thuộc tính thiết bị, phần `Anchor port (override)` phải hỗ trợ thao tác nhanh **đổi vị trí giữa 2 port cùng device** (swap `side + offset_ratio`) bằng một thao tác lưu, chỉ tác động đúng 2 port được chọn.
 - Bảng thuộc tính thiết bị cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port**, áp dụng kiểm tra **trùng link** và **port đã dùng** trước khi lưu.
 - Overview (nếu bật) chỉ L1/flow; L2/L3 chỉ hiển thị ở view riêng.  
   **Lưu ý:** UI hiện không hiển thị Overview; dùng L1 thay thế.

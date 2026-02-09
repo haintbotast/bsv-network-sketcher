@@ -461,6 +461,26 @@
                       Reset
                     </button>
                   </div>
+                  <div v-if="anchorDrafts[port]" class="anchor-swap-controls">
+                    <select v-model="anchorSwapTargets[port]">
+                      <option value="">-- Chọn port để đổi vị trí --</option>
+                      <option
+                        v-for="candidate in getAnchorSwapCandidates(port)"
+                        :key="`${port}-${candidate}`"
+                        :value="candidate"
+                      >
+                        {{ candidate }}
+                      </option>
+                    </select>
+                    <button
+                      type="button"
+                      class="ghost"
+                      :disabled="!canSwapAnchorWith(port)"
+                      @click="swapAnchorWith(port)"
+                    >
+                      Đổi vị trí với port đã chọn
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -694,7 +714,14 @@ const selectedDraftDirty = ref(false)
 const selectedSavePending = ref(false)
 let syncingDraft = false
 
-const anchorDrafts = ref<Record<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number; autoOffset: boolean }>>({})
+type AnchorDraft = {
+  side: 'left' | 'right' | 'top' | 'bottom'
+  offsetRatio: number
+  autoOffset: boolean
+}
+
+const anchorDrafts = ref<Record<string, AnchorDraft>>({})
+const anchorSwapTargets = ref<Record<string, string>>({})
 const positionEditEnabled = ref(false)
 const positionSaveSeq = new Map<string, number>()
 
@@ -886,9 +913,10 @@ const selectedDevicePortDefinitionMap = computed(() => {
 watch([selectedDevicePorts, selectedDeviceOverrideMap, selectedDevicePortDefinitionMap], () => {
   if (selectedDevicePorts.value.length === 0) {
     anchorDrafts.value = {}
+    anchorSwapTargets.value = {}
     return
   }
-  const next: Record<string, { side: 'left' | 'right' | 'top' | 'bottom'; offsetRatio: number; autoOffset: boolean }> = {}
+  const next: Record<string, AnchorDraft> = {}
   selectedDevicePorts.value.forEach(port => {
     const existing = selectedDeviceOverrideMap.value.get(port) || selectedDevicePortDefinitionMap.value.get(port)
     if (existing) {
@@ -902,9 +930,81 @@ watch([selectedDevicePorts, selectedDeviceOverrideMap, selectedDevicePortDefinit
     }
   })
   anchorDrafts.value = next
+  const swapNext: Record<string, string> = {}
+  selectedDevicePorts.value.forEach(port => {
+    const currentTarget = anchorSwapTargets.value[port]
+    swapNext[port] = currentTarget && currentTarget !== port && !!next[currentTarget]
+      ? currentTarget
+      : ''
+  })
+  anchorSwapTargets.value = swapNext
 })
 
 const hasAnchorOverride = (port: string) => selectedDeviceOverrideMap.value.has(port)
+const getAnchorSwapCandidates = (port: string) => selectedDevicePorts.value.filter(candidate => candidate !== port)
+
+function normalizeAnchorOffsetRatio(value: number) {
+  if (!Number.isFinite(value)) return 0.5
+  if (value < 0) return 0
+  if (value > 1) return 1
+  return value
+}
+
+function buildAnchorOverridePayload(deviceId: string, portName: string, draft: AnchorDraft) {
+  return {
+    device_id: deviceId,
+    port_name: portName,
+    side: draft.side,
+    offset_ratio: draft.autoOffset ? null : normalizeAnchorOffsetRatio(draft.offsetRatio),
+  }
+}
+
+const canSwapAnchorWith = (port: string) => {
+  const target = anchorSwapTargets.value[port]
+  return !!target && target !== port && !!anchorDrafts.value[port] && !!anchorDrafts.value[target]
+}
+
+async function swapAnchorWith(port: string) {
+  if (!selectedProjectId.value || selectedObjectType.value !== 'Device' || !selectedObject.value) return
+  const targetPort = (anchorSwapTargets.value[port] || '').trim()
+  if (!targetPort || targetPort === port) {
+    setNotice('Cần chọn port đích để đổi vị trí.', 'error')
+    return
+  }
+
+  const sourceDraft = anchorDrafts.value[port]
+  const targetDraft = anchorDrafts.value[targetPort]
+  if (!sourceDraft || !targetDraft) {
+    setNotice('Không tìm thấy dữ liệu anchor của 2 port cần đổi.', 'error')
+    return
+  }
+
+  const deviceId = (selectedObject.value as DeviceRow).id
+  const previousSource = { ...sourceDraft }
+  const previousTarget = { ...targetDraft }
+  const nextSource = { ...previousTarget }
+  const nextTarget = { ...previousSource }
+
+  anchorDrafts.value[port] = nextSource
+  anchorDrafts.value[targetPort] = nextTarget
+
+  try {
+    await upsertAnchorOverride(selectedProjectId.value, buildAnchorOverridePayload(deviceId, port, nextSource))
+    try {
+      await upsertAnchorOverride(selectedProjectId.value, buildAnchorOverridePayload(deviceId, targetPort, nextTarget))
+    } catch (error) {
+      await upsertAnchorOverride(selectedProjectId.value, buildAnchorOverridePayload(deviceId, port, previousSource)).catch(() => {})
+      throw error
+    }
+
+    scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'anchor-crud' })
+    setNotice(`Đã đổi vị trí anchor giữa '${port}' và '${targetPort}'.`, 'success')
+  } catch (error: any) {
+    anchorDrafts.value[port] = previousSource
+    anchorDrafts.value[targetPort] = previousTarget
+    setNotice(error?.message || 'Đổi vị trí anchor thất bại.', 'error')
+  }
+}
 
 async function saveAnchorOverride(port: string) {
   if (!selectedProjectId.value || selectedObjectType.value !== 'Device' || !selectedObject.value) return
@@ -912,12 +1012,7 @@ async function saveAnchorOverride(port: string) {
   const draft = anchorDrafts.value[port]
   if (!draft) return
   try {
-    await upsertAnchorOverride(selectedProjectId.value, {
-      device_id: deviceId,
-      port_name: port,
-      side: draft.side,
-      offset_ratio: draft.autoOffset ? null : draft.offsetRatio
-    })
+    await upsertAnchorOverride(selectedProjectId.value, buildAnchorOverridePayload(deviceId, port, draft))
     scheduleAutoLayout(selectedProjectId.value, { force: true, reason: 'anchor-crud' })
     setNotice('Đã lưu override anchor.', 'success')
   } catch (error: any) {
@@ -2329,6 +2424,13 @@ onMounted(() => {
 .anchor-controls {
   display: grid;
   grid-template-columns: 1fr auto 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.anchor-swap-controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
   gap: 8px;
   align-items: center;
 }

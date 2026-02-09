@@ -59,6 +59,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-29:** Bổ sung CRUD **Device Port** độc lập theo từng Device (`name`, `side`, `offset_ratio`) để người dùng chủ động khai báo điểm kết nối trước khi vẽ link.
 - **FR-30:** Tạo/sửa link phải kiểm tra endpoint port đã được khai báo trên đúng device; chặn lưu nếu thiếu port.
 - **FR-31:** UI canvas phải render port band từ dữ liệu port đã khai báo (không chỉ suy diễn từ link), nhằm giữ object/port đồng nhất với sơ đồ chuẩn.
+- **FR-32:** Trong phần `Anchor port (override)` của bảng thuộc tính thiết bị, cho phép người dùng chọn 2 port cùng device để **đổi vị trí anchor nhanh** (swap `side + offset_ratio`) mà không ảnh hưởng port khác.
 
 ## 5. Yêu cầu phi chức năng (NFR)
 

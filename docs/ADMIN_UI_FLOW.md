@@ -18,9 +18,10 @@
 6) (Tuỳ chọn) Khai báo nhanh link peer-control (`STACK/HA/HSRP`) từ tab **Bố cục** và đối chiếu legend màu/nét/chú giải
 7) (Tuỳ chọn) Bật **Sửa vị trí** trên canvas để kéo‑thả `Area/Device` và lưu tọa độ thủ công (có guide/snap alignment, tọa độ chuẩn theo step 0.25 đv, đồng bộ `grid_range` kiểu Excel)
 8) (Tuỳ chọn) Quản lý **Device Port** theo từng thiết bị (`name/side/offset_ratio`) trước khi tạo link
-9) Sửa giá trị → **Validate** → **Save**
-10) Hiển thị diff + audit log entry
-11) Lưu **config version** mới và cho phép khôi phục
+9) (Tuỳ chọn) Trong `Anchor port (override)`, chọn 2 port cùng device và bấm thao tác **Đổi vị trí** để hoán đổi nhanh vị trí anchor (swap side/offset).
+10) Sửa giá trị → **Validate** → **Save**
+11) Hiển thị diff + audit log entry
+12) Lưu **config version** mới và cho phép khôi phục
 
 **Ngoại lệ bắt buộc:**
 - Thao tác viewport để xem sơ đồ (`pan`, `zoom`, `reset view`) **không được trigger auto-layout**.

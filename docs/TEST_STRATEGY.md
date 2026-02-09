@@ -21,6 +21,7 @@
 - **area_compact_render:** L1 hiển thị Area dạng compact theo cụm thiết bị để giảm khoảng trắng nhưng không làm sai dữ liệu area gốc.
 - **peer_control_link_render:** `STACK/HA/HSRP` phải có style hiển thị riêng (màu/nét/lane) và không hòa lẫn với uplink/data.
 - **port_anchor_override:** override anchor per-port **được ưu tiên** và **không bị auto-layout ghi đè**; kiểm tra thêm trường hợp `offset_ratio = null` để giữ auto offset.
+- **port_anchor_swap_quick_action:** thao tác nhanh đổi vị trí 2 port cùng device trong `Anchor port (override)` phải swap đúng `side + offset_ratio`, chỉ ảnh hưởng đúng 2 port được chọn.
 - **uplink_anchor_policy:** L1 auto-anchor phải đặt **uplink ở top** và **non-uplink ở bottom**; chỉ lệch khi có override thủ công.
 - **endpoint_anchor_alignment_policy:** endpoint của link L1 phải bám đúng anchor ô port (không dời anchor để tách lane).
 - **l1_auto_side_stability_policy:** auto-pass L1 không tự ép `left/right`; side tự động chỉ dùng `top/bottom` khi không có override thủ công.
@@ -268,6 +269,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Uplink anchor policy: endpoint uplink (tier thấp -> tier cao) luôn neo ở top; chiều ngược lại neo ở bottom.
 - [ ] Uplink anchor policy: khi không suy ra tier, heuristic `port index = 1` phải neo top.
 - [ ] Uplink anchor policy: override thủ công (`side + offset_ratio`) phải giữ ưu tiên cao nhất.
+- [ ] Port anchor swap quick action: đổi vị trí 2 port cùng device phải cập nhật đúng cặp anchor của 2 port đó, không làm thay đổi anchor các port còn lại.
 - [ ] Endpoint anchor alignment: endpoint link L1 trùng anchor port-cell tương ứng (sai số render <= 1px), lane separation bắt đầu sau stub.
 - [ ] L1 auto-side stability: khi không có override thủ công, auto anchor không phát sinh side `left/right`.
 - [ ] L1 no-object crossing: link sau chuẩn hóa orthogonal không xuyên device/area không liên quan trong các cụm dày.

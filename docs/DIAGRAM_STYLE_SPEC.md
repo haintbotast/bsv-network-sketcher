@@ -93,6 +93,8 @@
 - **Short same-side fan sync (L1):** với link nội‑area ngắn và hai đầu cùng side, fan hai đầu được đồng bộ để tránh tạo “hộp nhỏ” sát port band.
 - **Direct intra ưu tiên theo hình học (L1):** với cặp thiết bị nội‑area theo phương ngang, hai đầu cùng side (`top/top` hoặc `bottom/bottom`) và không bị vật cản, router phải ưu tiên tuyến trực tiếp/orthogonal ngắn trước khi áp lane U cho purpose đặc biệt.
 - **Cặp dọc top-bottom (L1):** khi hai thiết bị xếp dọc (một trên, một dưới), không ép dùng rule direct ngang; giữ routing theo hành lang dọc/orthogonal để tránh tuyến khó đọc.
+- **No edge-hugging (L1):** segment link không được chạy trùng mép trái/phải/top/bottom của object (device/area) trong khoảng clearance; nếu trùng mép phải coi là va chạm và chọn tuyến khác.
+- **Port exit orthogonality (L1):** đoạn từ port ra khỏi stub và các bước dịch tách lane phải giữ orthogonal từng bước; không tạo segment chéo ngay sau port.
 - **Endpoint anchoring (L1):** điểm đầu/cuối link phải trùng side + tọa độ anchor của ô port (sai số render cho phép <= 1px).
 - **Bundle song song (L1):** nếu 2 thiết bị **cùng hàng/cột**, không bị vật cản thì ưu tiên **đường thẳng song song** cho các link bundle (bỏ A\*), để tránh “uốn cong” ngay tại port label.
 - **Peer control links (L1):** `STACK/HA/HSRP` ưu tiên tuyến nội‑area ngắn, tách lane riêng theo loại link để không hòa vào bó uplink/data.

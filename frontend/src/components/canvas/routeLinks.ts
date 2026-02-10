@@ -314,6 +314,41 @@ function buildDirectAnchorPath(
   return direct
 }
 
+function buildShiftBridge(
+  base: Point,
+  preferAxis: 'x' | 'y',
+  stemOffset: number,
+  bundleOffset: number
+) {
+  const points: Point[] = []
+  let cursor: Point = { x: base.x, y: base.y }
+
+  if (preferAxis === 'x') {
+    if (Math.abs(stemOffset) > 0.01) {
+      cursor = { x: cursor.x + stemOffset, y: cursor.y }
+      points.push(cursor)
+    }
+    if (Math.abs(bundleOffset) > 0.01) {
+      cursor = { x: cursor.x, y: cursor.y + bundleOffset }
+      points.push(cursor)
+    }
+  } else {
+    if (Math.abs(stemOffset) > 0.01) {
+      cursor = { x: cursor.x, y: cursor.y + stemOffset }
+      points.push(cursor)
+    }
+    if (Math.abs(bundleOffset) > 0.01) {
+      cursor = { x: cursor.x + bundleOffset, y: cursor.y }
+      points.push(cursor)
+    }
+  }
+
+  return {
+    shifted: cursor,
+    bridge: points,
+  }
+}
+
 export function routeLinks(
   linkMetas: Array<LinkMeta | null>,
   laneIndex: Map<string, { index: number; total: number }>,
@@ -521,20 +556,13 @@ export function routeLinks(
         const fromStemOffset = resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'from')), scale)
         const toStemOffset = resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'to')), scale)
 
-        const fromShifted: Point = preferAxis === 'x'
-          ? { x: fromBase.x + fromStemOffset, y: fromBase.y + bundleOffset }
-          : { x: fromBase.x + bundleOffset, y: fromBase.y + fromStemOffset }
-        const toShifted: Point = preferAxis === 'x'
-          ? { x: toBase.x + toStemOffset, y: toBase.y + bundleOffset }
-          : { x: toBase.x + bundleOffset, y: toBase.y + toStemOffset }
-
         if (isL1View && isInterArea) {
           const interLaneGap = Math.max(10, (renderTuning.bundle_gap ?? 0) * scale * 1.6)
           path = buildInterAreaPath(
             { x: fromAnchor.x, y: fromAnchor.y },
             { x: toAnchor.x, y: toAnchor.y },
-            fromShifted,
-            toShifted,
+            fromBase,
+            toBase,
             fromCenter,
             toCenter,
             laneIndex.get(link.id),
@@ -543,11 +571,17 @@ export function routeLinks(
             clearance,
           )
         } else {
+          const fromShift = buildShiftBridge(fromBase, preferAxis, fromStemOffset, bundleOffset)
+          const toShift = buildShiftBridge(toBase, preferAxis, toStemOffset, bundleOffset)
+          const fromShifted = fromShift.shifted
+          const toShifted = toShift.shifted
           const orth = buildOrthPath(fromShifted, toShifted, obstacles, clearance, preferAxis)
           path = simplifyPath([
             { x: fromAnchor.x, y: fromAnchor.y },
             { x: fromBase.x, y: fromBase.y },
+            ...fromShift.bridge,
             ...orth,
+            ...toShift.bridge.slice(0, -1).reverse(),
             { x: toBase.x, y: toBase.y },
             { x: toAnchor.x, y: toAnchor.y },
           ])

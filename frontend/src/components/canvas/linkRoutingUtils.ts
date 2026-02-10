@@ -134,6 +134,31 @@ export function segmentIntersectsRect(
   const top = rect.y - margin
   const bottom = rect.y + rect.height + margin
 
+  // Nhanh: không chồng bbox thì chắc chắn không giao.
+  const segMinX = Math.min(p1.x, p2.x)
+  const segMaxX = Math.max(p1.x, p2.x)
+  const segMinY = Math.min(p1.y, p2.y)
+  const segMaxY = Math.max(p1.y, p2.y)
+  if (segMaxX < left || segMinX > right || segMaxY < top || segMinY > bottom) return false
+
+  // Đoạn song song trùng mép rect cũng phải tính là va chạm để tránh line bám cạnh object.
+  if (Math.abs(p1.x - p2.x) <= 1e-6) {
+    const x = p1.x
+    if (x >= left && x <= right) {
+      const overlapTop = Math.max(segMinY, top)
+      const overlapBottom = Math.min(segMaxY, bottom)
+      if (overlapTop <= overlapBottom) return true
+    }
+  }
+  if (Math.abs(p1.y - p2.y) <= 1e-6) {
+    const y = p1.y
+    if (y >= top && y <= bottom) {
+      const overlapLeft = Math.max(segMinX, left)
+      const overlapRight = Math.min(segMaxX, right)
+      if (overlapLeft <= overlapRight) return true
+    }
+  }
+
   const edges = [
     [{ x: left, y: top }, { x: right, y: top }],
     [{ x: right, y: top }, { x: right, y: bottom }],
@@ -142,8 +167,32 @@ export function segmentIntersectsRect(
   ]
 
   type Point = { x: number; y: number }
-  const ccw = (a: Point, b: Point, c: Point) => (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x)
-  const intersects = (a: Point, b: Point, c: Point, d: Point) => ccw(a, c, d) !== ccw(b, c, d) && ccw(a, b, c) !== ccw(a, b, d)
+  const eps = 1e-6
+  const orientation = (a: Point, b: Point, c: Point) => {
+    const value = (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y)
+    if (Math.abs(value) <= eps) return 0
+    return value > 0 ? 1 : 2
+  }
+  const onSegment = (a: Point, b: Point, c: Point) => {
+    return (
+      b.x <= Math.max(a.x, c.x) + eps &&
+      b.x + eps >= Math.min(a.x, c.x) &&
+      b.y <= Math.max(a.y, c.y) + eps &&
+      b.y + eps >= Math.min(a.y, c.y)
+    )
+  }
+  const intersects = (a: Point, b: Point, c: Point, d: Point) => {
+    const o1 = orientation(a, b, c)
+    const o2 = orientation(a, b, d)
+    const o3 = orientation(c, d, a)
+    const o4 = orientation(c, d, b)
+    if (o1 !== o2 && o3 !== o4) return true
+    if (o1 === 0 && onSegment(a, c, b)) return true
+    if (o2 === 0 && onSegment(a, d, b)) return true
+    if (o3 === 0 && onSegment(c, a, d)) return true
+    if (o4 === 0 && onSegment(c, b, d)) return true
+    return false
+  }
 
   return edges.some(([a, b]) => intersects(p1, p2, a, b))
 }

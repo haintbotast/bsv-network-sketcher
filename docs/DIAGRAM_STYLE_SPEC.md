@@ -180,6 +180,11 @@
   - **L1 (thực tế):** ước lượng **bề ngang dải port (port band)** theo số lượng/độ dài port để tăng `node_spacing`/`row_gap` (tránh object chèn lên nhau).
   - **L2/L3:** cộng `label_band` vào chiều cao node để chừa chỗ nhãn L2/L3 dưới thiết bị; đồng thời chừa band nhãn cho group (VLAN/Subnet).
 - **Kích thước thiết bị (Device):** tự động **nới rộng theo số lượng/độ dài port** và giữ vùng thân thiết bị đủ chỗ cho tên thiết bị.
+- **Chuẩn hóa chiều cao hiển thị Device (L1/UI):**
+  - Mốc chuẩn tổng chiều cao object: **76 px @ scale 1x** (áp cho render trên canvas).
+  - Nếu dữ liệu kích thước thực tế lớn hơn mốc chuẩn, giữ kích thước lớn hơn (không ép thu nhỏ).
+  - Chiều cao thân (body) tối thiểu **24 px** để bảo đảm đọc được nhãn.
+  - Chiều cao dải port (top/bottom band) cố định theo `port cell` để object cùng lớp nhìn cân bằng.
 - Micro layout sử dụng **kích thước thiết bị sau auto-resize** để tính bounding và sắp xếp trước khi tính macro layout.
 - **Quy tắc nhãn port:** định dạng **chữ cái + khoảng trắng + số hiệu**.  
   Ví dụ: `Gi 0/1`, `Gi 1/0/48`, `HA 1`, `Port 1`.
@@ -192,6 +197,21 @@
 | Device | 1.2 x 0.5 | Theo preset layout |
 | Waypoint | 0.25 x 0.25 | Kích thước cố định |
 | Port Cell (L1) | Auto-fit theo text | Nằm trong dải port top/bottom của object |
+
+### 4.2 Bộ shape chuẩn khuyến nghị (tham khảo vận hành)
+
+> Nguyên tắc dự án vẫn là **một style chung**. Các bộ dưới đây là danh mục chuẩn để chọn 1 bộ mặc định và tái sử dụng nhất quán khi cần mở rộng.
+
+| Bộ | Area | Device | Waypoint | Endpoint | Khi nên dùng |
+|----|------|--------|----------|----------|--------------|
+| **A - Technical Balanced (khuyến nghị mặc định)** | rounded-rect (radius nhẹ) | rect góc vuông | diamond | rect nhỏ | Phù hợp sơ đồ mạng kỹ thuật, route orthogonal rõ ràng |
+| **B - Infra Emphasis** | rounded-rect đậm viền | rounded-rect | circle | rect nhỏ | Cần nhấn nhóm hạ tầng, giảm cảm giác cứng |
+| **C - Exec Readability** | rect đơn giản | rounded-rect nhẹ | circle | circle nhỏ | Dùng cho slide trình bày, ưu tiên nhìn nhanh |
+
+Quy định khi áp dụng:
+- Chỉ chọn **một bộ shape chính** cho toàn project/export để tránh lệch UI ↔ PPTX.
+- Không trộn `diamond` và `circle` cho waypoint trong cùng một view L1.
+- Dù chọn bộ nào, link L1 vẫn giữ Manhattan + lineJoin miter/lineCap butt theo chuẩn kỹ thuật.
 
 ---
 

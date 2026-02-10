@@ -19,6 +19,8 @@
 - **port_embedded_render:** L1 port label phải nằm trong object (port band top/bottom), không hiển thị overlay label trên link.
 - **l1_technical_render:** L1 giữ nét kỹ thuật (đường orthogonal, góc vuông rõ, giảm dùng màu nhấn cho link LAN/DEFAULT).
 - **area_compact_render:** L1 hiển thị Area dạng compact theo cụm thiết bị để giảm khoảng trắng nhưng không làm sai dữ liệu area gốc.
+- **l1_device_height_balance_policy:** chiều cao hiển thị Device trên canvas được chuẩn hóa theo mốc chuẩn (76px @ scale 1x), giữ kích thước lớn hơn nếu dữ liệu thực lớn hơn mốc.
+- **l1_device_body_min_height_policy:** thân Device (vùng đặt nhãn) luôn có chiều cao tối thiểu 24px để bảo đảm đọc được tên thiết bị khi có port band.
 - **peer_control_link_render:** `STACK/HA/HSRP` phải có style hiển thị riêng (màu/nét/lane) và không hòa lẫn với uplink/data.
 - **port_anchor_override:** override anchor per-port **được ưu tiên** và **không bị auto-layout ghi đè**; kiểm tra thêm trường hợp `offset_ratio = null` để giữ auto offset.
 - **port_anchor_swap_quick_action:** thao tác nhanh đổi vị trí 2 port cùng device trong `Anchor port (override)` phải swap đúng `side + offset_ratio`, chỉ ảnh hưởng đúng 2 port được chọn.

@@ -628,7 +628,8 @@ const DEVICE_PORT_BAND_PADDING_X = 6
 const DEVICE_PORT_BAND_PADDING_Y = 4
 const DEVICE_PORT_FONT_SIZE = 10
 const DEVICE_LABEL_FONT_SIZE = 13
-const DEVICE_LABEL_MIN_HEIGHT = 30
+const DEVICE_LABEL_MIN_HEIGHT = 24
+const DEVICE_STANDARD_TOTAL_HEIGHT = 76
 const DEVICE_BODY_VERTICAL_PADDING = 6
 const DEVICE_MIN_WIDTH = 96
 
@@ -691,6 +692,8 @@ type DeviceRenderFrame = {
   bottomBandHeight: number
   bodyHeight: number
 }
+
+const DEVICE_PORT_BAND_HEIGHT = DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2
 
 const deviceTierMap = computed(() => buildDeviceTierMap(props.devices))
 
@@ -787,13 +790,15 @@ const estimateBandWidth = (ports: string[]) => {
 }
 
 const resolveDeviceRenderFrame = (deviceRect: { width: number; height: number }, bands: DevicePortBands): DeviceRenderFrame => {
-  const topBandHeight = bands.top.length > 0 ? DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2 : 0
-  const bottomBandHeight = bands.bottom.length > 0 ? DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2 : 0
-  const bodyHeight = Math.max(
-    deviceRect.height,
+  const topBandHeight = bands.top.length > 0 ? DEVICE_PORT_BAND_HEIGHT : 0
+  const bottomBandHeight = bands.bottom.length > 0 ? DEVICE_PORT_BAND_HEIGHT : 0
+  const minBodyHeight = Math.max(
     DEVICE_LABEL_MIN_HEIGHT,
     DEVICE_LABEL_FONT_SIZE + DEVICE_BODY_VERTICAL_PADDING * 2
   )
+  const baseTotalHeight = Math.max(deviceRect.height, DEVICE_STANDARD_TOTAL_HEIGHT)
+  const availableBodyHeight = baseTotalHeight - topBandHeight - bottomBandHeight
+  const bodyHeight = Math.max(availableBodyHeight, minBodyHeight)
   return { topBandHeight, bottomBandHeight, bodyHeight }
 }
 
@@ -1003,15 +1008,14 @@ const visibleDevices = computed(() => {
       const rect = deviceViewMap.value.get(device.id)!
       const isSelected = props.selectedId === device.id
       const bands = devicePortBands.value.get(device.id) || { top: [], bottom: [] }
-      const topBandHeight = bands.top.length > 0 ? DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2 : 0
-      const bottomBandHeight = bands.bottom.length > 0 ? DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2 : 0
-      const bodyY = topBandHeight
-      const bodyHeight = Math.max(rect.height - topBandHeight - bottomBandHeight, DEVICE_LABEL_MIN_HEIGHT)
+      const frame = resolveDeviceRenderFrame(rect, bands)
+      const bodyY = frame.topBandHeight
+      const bodyHeight = frame.bodyHeight
       const topPorts = buildPortCells(device.id, bands.top, 0, rect.width, 'top')
       const bottomPorts = buildPortCells(
         device.id,
         bands.bottom,
-        rect.height - bottomBandHeight,
+        rect.height - frame.bottomBandHeight,
         rect.width,
         'bottom'
       )

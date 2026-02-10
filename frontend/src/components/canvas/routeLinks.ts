@@ -97,8 +97,7 @@ function resolveGlobalLaneOffset(
   return clamp(centered * axisGap, -limit, limit)
 }
 
-function buildAreaPairKey(a?: string, b?: string) {
-  if (!a || !b) return null
+function buildAreaPairKey(a: string, b: string) {
   return a < b ? `${a}|${b}` : `${b}|${a}`
 }
 

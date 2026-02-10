@@ -775,7 +775,14 @@ function handleResetViewport() {
 }
 
 function togglePositionEditMode() {
-  positionEditEnabled.value = !positionEditEnabled.value
+  const enabled = !positionEditEnabled.value
+  positionEditEnabled.value = enabled
+  setNotice(
+    enabled
+      ? 'Đã bật chế độ Sửa vị trí. Kéo-thả đối tượng để lưu vị trí trực tiếp.'
+      : 'Đã tắt chế độ Sửa vị trí.',
+    'info'
+  )
 }
 
 function normalizePositionUnits(value: number) {
@@ -803,11 +810,52 @@ async function handleCanvasObjectPositionChange(payload: { id: string; type: 'de
       selectedDraft.value.position_x = positionX
       selectedDraft.value.position_y = positionY
     }
+    const objectLabel = payload.type === 'area' ? 'khu vực' : 'thiết bị'
+    setNotice(`Đã lưu vị trí ${objectLabel}.`, 'success')
   } catch (error: any) {
     if (positionSaveSeq.get(key) === seq) {
       setNotice(error?.message || 'Lưu vị trí thủ công thất bại.', 'error')
     }
   }
+}
+
+const AREA_POSITION_ONLY_KEYS = new Set(['position_x', 'position_y', 'grid_range'])
+const DEVICE_POSITION_ONLY_KEYS = new Set(['position_x', 'position_y', 'grid_range'])
+
+function normalizeComparableValue(key: string, value: unknown) {
+  if (value == null || value === '') return null
+  if (key === 'position_x' || key === 'position_y') {
+    const num = Number(value)
+    return Number.isFinite(num) ? num : null
+  }
+  return value
+}
+
+function collectChangedKeysForSave(
+  objectType: 'Area' | 'Device',
+  original: Record<string, any>,
+  draft: Record<string, any>,
+) {
+  const keys = objectType === 'Area'
+    ? ['name', 'grid_row', 'grid_col', 'grid_range', 'position_x', 'position_y', 'width', 'height']
+    : ['name', 'area_name', 'device_type', 'grid_range', 'position_x', 'position_y', 'width', 'height']
+
+  return keys.filter(key => {
+    const left = normalizeComparableValue(key, original[key])
+    const right = normalizeComparableValue(key, draft[key])
+    return left !== right
+  })
+}
+
+function isPositionOnlySave(
+  objectType: 'Area' | 'Device',
+  original: Record<string, any>,
+  draft: Record<string, any>,
+) {
+  const changedKeys = collectChangedKeysForSave(objectType, original, draft)
+  if (!changedKeys.length) return false
+  const allowSet = objectType === 'Area' ? AREA_POSITION_ONLY_KEYS : DEVICE_POSITION_ONLY_KEYS
+  return changedKeys.every(key => allowSet.has(key))
 }
 
 // View mode - _selectedAreaNameRef synced via watch after selectedAreaName is defined
@@ -1811,6 +1859,7 @@ async function saveSelectedObject() {
 
   const projectId = selectedProjectId.value
   const objectType = selectedObjectType.value
+  const originalObject = selectedObject.value ? cloneRow(selectedObject.value) : null
   if (!objectType) return
 
   if (objectType === 'Device' && !selectedDraft.value.area_name) {
@@ -1870,15 +1919,28 @@ async function saveSelectedObject() {
       if (index >= 0 && updated) links.value[index] = updated as LinkRow
     }
     if (updated) {
-      const reasonByType = {
-        Area: 'area-crud',
-        Device: 'device-crud',
-        Link: 'link-crud',
-      } as const
-      scheduleAutoLayout(projectId, { force: true, reason: reasonByType[objectType as 'Area' | 'Device' | 'Link'] })
+      let shouldRunAutoLayout = objectType === 'Link'
+      if ((objectType === 'Area' || objectType === 'Device') && originalObject) {
+        shouldRunAutoLayout = !isPositionOnlySave(
+          objectType as 'Area' | 'Device',
+          originalObject as Record<string, any>,
+          selectedDraft.value as Record<string, any>
+        )
+      }
+      if (shouldRunAutoLayout) {
+        const reasonByType = {
+          Area: 'area-crud',
+          Device: 'device-crud',
+          Link: 'link-crud',
+        } as const
+        scheduleAutoLayout(projectId, { force: true, reason: reasonByType[objectType as 'Area' | 'Device' | 'Link'] })
+      }
       selectedDraft.value = cloneRow(updated)
       selectedDraftDirty.value = false
-      setNotice('Đã lưu thay đổi.', 'success')
+      setNotice(
+        shouldRunAutoLayout ? 'Đã lưu thay đổi. Bố cục sẽ được cập nhật tự động.' : 'Đã lưu thay đổi.',
+        'success'
+      )
     }
   } catch (error: any) {
     setNotice(error?.message || 'Lưu thay đổi thất bại.', 'error')

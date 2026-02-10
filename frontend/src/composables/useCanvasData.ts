@@ -206,6 +206,7 @@ export function useCanvasData(
       const index = areas.value.findIndex(area => area.id === row.id)
       if (index >= 0) areas.value[index] = created
       scheduleAutoLayout(projectId, { force: true, reason: 'area-crud' })
+      setNotice(`Đã tạo area '${created.name}'.`, 'success')
     } catch (error: any) {
       if (row.__temp) {
         areas.value = areas.value.filter(area => area.id !== row.id)
@@ -234,6 +235,7 @@ export function useCanvasData(
         const index = areas.value.findIndex(area => area.id === payload.row.id)
         if (index >= 0) areas.value[index] = updated
         scheduleAutoLayout(projectId, { force: true, reason: 'area-crud' })
+        setNotice(`Đã cập nhật area '${updated.name}'.`, 'success')
       } catch (error: any) {
         setNotice(error?.message || 'Cập nhật area thất bại.', 'error')
       }
@@ -247,6 +249,7 @@ export function useCanvasData(
     try {
       await deleteArea(projectId, row.id)
       scheduleAutoLayout(projectId, { force: true, reason: 'area-crud' })
+      setNotice(`Đã xóa area '${row.name}'.`, 'success')
     } catch (error: any) {
       setNotice(error?.message || 'Xóa area thất bại.', 'error')
     }
@@ -277,6 +280,7 @@ export function useCanvasData(
       const index = devices.value.findIndex(device => device.id === row.id)
       if (index >= 0) devices.value[index] = created
       scheduleAutoLayout(projectId, { force: true, reason: 'device-crud' })
+      setNotice(`Đã tạo thiết bị '${created.name}'.`, 'success')
     } catch (error: any) {
       if (row.__temp) {
         devices.value = devices.value.filter(device => device.id !== row.id)
@@ -305,6 +309,7 @@ export function useCanvasData(
         const index = devices.value.findIndex(device => device.id === payload.row.id)
         if (index >= 0) devices.value[index] = updated
         scheduleAutoLayout(projectId, { force: true, reason: 'device-crud' })
+        setNotice(`Đã cập nhật thiết bị '${updated.name}'.`, 'success')
       } catch (error: any) {
         setNotice(error?.message || 'Cập nhật device thất bại.', 'error')
       }
@@ -320,6 +325,7 @@ export function useCanvasData(
       devicePorts.value = devicePorts.value.filter(port => port.device_id !== row.id)
       portAnchorOverrides.value = portAnchorOverrides.value.filter(override => override.device_id !== row.id)
       scheduleAutoLayout(projectId, { force: true, reason: 'device-crud' })
+      setNotice(`Đã xóa thiết bị '${row.name}'.`, 'success')
     } catch (error: any) {
       setNotice(error?.message || 'Xóa device thất bại.', 'error')
     }
@@ -388,6 +394,7 @@ export function useCanvasData(
       const index = links.value.findIndex(link => link.id === row.id)
       if (index >= 0) links.value[index] = created
       scheduleAutoLayout(projectId, { force: true, reason: 'link-crud' })
+      setNotice('Đã tạo link.', 'success')
     } catch (error: any) {
       if (row.__temp) {
         links.value = links.value.filter(link => link.id !== row.id)
@@ -413,6 +420,7 @@ export function useCanvasData(
         const index = links.value.findIndex(link => link.id === payload.row.id)
         if (index >= 0) links.value[index] = updated
         scheduleAutoLayout(projectId, { force: true, reason: 'link-crud' })
+        setNotice('Đã cập nhật link.', 'success')
       } catch (error: any) {
         setNotice(error?.message || 'Cập nhật link thất bại.', 'error')
       }
@@ -426,6 +434,7 @@ export function useCanvasData(
     try {
       await deleteLink(projectId, row.id)
       scheduleAutoLayout(projectId, { force: true, reason: 'link-crud' })
+      setNotice('Đã xóa link.', 'success')
     } catch (error: any) {
       setNotice(error?.message || 'Xóa link thất bại.', 'error')
     }

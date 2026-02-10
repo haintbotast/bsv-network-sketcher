@@ -51,6 +51,7 @@
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
 - **main_navigator_center_policy:** cụm điều khiển viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) hiển thị canh giữa trong main navigator panel.
 - **manual_position_edit_policy:** khi bật chế độ sửa vị trí, kéo‑thả `Area/Device` phải lưu `position_x/position_y` về DB ở `drag-end` và không trigger `/auto-layout`.
+- **manual_position_property_save_policy:** lưu thuộc tính `Area/Device` nếu chỉ đổi `position_x/position_y/grid_range` thì không trigger `/auto-layout`.
 - **drag_alignment_policy:** trong chế độ sửa vị trí phải hiển thị guide ngang/dọc và snap nhẹ khi object gần mốc align của object liên quan.
 - **position_standard_table_policy:** `position_x/position_y` sau drag hoặc nhập tay phải nằm trên mốc chuẩn (bội số step 0.25 đv).
 - **layout_db_grid_sync_policy:** khi apply auto-layout vào DB (L1/L2/L3 + waypoint), phải đồng bộ chặt `position_*` và `grid_range`; `grid_row/grid_col` của Area được giữ như placement map logic (không bị auto-layout ghi đè).
@@ -286,6 +287,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Micro row center: layer nhiều hàng phải căn giữa, hàng ngắn không dồn trái cứng.
 - [ ] Manual position edit: bật chế độ sửa vị trí, kéo‑thả `Area/Device` và thả chuột sẽ lưu `position_x/position_y` thành công.
 - [ ] Manual position edit: thao tác kéo‑thả chỉnh vị trí không phát sinh request `/auto-layout`.
+- [ ] Manual position edit: lưu trong panel thuộc tính với thay đổi chỉ thuộc `position_x/position_y/grid_range` không phát sinh request `/auto-layout`.
 - [ ] Manual position edit: khi tắt chế độ sửa vị trí, kéo chuột trên object không thay đổi tọa độ lưu DB.
 - [ ] Manual position edit: khi drag gần trục giữa/mép của object liên quan, phải hiện guide ngang/dọc và object snap nhẹ vào trục đó.
 - [ ] Position standard table: tọa độ lưu DB sau drag luôn là bội số 0.25 đv (không còn số lẻ rời rạc như 12.13).

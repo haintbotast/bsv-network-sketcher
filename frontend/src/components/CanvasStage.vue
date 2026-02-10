@@ -60,6 +60,7 @@
           @dragend="event => onObjectDragEnd(event, device.id, 'device')"
         >
           <v-rect :config="device.bodyRect" />
+          <v-shape v-if="device.iconShape" :config="device.iconShape" />
           <v-group
             v-for="port in device.topPorts"
             :key="port.id"
@@ -632,6 +633,20 @@ const DEVICE_LABEL_MIN_HEIGHT = 24
 const DEVICE_STANDARD_TOTAL_HEIGHT = 76
 const DEVICE_BODY_VERTICAL_PADDING = 6
 const DEVICE_MIN_WIDTH = 96
+const DEVICE_ICON_STROKE_WIDTH = 1
+const DEVICE_ICON_MIN_SIZE = 12
+const DEVICE_ICON_MAX_SIZE = 18
+const DEVICE_ICON_MARGIN_LEFT = 8
+const DEVICE_ICON_LABEL_GAP = 8
+const DEVICE_ICON_COLOR = '#4f4a44'
+
+type DeviceIconKind = 'router' | 'switch' | 'firewall' | 'server' | 'storage' | 'ap' | 'endpoint' | 'unknown'
+
+function clampNumber(value: number, min: number, max: number) {
+  if (value < min) return min
+  if (value > max) return max
+  return value
+}
 
 function resolveDeviceRole(device: DeviceModel) {
   const name = device.name.toUpperCase()
@@ -654,6 +669,24 @@ function resolveDeviceRole(device: DeviceModel) {
     return 'access'
   }
   return 'endpoint'
+}
+
+function resolveDeviceIconKind(device: DeviceModel): DeviceIconKind {
+  if (device.type === 'Storage') return 'storage'
+  if (device.type === 'AP') return 'ap'
+  if (device.type === 'PC') return 'endpoint'
+  const role = resolveDeviceRole(device)
+  if (role === 'router') return 'router'
+  if (role === 'firewall') return 'firewall'
+  if (role === 'server') return 'server'
+  if (role === 'endpoint') {
+    const name = (device.name || '').toUpperCase()
+    if (name.includes('AP') || name.includes('ACCESS POINT')) return 'ap'
+    if (name.includes('NAS') || name.includes('SAN') || name.includes('STORAGE')) return 'storage'
+    return 'endpoint'
+  }
+  if (role === 'access' || role === 'core' || role === 'dist') return 'switch'
+  return 'unknown'
 }
 
 type DevicePortBands = {
@@ -693,7 +726,156 @@ type DeviceRenderFrame = {
   bodyHeight: number
 }
 
+type DeviceIconFrame = {
+  x: number
+  y: number
+  size: number
+}
+
 const DEVICE_PORT_BAND_HEIGHT = DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2
+
+function buildDeviceIconFrame(bodyY: number, bodyHeight: number, bodyWidth: number): DeviceIconFrame | null {
+  if (bodyHeight <= 8 || bodyWidth <= DEVICE_ICON_MARGIN_LEFT + DEVICE_ICON_MIN_SIZE + 12) return null
+  const rawSize = Math.min(bodyHeight - 6, bodyWidth * 0.16, DEVICE_ICON_MAX_SIZE)
+  const size = clampNumber(rawSize, DEVICE_ICON_MIN_SIZE, DEVICE_ICON_MAX_SIZE)
+  return {
+    x: DEVICE_ICON_MARGIN_LEFT,
+    y: bodyY + (bodyHeight - size) / 2,
+    size,
+  }
+}
+
+function buildDeviceIconShape(
+  kind: DeviceIconKind,
+  frame: DeviceIconFrame | null,
+  isSelected: boolean
+) {
+  if (!frame) return null
+  const { x, y, size } = frame
+  const cx = x + size / 2
+  const cy = y + size / 2
+  const stroke = isSelected ? '#d66c3b' : DEVICE_ICON_COLOR
+  const dash = kind === 'unknown' ? [2, 2] : []
+
+  return {
+    x: 0,
+    y: 0,
+    stroke,
+    strokeWidth: DEVICE_ICON_STROKE_WIDTH,
+    lineCap: 'round',
+    lineJoin: 'round',
+    dash,
+    listening: false,
+    sceneFunc: (ctx: CanvasRenderingContext2D, shape: any) => {
+      ctx.beginPath()
+
+      if (kind === 'router') {
+        const r = size * 0.42
+        for (let i = 0; i < 6; i += 1) {
+          const angle = Math.PI / 6 + (i * Math.PI) / 3
+          const px = cx + r * Math.cos(angle)
+          const py = cy + r * Math.sin(angle)
+          if (i === 0) ctx.moveTo(px, py)
+          else ctx.lineTo(px, py)
+        }
+        ctx.closePath()
+        ctx.moveTo(cx - r * 0.55, cy)
+        ctx.lineTo(cx + r * 0.55, cy)
+        ctx.moveTo(cx, cy - r * 0.55)
+        ctx.lineTo(cx, cy + r * 0.55)
+      } else if (kind === 'switch') {
+        const left = x + size * 0.1
+        const top = y + size * 0.16
+        const width = size * 0.8
+        const height = size * 0.68
+        ctx.rect(left, top, width, height)
+        const slotW = size * 0.1
+        const slotH = size * 0.1
+        const slotTop = top + height * 0.55
+        const gap = (width - slotW * 4) / 5
+        for (let i = 0; i < 4; i += 1) {
+          const sx = left + gap + i * (slotW + gap)
+          ctx.rect(sx, slotTop, slotW, slotH)
+        }
+      } else if (kind === 'firewall') {
+        const left = x + size * 0.14
+        const top = y + size * 0.18
+        const width = size * 0.72
+        const height = size * 0.64
+        ctx.rect(left, top, width, height)
+        ctx.moveTo(left, top + height / 3)
+        ctx.lineTo(left + width, top + height / 3)
+        ctx.moveTo(left, top + (height * 2) / 3)
+        ctx.lineTo(left + width, top + (height * 2) / 3)
+        ctx.moveTo(left + width * 0.3, top)
+        ctx.lineTo(left + width * 0.3, top + height / 3)
+        ctx.moveTo(left + width * 0.7, top + height / 3)
+        ctx.lineTo(left + width * 0.7, top + (height * 2) / 3)
+        ctx.moveTo(left + width * 0.3, top + (height * 2) / 3)
+        ctx.lineTo(left + width * 0.3, top + height)
+      } else if (kind === 'server') {
+        const left = x + size * 0.14
+        const top = y + size * 0.14
+        const width = size * 0.72
+        const height = size * 0.72
+        ctx.rect(left, top, width, height)
+        ctx.moveTo(left, top + height / 3)
+        ctx.lineTo(left + width, top + height / 3)
+        ctx.moveTo(left, top + (height * 2) / 3)
+        ctx.lineTo(left + width, top + (height * 2) / 3)
+        const ledR = size * 0.04
+        ctx.moveTo(left + width * 0.86 + ledR, top + height / 6)
+        ctx.arc(left + width * 0.86, top + height / 6, ledR, 0, Math.PI * 2)
+      } else if (kind === 'storage') {
+        const rx = size * 0.28
+        const ry = size * 0.12
+        const topY = y + size * 0.22
+        const bottomY = y + size * 0.78
+        ctx.moveTo(cx - rx, topY)
+        ctx.ellipse(cx, topY, rx, ry, 0, 0, Math.PI * 2)
+        ctx.moveTo(cx - rx, topY)
+        ctx.lineTo(cx - rx, bottomY)
+        ctx.moveTo(cx + rx, topY)
+        ctx.lineTo(cx + rx, bottomY)
+        ctx.moveTo(cx - rx, bottomY)
+        ctx.ellipse(cx, bottomY, rx, ry, 0, 0, Math.PI)
+      } else if (kind === 'ap') {
+        const r0 = size * 0.06
+        ctx.moveTo(cx + r0, cy + size * 0.14)
+        ctx.arc(cx, cy + size * 0.14, r0, 0, Math.PI * 2)
+        const arcs = [size * 0.16, size * 0.28]
+        arcs.forEach(r => {
+          ctx.moveTo(cx - r * 0.72, cy + size * 0.14)
+          ctx.arc(cx, cy + size * 0.14, r, Math.PI * 1.18, Math.PI * 1.82)
+        })
+      } else if (kind === 'endpoint') {
+        const left = x + size * 0.12
+        const top = y + size * 0.16
+        const width = size * 0.76
+        const height = size * 0.48
+        ctx.rect(left, top, width, height)
+        ctx.moveTo(cx, top + height)
+        ctx.lineTo(cx, y + size * 0.82)
+        ctx.moveTo(cx - size * 0.18, y + size * 0.82)
+        ctx.lineTo(cx + size * 0.18, y + size * 0.82)
+      } else {
+        const left = x + size * 0.14
+        const top = y + size * 0.14
+        const width = size * 0.72
+        const height = size * 0.72
+        ctx.rect(left, top, width, height)
+        ctx.moveTo(cx - size * 0.1, cy - size * 0.08)
+        ctx.quadraticCurveTo(cx, cy - size * 0.26, cx + size * 0.1, cy - size * 0.08)
+        ctx.quadraticCurveTo(cx + size * 0.16, cy, cx, cy + size * 0.1)
+        ctx.lineTo(cx, cy + size * 0.2)
+        ctx.moveTo(cx + size * 0.01, cy + size * 0.3)
+        ctx.arc(cx, cy + size * 0.3, size * 0.01, 0, Math.PI * 2)
+      }
+
+      ctx.strokeShape(shape)
+    },
+  }
+}
 
 const deviceTierMap = computed(() => buildDeviceTierMap(props.devices))
 
@@ -1011,6 +1193,12 @@ const visibleDevices = computed(() => {
       const frame = resolveDeviceRenderFrame(rect, bands)
       const bodyY = frame.topBandHeight
       const bodyHeight = frame.bodyHeight
+      const iconKind = resolveDeviceIconKind(device)
+      const iconFrame = buildDeviceIconFrame(bodyY, bodyHeight, rect.width)
+      const iconShape = buildDeviceIconShape(iconKind, iconFrame, isSelected)
+      const labelX = iconFrame
+        ? Math.min(iconFrame.x + iconFrame.size + DEVICE_ICON_LABEL_GAP, Math.max(rect.width - 20, 10))
+        : 10
       const topPorts = buildPortCells(device.id, bands.top, 0, rect.width, 'top')
       const bottomPorts = buildPortCells(
         device.id,
@@ -1045,18 +1233,19 @@ const visibleDevices = computed(() => {
           shadowOpacity: 0,
           shadowForStrokeEnabled: false
         },
+        iconShape,
         topPorts,
         bottomPorts,
         label: {
-          x: 10,
+          x: labelX,
           y: bodyY + Math.max((bodyHeight - DEVICE_LABEL_FONT_SIZE) / 2 - 1, 4),
-          width: Math.max(rect.width - 16, 0),
+          width: Math.max(rect.width - labelX - 8, 0),
           text: device.name,
           fontSize: DEVICE_LABEL_FONT_SIZE,
           fontFamily: FONT_FAMILY,
           fill: '#1f1f1f',
           wrap: 'none',
-          align: 'center',
+          align: 'left',
           ellipsis: true
         }
       }

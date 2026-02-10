@@ -183,6 +183,7 @@
   - **L1 (thực tế):** ước lượng **bề ngang dải port (port band)** theo số lượng/độ dài port để tăng `node_spacing`/`row_gap` (tránh object chèn lên nhau).
   - **L2/L3:** cộng `label_band` vào chiều cao node để chừa chỗ nhãn L2/L3 dưới thiết bị; đồng thời chừa band nhãn cho group (VLAN/Subnet).
 - **Kích thước thiết bị (Device):** tự động **nới rộng theo số lượng/độ dài port** và giữ vùng thân thiết bị đủ chỗ cho tên thiết bị.
+- **Nguyên tắc `port-first`:** port band (top/bottom) là thành phần ưu tiên cao nhất; icon nhận diện loại thiết bị chỉ hiển thị trong thân `Device` và không được chạm vùng port band.
 - **Chuẩn hóa chiều cao hiển thị Device (L1/UI):**
   - Mốc chuẩn tổng chiều cao object: **76 px @ scale 1x** (áp cho render trên canvas).
   - Nếu dữ liệu kích thước thực tế lớn hơn mốc chuẩn, giữ kích thước lớn hơn (không ép thu nhỏ).
@@ -215,6 +216,24 @@ Quy định khi áp dụng:
 - Chỉ chọn **một bộ shape chính** cho toàn project/export để tránh lệch UI ↔ PPTX.
 - Không trộn `diamond` và `circle` cho waypoint trong cùng một view L1.
 - Dù chọn bộ nào, link L1 vẫn giữ Manhattan + lineJoin miter/lineCap butt theo chuẩn kỹ thuật.
+
+### 4.3 Icon nhận diện theo loại thiết bị (đang áp dụng cho bộ A)
+
+| Loại thiết bị | Icon gợi nhớ | Quy tắc hiển thị |
+|---------------|--------------|------------------|
+| Router | Lục giác + trục ngang/dọc | Nét mảnh, không fill |
+| Switch (Core/Dist/Access) | Khối chữ nhật + hàng port mini | Nét mảnh, không fill |
+| Firewall | Khối tường gạch đơn giản | Nét mảnh, không fill |
+| Server | Rack 3 ngăn | Nét mảnh, không fill |
+| Storage | Cylinder | Nét mảnh, không fill |
+| AP | Chấm + 2 cung sóng | Nét mảnh, không fill |
+| Endpoint/PC | Màn hình + chân đế | Nét mảnh, không fill |
+| Unknown | Khung vuông + `?` | Nét đứt |
+
+Ràng buộc kỹ thuật:
+- Kích thước icon khuyến nghị: **12-18 px** tùy chiều cao body.
+- Icon canh trái trong thân device; nhãn tên thiết bị dịch sang phải để không chồng icon.
+- Icon không được thay đổi hitbox/collision của device; routing và kiểm tra va chạm vẫn dựa trên khung chữ nhật của object.
 
 ---
 

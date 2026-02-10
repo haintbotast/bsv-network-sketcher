@@ -41,6 +41,7 @@
 - **l1_stem_deoverlap_policy:** sau stub rời port, router phải cho phép lệch nhỏ theo rank endpoint để giảm hiện tượng các đoạn đứng/đoạn ngang dính sát nhau.
 - **l1_global_lane_two_axis_policy:** router phải tách làn chung theo cả 2 hướng ngang/dọc trong cùng cụm gần để giảm dính bó giữa các cặp link khác nhau.
 - **l1_parallel_segment_nudge_policy:** hậu xử lý phải nudge các segment ngang/dọc song song trong cùng corridor, đồng thời bảo toàn segment `anchor→stub` hai đầu để không lệch điểm xuất phát tại port.
+- **l1_post_nudge_validity_gate_policy:** sau nudge, mỗi link phải pass lại `pathBlocked`; link nào va chạm obstacle phải rollback về path trước nudge.
 - **l1_global_corridor_split_policy:** router phải tách làn toàn cục theo corridor (scope + axis + bucket) trước hậu xử lý nudge để giảm dính bó giữa các cặp link khác nhau.
 - **l1_jump_direction_consistency_policy:** tại giao điểm, arc jump phải thống nhất hướng hiển thị (segment ngang nhảy lên, segment dọc nhảy sang phải), không phụ thuộc chiều đi của segment.
 - **l1_jump_turn_guard_policy:** không vẽ arc jump khi giao điểm nằm quá gần đầu/cuối segment để tránh hiện tượng “vừa nhảy xong rẽ ngay”.
@@ -307,6 +308,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Stem de-overlap: với cụm port dày, các đoạn đứng rời port và đoạn chuyển tiếp không còn đè lên nhau thành một nét.
 - [ ] Global lane two-axis: trong cụm dày, cả bó ngang và bó dọc đều được tách làn ổn định giữa nhiều cặp link khác nhau.
 - [ ] Parallel segment nudge: trong cụm line ngang/dọc dày, các segment giữa được tách rõ, còn đoạn `anchor→stub` sát port vẫn giữ ổn định.
+- [ ] Post-nudge validity gate: nudge không được làm link xuyên object; link va chạm sau nudge phải tự rollback về path hợp lệ trước nudge.
 - [ ] Global corridor split: nhiều link khác cặp device nhưng chung hành lang ngang/dọc vẫn có khoảng cách ổn định trước khi áp nudge.
 - [ ] Jump direction consistency: arc jump luôn nhảy lên (đoạn ngang) hoặc sang phải (đoạn dọc) kể cả khi segment đi ngược chiều.
 - [ ] Jump turn guard: giao điểm nằm sát đầu/cuối segment (gần điểm rẽ) không vẽ arc để tránh cảm giác rối.

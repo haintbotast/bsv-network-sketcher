@@ -78,6 +78,8 @@
   - Nếu bị cản thì fallback orthogonal đơn giản (không dùng tối ưu toàn cục/A\*).
 - **Path validity gate (L1):** mọi candidate/fallback phải qua kiểm tra va chạm (`pathBlocked`); không chấp nhận tuyến ép xuyên object.
 - **Boundary escape fallback (L1):** khi các tuyến cục bộ đều bị chặn, router thử hành lang biên theo cụm obstacle **lân cận đoạn link trước**, chỉ mở rộng ra xa khi thật sự cần.
+- **Fallback detour guard (L1):** candidate có quãng đường vòng vượt ngưỡng hợp lý so với khoảng cách trực tiếp phải bị loại, tránh tuyến “đi xa bất thường”.
+- **Offset giảm dần trước fallback (L1):** trước khi chấp nhận fallback xa, router phải thử lại cùng cặp endpoint với mức tách `bundle/stem` giảm dần để tìm tuyến gần hơn.
 - Sau bước chuẩn hóa orthogonal, nếu tuyến cắt qua object thì fallback tuyến orthogonal thay thế để bảo toàn tính hợp lệ.
 - **Pair alignment:** với nhiều link giữa 2 thiết bị kề nhau, anchor được **xếp đồng bộ theo thứ tự port phía đối diện** để giảm chéo.
 - **Same-row alignment:** link giữa **2 thiết bị cùng hàng/cùng cột** sẽ ưu tiên **canh thẳng anchor + ô port** (ngang hoặc dọc). Chỉ áp dụng khi **đường thẳng không bị vật cản**; nếu bị cản thì giữ routing tránh vật cản.
@@ -90,7 +92,7 @@
   - **non-uplink => bottom**
   - **left/right** có thể xuất hiện ở dữ liệu override, nhưng render/routing L1 chuẩn hóa về side port band (`top` hoặc `bottom`) để tránh lệch điểm xuất phát link.
 - **Port side stability (L1):** side tự động chỉ theo policy `top/bottom`; không tự ép sang `left/right` trong auto pass để tránh lệch giữa anchor và port band.
-- **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng; offset tối thiểu bằng **max(`bundle_gap`, `grid cell`)** và **tự nhân hệ số theo `total`** (nhiều link → khoảng cách lớn hơn). Với tuyến ưu tiên trục dọc, bundle gap được tăng thêm hệ số mạnh hơn để giảm chồng đoạn đứng. Router cho phép **stem de-overlap** (lệch nhỏ sau stub theo rank endpoint) để tách các đoạn đứng/đoạn ngang còn sát nhau, đồng thời áp **chia làn chung 2 hướng (ngang/dọc)** theo cụm gần để tránh dính bó giữa các cặp link khác nhau.
+- **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng; offset tối thiểu bằng **max(`bundle_gap`, `grid cell`)** và **tự nhân hệ số theo `total`** (nhiều link → khoảng cách lớn hơn). Với tuyến ưu tiên trục dọc, bundle gap được tăng thêm hệ số mạnh hơn để giảm chồng đoạn đứng. Router cho phép **stem de-overlap** (lệch nhỏ sau stub theo rank endpoint) để tách các đoạn đứng/đoạn ngang còn sát nhau, đồng thời áp **chia làn chung 2 hướng (ngang/dọc)** theo cụm gần và theo phạm vi Area để tránh dính bó giữa các cặp link khác nhau.
 - **Stub fan theo rank active (L1):** fan-out đoạn stub được tính theo **thứ tự endpoint active** trên cùng `(device, side)` với spread chuẩn `0..28px * scale`, tránh phụ thuộc trực tiếp vào kích thước object.
 - **Short same-side fan sync (L1):** với link nội‑area ngắn và hai đầu cùng side, fan hai đầu được đồng bộ để tránh tạo “hộp nhỏ” sát port band.
 - **Direct intra ưu tiên theo hình học (L1):** với cặp thiết bị nội‑area theo phương ngang, hai đầu cùng side (`top/top` hoặc `bottom/bottom`) và không bị vật cản, router phải ưu tiên tuyến trực tiếp/orthogonal ngắn trước khi áp lane U cho purpose đặc biệt.

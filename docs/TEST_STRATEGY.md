@@ -30,6 +30,8 @@
 - **l1_no_object_crossing_policy:** tuyến L1 sau chuẩn hóa orthogonal không được xuyên qua device/area không liên quan.
 - **l1_path_validity_gate_policy:** mọi tuyến candidate/fallback sau khi dựng path đều phải pass `pathBlocked`; không được giữ tuyến bị chặn để render.
 - **l1_boundary_escape_fallback_policy:** khi fallback cục bộ thất bại, router phải thử hành lang biên theo cụm obstacle lân cận link trước, chỉ mở rộng phạm vi khi cần.
+- **l1_fallback_detour_guard_policy:** candidate fallback có quãng đường vòng quá xa so với khoảng cách trực tiếp phải bị loại.
+- **l1_offset_reduction_retry_policy:** trước khi dùng fallback xa, router phải thử giảm dần độ tách `bundle/stem` để tìm tuyến gần hơn và ít méo hơn.
 - **port_turn_clearance_policy:** điểm rẽ đầu tiên của link L1 phải cách port band đủ xa để không dính nhãn port.
 - **l1_stub_fan_rank_policy:** fan-out đoạn stub phải dựa trên rank endpoint active theo `(device, side)`, không phụ thuộc trực tiếp vào bề rộng/cao device.
 - **l1_short_same_side_fan_sync_policy:** link nội‑area ngắn có hai đầu cùng side phải đồng bộ fan hai đầu để tránh “hộp nhỏ” gần port band.
@@ -300,6 +302,8 @@ test.describe('Diagram Editor', () => {
 - [ ] Vertical bundle separation: cụm link ưu tiên trục dọc không bị dính/chồng đoạn đứng khi số link tăng.
 - [ ] Stem de-overlap: với cụm port dày, các đoạn đứng rời port và đoạn chuyển tiếp không còn đè lên nhau thành một nét.
 - [ ] Global lane two-axis: trong cụm dày, cả bó ngang và bó dọc đều được tách làn ổn định giữa nhiều cặp link khác nhau.
+- [ ] Fallback detour guard: tuyến fallback không xuất hiện vòng xa bất thường (độ dài route trong ngưỡng cho phép theo profile scale).
+- [ ] Offset reduction retry: khi tăng spacing làm route thất bại, router tự giảm dần offset và vẫn tìm được tuyến hợp lệ gần endpoint.
 - [ ] No edge-hugging: link không bám trùng mép trái/phải/top/bottom của object trong các ca dense routing.
 - [ ] Port exit orthogonality: sau điểm rời port/stub không có đoạn chéo; chỉ có chuỗi bước ngang/dọc.
 - [ ] Port embedded render: port label hiển thị trong object theo dải top/bottom, không còn nhãn port nổi trên link ở view L1.

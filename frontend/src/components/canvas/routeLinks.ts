@@ -92,6 +92,50 @@ function pathBlocked(path: Point[], obstacles: Rect[], clearance: number) {
   return false
 }
 
+function findUShapePath(start: Point, end: Point, obstacles: Rect[], clearance: number, preferAxis: 'x' | 'y'): Point[] | null {
+  if (!obstacles.length) return null
+  const pad = Math.max(clearance, 8)
+  const minX = Math.min(start.x, end.x) - pad
+  const maxX = Math.max(start.x, end.x) + pad
+  const minY = Math.min(start.y, end.y) - pad
+  const maxY = Math.max(start.y, end.y) + pad
+  const relevant = obstacles.filter(r =>
+    r.x < maxX && r.x + r.width > minX && r.y < maxY && r.y + r.height > minY
+  )
+  if (!relevant.length) return null
+
+  if (preferAxis === 'x') {
+    let topEdge = Infinity, bottomEdge = -Infinity
+    for (const r of relevant) {
+      topEdge = Math.min(topEdge, r.y)
+      bottomEdge = Math.max(bottomEdge, r.y + r.height)
+    }
+    const midY = (start.y + end.y) / 2
+    const aboveY = topEdge - pad
+    const belowY = bottomEdge + pad
+    const sorted = Math.abs(aboveY - midY) <= Math.abs(belowY - midY) ? [aboveY, belowY] : [belowY, aboveY]
+    for (const y of sorted) {
+      const path = simplifyPath([start, { x: start.x, y }, { x: end.x, y }, end])
+      if (!pathBlocked(path, obstacles, clearance)) return path
+    }
+  } else {
+    let leftEdge = Infinity, rightEdge = -Infinity
+    for (const r of relevant) {
+      leftEdge = Math.min(leftEdge, r.x)
+      rightEdge = Math.max(rightEdge, r.x + r.width)
+    }
+    const midX = (start.x + end.x) / 2
+    const leftX = leftEdge - pad
+    const rightX = rightEdge + pad
+    const sorted = Math.abs(leftX - midX) <= Math.abs(rightX - midX) ? [leftX, rightX] : [rightX, leftX]
+    for (const x of sorted) {
+      const path = simplifyPath([start, { x, y: start.y }, { x, y: end.y }, end])
+      if (!pathBlocked(path, obstacles, clearance)) return path
+    }
+  }
+  return null
+}
+
 function buildOrthPath(start: Point, end: Point, obstacles: Rect[], clearance: number, preferAxis: 'x' | 'y') {
   const orth = connectOrthogonal(start, end, obstacles, clearance, preferAxis)
   if (orth && orth.length >= 2) {
@@ -110,7 +154,14 @@ function buildOrthPath(start: Point, end: Point, obstacles: Rect[], clearance: n
   const alt = simplifyPath([start, altMid, end])
   if (!pathBlocked(alt, obstacles, clearance)) return alt
 
-  return simplifyPath([start, end])
+  // U-shape: đi vòng qua obstacles (chỉ tính bounding box, O(n))
+  const uPath = findUShapePath(start, end, obstacles, clearance, preferAxis)
+  if (uPath) return uPath
+  const uPathAlt = findUShapePath(start, end, obstacles, clearance, preferAxis === 'x' ? 'y' : 'x')
+  if (uPathAlt) return uPathAlt
+
+  // Ép orthogonal (không bao giờ trả đường chéo)
+  return simplifyPath([start, midpoint, end])
 }
 
 function resolvePeerLaneY(

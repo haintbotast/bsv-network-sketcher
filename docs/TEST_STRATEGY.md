@@ -29,7 +29,7 @@
 - **l1_override_side_normalization_policy:** ở L1, override side phải được chuẩn hóa theo port band (`top` giữ nguyên, `left/right/bottom` về `bottom`) để tránh lệch anchor so với điểm render port.
 - **l1_no_object_crossing_policy:** tuyến L1 sau chuẩn hóa orthogonal không được xuyên qua device/area không liên quan.
 - **l1_path_validity_gate_policy:** mọi tuyến candidate/fallback sau khi dựng path đều phải pass `pathBlocked`; không được giữ tuyến bị chặn để render.
-- **l1_boundary_escape_fallback_policy:** khi fallback cục bộ thất bại, router phải thử hành lang biên theo bao obstacle để tìm tuyến orthogonal an toàn trước khi bỏ link.
+- **l1_boundary_escape_fallback_policy:** khi fallback cục bộ thất bại, router phải thử hành lang biên theo cụm obstacle lân cận link trước, chỉ mở rộng phạm vi khi cần.
 - **port_turn_clearance_policy:** điểm rẽ đầu tiên của link L1 phải cách port band đủ xa để không dính nhãn port.
 - **l1_stub_fan_rank_policy:** fan-out đoạn stub phải dựa trên rank endpoint active theo `(device, side)`, không phụ thuộc trực tiếp vào bề rộng/cao device.
 - **l1_short_same_side_fan_sync_policy:** link nội‑area ngắn có hai đầu cùng side phải đồng bộ fan hai đầu để tránh “hộp nhỏ” gần port band.
@@ -37,6 +37,7 @@
 - **l1_vertical_pair_routing_policy:** với cặp nội‑area xếp dọc trên‑dưới, routing không ép theo rule direct ngang; phải giữ tuyến orthogonal dọc dễ đọc.
 - **l1_vertical_bundle_separation_policy:** với bundle ưu tiên trục dọc, khoảng tách lane phải được tăng so với trục ngang để giảm chồng đoạn đứng.
 - **l1_stem_deoverlap_policy:** sau stub rời port, router phải cho phép lệch nhỏ theo rank endpoint để giảm hiện tượng các đoạn đứng/đoạn ngang dính sát nhau.
+- **l1_global_lane_two_axis_policy:** router phải tách làn chung theo cả 2 hướng ngang/dọc trong cùng cụm gần để giảm dính bó giữa các cặp link khác nhau.
 - **l1_no_edge_hugging_policy:** segment link chạy trùng mép object (colinear với cạnh rect trong clearance) phải bị coi là va chạm và được reroute.
 - **l1_port_exit_orthogonality_policy:** khi dịch tách lane sau stub, tuyến phải giữ các đoạn orthogonal tuần tự, không xuất hiện segment chéo ngay sau port.
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
@@ -290,7 +291,7 @@ test.describe('Diagram Editor', () => {
 - [ ] L1 override side normalization: dữ liệu override `left/right` ở L1 vẫn phải cho endpoint bám đúng side port band và không tạo đoạn lệch khỏi ô port.
 - [ ] L1 no-object crossing: link sau chuẩn hóa orthogonal không xuyên device/area không liên quan trong các cụm dày.
 - [ ] L1 path validity gate: không có link nào được render nếu còn va chạm obstacle sau các nhánh fallback.
-- [ ] L1 boundary escape fallback: trong ca dense obstacles, router vẫn tìm được tuyến orthogonal an toàn qua hành lang biên bao obstacle.
+- [ ] L1 boundary escape fallback: trong ca dense obstacles, router ưu tiên hành lang biên theo cụm gần; chỉ mở rộng xa khi các cách gần đều không hợp lệ.
 - [ ] Port turn clearance: điểm rẽ đầu tiên không dính sát port band/label ở scale 1x (đạt khoảng cách tối thiểu theo profile tuning).
 - [ ] Stub fan rank: endpoint active cùng `(device, side)` được tách fan theo thứ tự ổn định; spread fan không vượt ngưỡng style tại scale hiện hành.
 - [ ] Short same-side fan sync: link nội‑area ngắn có hai đầu cùng side không tạo “hộp nhỏ” sát port (fan hai đầu đồng bộ).
@@ -298,6 +299,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Vertical pair routing: cặp xếp dọc trên‑dưới không dùng rule direct ngang; tuyến giữ dạng orthogonal dọc nhất quán.
 - [ ] Vertical bundle separation: cụm link ưu tiên trục dọc không bị dính/chồng đoạn đứng khi số link tăng.
 - [ ] Stem de-overlap: với cụm port dày, các đoạn đứng rời port và đoạn chuyển tiếp không còn đè lên nhau thành một nét.
+- [ ] Global lane two-axis: trong cụm dày, cả bó ngang và bó dọc đều được tách làn ổn định giữa nhiều cặp link khác nhau.
 - [ ] No edge-hugging: link không bám trùng mép trái/phải/top/bottom của object trong các ca dense routing.
 - [ ] Port exit orthogonality: sau điểm rời port/stub không có đoạn chéo; chỉ có chuỗi bước ngang/dọc.
 - [ ] Port embedded render: port label hiển thị trong object theo dải top/bottom, không còn nhãn port nổi trên link ở view L1.

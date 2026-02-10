@@ -22,6 +22,10 @@ const LABEL_STUB_PADDING = 4
 const FAN_SPREAD_BASE = 28
 const BUNDLE_OFFSET_MIN = 11
 const BUNDLE_OFFSET_FACTOR = 1.12
+const GLOBAL_LANE_BUCKET_FACTOR = 1.25
+const GLOBAL_LANE_GAP_FACTOR = 0.42
+const GLOBAL_LANE_LIMIT = 30
+const GLOBAL_STEM_BUCKET_BASE = 18
 
 type PeerPurposeKind = 'stack' | 'ha' | 'hsrp'
 
@@ -67,6 +71,42 @@ function resolveStemOffset(rank: FanRank | undefined, scale: number) {
   const gap = Math.max(5, 8 * scale)
   const limit = Math.max(10, 30 * scale)
   return clamp(centered * gap, -limit, limit)
+}
+
+function resolveGlobalStemOffset(rank: FanRank | undefined, scale: number) {
+  const centered = resolveFanCenteredRank(rank)
+  if (!centered) return 0
+  const gap = Math.max(2, 3.2 * scale)
+  const limit = Math.max(8, 14 * scale)
+  return clamp(centered * gap, -limit, limit)
+}
+
+function resolveGlobalLaneOffset(
+  rank: FanRank | undefined,
+  axis: 'x' | 'y',
+  scale: number,
+  renderTuning: RenderTuning
+) {
+  const centered = resolveFanCenteredRank(rank)
+  if (!centered) return 0
+  const baseGap = Math.max(3, (renderTuning.bundle_gap ?? 0) * scale * GLOBAL_LANE_GAP_FACTOR)
+  const axisGap = axis === 'x'
+    ? Math.max(4, baseGap)
+    : Math.max(5, baseGap * 1.2)
+  const limit = Math.max(12, GLOBAL_LANE_LIMIT * scale)
+  return clamp(centered * axisGap, -limit, limit)
+}
+
+function buildAreaPairKey(a?: string, b?: string) {
+  if (!a || !b) return null
+  return a < b ? `${a}|${b}` : `${b}|${a}`
+}
+
+function resolveLaneScopeKey(fromAreaId?: string, toAreaId?: string) {
+  if (!fromAreaId && !toAreaId) return 'global'
+  if (!fromAreaId || !toAreaId) return `edge:${fromAreaId || toAreaId}`
+  if (fromAreaId === toAreaId) return `intra:${fromAreaId}`
+  return `inter:${buildAreaPairKey(fromAreaId, toAreaId)}`
 }
 
 function resolvePeerPurposeKind(
@@ -181,11 +221,21 @@ function buildBoundaryEscapePath(
   preferAxis: 'x' | 'y'
 ) {
   if (!obstacles.length) return null
+  const windowPad = Math.max(clearance * 12, 180)
+  const focusMinX = Math.min(start.x, end.x) - windowPad
+  const focusMaxX = Math.max(start.x, end.x) + windowPad
+  const focusMinY = Math.min(start.y, end.y) - windowPad
+  const focusMaxY = Math.max(start.y, end.y) + windowPad
+  const localObstacles = obstacles.filter(rect =>
+    rect.x < focusMaxX && rect.x + rect.width > focusMinX &&
+    rect.y < focusMaxY && rect.y + rect.height > focusMinY
+  )
+  const activeObstacles = localObstacles.length ? localObstacles : obstacles
   let minX = Math.min(start.x, end.x)
   let maxX = Math.max(start.x, end.x)
   let minY = Math.min(start.y, end.y)
   let maxY = Math.max(start.y, end.y)
-  obstacles.forEach(rect => {
+  activeObstacles.forEach(rect => {
     minX = Math.min(minX, rect.x)
     maxX = Math.max(maxX, rect.x + rect.width)
     minY = Math.min(minY, rect.y)
@@ -461,6 +511,62 @@ export function routeLinks(
     })
   })
 
+  const globalLaneBucket = Math.max(14, (renderTuning.bundle_gap ?? 0) * scale * GLOBAL_LANE_BUCKET_FACTOR)
+  const globalLaneGroups = new Map<string, Array<{ linkId: string; order: number }>>()
+  linkMetas.forEach(meta => {
+    if (!meta) return
+    const anchors = resolvedAnchorsByLink.get(meta.link.id)
+    if (!anchors) return
+    const axis: 'x' | 'y' = Math.abs(meta.toCenter.x - meta.fromCenter.x) >= Math.abs(meta.toCenter.y - meta.fromCenter.y) ? 'x' : 'y'
+    const primary = axis === 'x'
+      ? (anchors.fromAnchor.y + anchors.toAnchor.y) / 2
+      : (anchors.fromAnchor.x + anchors.toAnchor.x) / 2
+    const order = axis === 'x'
+      ? (anchors.fromAnchor.x + anchors.toAnchor.x) / 2
+      : (anchors.fromAnchor.y + anchors.toAnchor.y) / 2
+    const scope = resolveLaneScopeKey(meta.fromAreaId || undefined, meta.toAreaId || undefined)
+    const key = `${scope}|${axis}|${Math.round(primary / globalLaneBucket)}`
+    const list = globalLaneGroups.get(key) || []
+    list.push({ linkId: meta.link.id, order })
+    globalLaneGroups.set(key, list)
+  })
+  const globalLaneRankByLink = new Map<string, FanRank>()
+  globalLaneGroups.forEach(entries => {
+    entries.sort((a, b) => a.order - b.order || a.linkId.localeCompare(b.linkId))
+    const total = entries.length
+    entries.forEach((entry, index) => {
+      globalLaneRankByLink.set(entry.linkId, { index, total })
+    })
+  })
+
+  const globalStemBucket = Math.max(10, GLOBAL_STEM_BUCKET_BASE * scale)
+  const globalStemGroups = new Map<string, Array<{ linkId: string; endpoint: LinkEndpoint; order: number }>>()
+  const pushGlobalStemEntry = (
+    linkId: string,
+    endpoint: LinkEndpoint,
+    side: ExitSide,
+    anchor: { x: number; y: number }
+  ) => {
+    const primary = (side === 'top' || side === 'bottom') ? anchor.x : anchor.y
+    const order = (side === 'top' || side === 'bottom') ? anchor.y : anchor.x
+    const key = `${side}|${Math.round(primary / globalStemBucket)}`
+    const list = globalStemGroups.get(key) || []
+    list.push({ linkId, endpoint, order })
+    globalStemGroups.set(key, list)
+  }
+  resolvedAnchorsByLink.forEach((anchors, linkId) => {
+    pushGlobalStemEntry(linkId, 'from', anchors.fromAnchor.side, anchors.fromAnchor)
+    pushGlobalStemEntry(linkId, 'to', anchors.toAnchor.side, anchors.toAnchor)
+  })
+  const globalStemRankByEndpoint = new Map<string, FanRank>()
+  globalStemGroups.forEach(entries => {
+    entries.sort((a, b) => a.order - b.order || a.linkId.localeCompare(b.linkId) || a.endpoint.localeCompare(b.endpoint))
+    const total = entries.length
+    entries.forEach((entry, index) => {
+      globalStemRankByEndpoint.set(fanEndpointKey(entry.linkId, entry.endpoint), { index, total })
+    })
+  })
+
   const links = linkMetas
     .map(meta => {
       if (!meta) return null
@@ -599,11 +705,29 @@ export function routeLinks(
         const axisBundleGap = preferAxis === 'y'
           ? Math.max(bundleGapBase * 1.8, 14 * scale)
           : bundleGapBase
-        const bundleOffset = bundle && bundle.total > 1
+        const pairBundleOffset = bundle && bundle.total > 1
           ? (bundle.index - (bundle.total - 1) / 2) * axisBundleGap
           : 0
-        const fromStemOffset = resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'from')), scale)
-        const toStemOffset = resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'to')), scale)
+        const globalLaneOffset = isL1View
+          ? resolveGlobalLaneOffset(globalLaneRankByLink.get(link.id), preferAxis, scale, renderTuning)
+          : 0
+        const bundleOffset = clamp(
+          pairBundleOffset + globalLaneOffset,
+          -Math.max(16, GLOBAL_LANE_LIMIT * scale),
+          Math.max(16, GLOBAL_LANE_LIMIT * scale)
+        )
+        const fromStemOffset = clamp(
+          resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'from')), scale)
+          + resolveGlobalStemOffset(globalStemRankByEndpoint.get(fanEndpointKey(link.id, 'from')), scale),
+          -Math.max(12, 26 * scale),
+          Math.max(12, 26 * scale)
+        )
+        const toStemOffset = clamp(
+          resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'to')), scale)
+          + resolveGlobalStemOffset(globalStemRankByEndpoint.get(fanEndpointKey(link.id, 'to')), scale),
+          -Math.max(12, 26 * scale),
+          Math.max(12, 26 * scale)
+        )
 
         if (isL1View && isInterArea) {
           const interLaneGap = Math.max(10, (renderTuning.bundle_gap ?? 0) * scale * 1.6)

@@ -16,6 +16,7 @@ export interface LinkForCrossing {
 }
 
 const EPS = 1.0  // epsilon loại trừ giao điểm quá gần endpoint
+const TURN_GUARD_FACTOR = 2.2
 
 /**
  * Tìm giao điểm 2 đoạn thẳng orthogonal.
@@ -164,13 +165,14 @@ export function drawPolylineWithJumps(
     }
 
     const isHorizontal = Math.abs(y2 - y1) < 0.5
+    const turnGuard = Math.max(radius + 1, radius * TURN_GUARD_FACTOR)
 
     // Lọc crossings quá gần endpoint hoặc quá gần nhau
     const filtered: Crossing[] = []
     for (const c of segCrossings) {
       const dist = isHorizontal ? Math.abs(c.x - x1) : Math.abs(c.y - y1)
       const distEnd = isHorizontal ? Math.abs(c.x - x2) : Math.abs(c.y - y2)
-      if (dist < radius + 1 || distEnd < radius + 1) continue  // Quá gần endpoint
+      if (dist < turnGuard || distEnd < turnGuard) continue  // Tránh jump sát điểm rẽ
       if (filtered.length > 0) {
         const prev = filtered[filtered.length - 1]
         const gap = Math.hypot(c.x - prev.x, c.y - prev.y)
@@ -189,20 +191,22 @@ export function drawPolylineWithJumps(
       for (const c of filtered) {
         // Vẽ đến trước arc
         ctx.lineTo(c.x - dir * radius, c.y)
-        // Semicircle nhảy lên (negative Y)
+        // Luôn nhảy lên (negative Y), không phụ thuộc hướng đi trái/phải.
         const startAngle = dir > 0 ? Math.PI : 0
         const endAngle = dir > 0 ? 0 : Math.PI
-        ctx.arc(c.x, c.y, radius, startAngle, endAngle, true)
+        const counterClockwise = dir > 0
+        ctx.arc(c.x, c.y, radius, startAngle, endAngle, counterClockwise)
       }
     } else {
       const dir = y2 > y1 ? 1 : -1
       for (const c of filtered) {
         // Vẽ đến trước arc
         ctx.lineTo(c.x, c.y - dir * radius)
-        // Semicircle nhảy sang phải (positive X)
+        // Luôn nhảy sang phải (positive X), không phụ thuộc hướng đi lên/xuống.
         const startAngle = dir > 0 ? -Math.PI / 2 : Math.PI / 2
         const endAngle = dir > 0 ? Math.PI / 2 : -Math.PI / 2
-        ctx.arc(c.x, c.y, radius, startAngle, endAngle, true)
+        const counterClockwise = dir > 0
+        ctx.arc(c.x, c.y, radius, startAngle, endAngle, counterClockwise)
       }
     }
 

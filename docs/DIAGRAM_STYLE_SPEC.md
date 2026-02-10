@@ -221,6 +221,7 @@ Khi hai đường link cắt nhau, đường link có **index render cao hơn** 
 | Convention | Link index cao nhảy qua link index thấp |
 | Áp dụng | Tất cả links: inter-area, intra-area, bundled |
 | Epsilon loại trừ | 1px từ endpoint segment |
+| Turn guard | Không vẽ arc nếu giao điểm cách đầu/cuối segment < 2.2 × radius |
 | Khoảng cách tối thiểu giữa 2 arc | 2.5 × radius |
 
 Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), thay thế `v-line`.

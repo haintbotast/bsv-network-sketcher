@@ -42,6 +42,8 @@
 - **l1_global_lane_two_axis_policy:** router phải tách làn chung theo cả 2 hướng ngang/dọc trong cùng cụm gần để giảm dính bó giữa các cặp link khác nhau.
 - **l1_parallel_segment_nudge_policy:** hậu xử lý phải nudge các segment ngang/dọc song song trong cùng corridor, đồng thời bảo toàn segment `anchor→stub` hai đầu để không lệch điểm xuất phát tại port.
 - **l1_global_corridor_split_policy:** router phải tách làn toàn cục theo corridor (scope + axis + bucket) trước hậu xử lý nudge để giảm dính bó giữa các cặp link khác nhau.
+- **l1_jump_direction_consistency_policy:** tại giao điểm, arc jump phải thống nhất hướng hiển thị (segment ngang nhảy lên, segment dọc nhảy sang phải), không phụ thuộc chiều đi của segment.
+- **l1_jump_turn_guard_policy:** không vẽ arc jump khi giao điểm nằm quá gần đầu/cuối segment để tránh hiện tượng “vừa nhảy xong rẽ ngay”.
 - **l1_no_edge_hugging_policy:** segment link chạy trùng mép object (colinear với cạnh rect trong clearance) phải bị coi là va chạm và được reroute.
 - **l1_port_exit_orthogonality_policy:** khi dịch tách lane sau stub, tuyến phải giữ các đoạn orthogonal tuần tự, không xuất hiện segment chéo ngay sau port.
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
@@ -306,6 +308,8 @@ test.describe('Diagram Editor', () => {
 - [ ] Global lane two-axis: trong cụm dày, cả bó ngang và bó dọc đều được tách làn ổn định giữa nhiều cặp link khác nhau.
 - [ ] Parallel segment nudge: trong cụm line ngang/dọc dày, các segment giữa được tách rõ, còn đoạn `anchor→stub` sát port vẫn giữ ổn định.
 - [ ] Global corridor split: nhiều link khác cặp device nhưng chung hành lang ngang/dọc vẫn có khoảng cách ổn định trước khi áp nudge.
+- [ ] Jump direction consistency: arc jump luôn nhảy lên (đoạn ngang) hoặc sang phải (đoạn dọc) kể cả khi segment đi ngược chiều.
+- [ ] Jump turn guard: giao điểm nằm sát đầu/cuối segment (gần điểm rẽ) không vẽ arc để tránh cảm giác rối.
 - [ ] Fallback detour guard: tuyến fallback không xuất hiện vòng xa bất thường (độ dài route trong ngưỡng cho phép theo profile scale).
 - [ ] Offset reduction retry: khi tăng spacing làm route thất bại, router tự giảm dần offset và vẫn tìm được tuyến hợp lệ gần endpoint.
 - [ ] No edge-hugging: link không bám trùng mép trái/phải/top/bottom của object trong các ca dense routing.

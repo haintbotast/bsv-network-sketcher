@@ -19,9 +19,9 @@ export type RouteLinksParams = {
 }
 
 const LABEL_STUB_PADDING = 4
-const FAN_SPREAD_BASE = 24
-const BUNDLE_OFFSET_MIN = 9
-const BUNDLE_OFFSET_FACTOR = 0.95
+const FAN_SPREAD_BASE = 28
+const BUNDLE_OFFSET_MIN = 11
+const BUNDLE_OFFSET_FACTOR = 1.12
 
 type PeerPurposeKind = 'stack' | 'ha' | 'hsrp'
 
@@ -54,6 +54,19 @@ function fanEndpointKey(linkId: string, endpoint: LinkEndpoint) {
 function resolveFanDistance(rank: FanRank | undefined, spread: number) {
   if (!rank || rank.total <= 1) return 0
   return clamp(rank.index / (rank.total - 1), 0, 1) * spread
+}
+
+function resolveFanCenteredRank(rank: FanRank | undefined) {
+  if (!rank || rank.total <= 1) return 0
+  return rank.index - (rank.total - 1) / 2
+}
+
+function resolveStemOffset(rank: FanRank | undefined, scale: number) {
+  const centered = resolveFanCenteredRank(rank)
+  if (!centered) return 0
+  const gap = Math.max(5, 8 * scale)
+  const limit = Math.max(10, 30 * scale)
+  return clamp(centered * gap, -limit, limit)
 }
 
 function resolvePeerPurposeKind(
@@ -500,18 +513,20 @@ export function routeLinks(
       if (!path.length) {
         const bundleGapBase = Math.max(BUNDLE_OFFSET_MIN, (renderTuning.bundle_gap ?? 0) * scale * BUNDLE_OFFSET_FACTOR)
         const axisBundleGap = preferAxis === 'y'
-          ? Math.max(bundleGapBase * 1.2, 11 * scale)
+          ? Math.max(bundleGapBase * 1.8, 14 * scale)
           : bundleGapBase
         const bundleOffset = bundle && bundle.total > 1
           ? (bundle.index - (bundle.total - 1) / 2) * axisBundleGap
           : 0
+        const fromStemOffset = resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'from')), scale)
+        const toStemOffset = resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'to')), scale)
 
         const fromShifted: Point = preferAxis === 'x'
-          ? { x: fromBase.x, y: fromBase.y + bundleOffset }
-          : { x: fromBase.x + bundleOffset, y: fromBase.y }
+          ? { x: fromBase.x + fromStemOffset, y: fromBase.y + bundleOffset }
+          : { x: fromBase.x + bundleOffset, y: fromBase.y + fromStemOffset }
         const toShifted: Point = preferAxis === 'x'
-          ? { x: toBase.x, y: toBase.y + bundleOffset }
-          : { x: toBase.x + bundleOffset, y: toBase.y }
+          ? { x: toBase.x + toStemOffset, y: toBase.y + bundleOffset }
+          : { x: toBase.x + bundleOffset, y: toBase.y + toStemOffset }
 
         if (isL1View && isInterArea) {
           const interLaneGap = Math.max(10, (renderTuning.bundle_gap ?? 0) * scale * 1.6)

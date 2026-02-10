@@ -33,6 +33,7 @@
 - **l1_direct_intra_priority_policy:** với cặp nội‑area theo phương ngang, cùng side `top/top` hoặc `bottom/bottom`, nếu tuyến direct/orthogonal ngắn không bị cản thì phải ưu tiên trước lane U theo purpose.
 - **l1_vertical_pair_routing_policy:** với cặp nội‑area xếp dọc trên‑dưới, routing không ép theo rule direct ngang; phải giữ tuyến orthogonal dọc dễ đọc.
 - **l1_vertical_bundle_separation_policy:** với bundle ưu tiên trục dọc, khoảng tách lane phải được tăng so với trục ngang để giảm chồng đoạn đứng.
+- **l1_stem_deoverlap_policy:** sau stub rời port, router phải cho phép lệch nhỏ theo rank endpoint để giảm hiện tượng các đoạn đứng/đoạn ngang dính sát nhau.
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
 - **main_navigator_center_policy:** cụm điều khiển viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) hiển thị canh giữa trong main navigator panel.
 - **manual_position_edit_policy:** khi bật chế độ sửa vị trí, kéo‑thả `Area/Device` phải lưu `position_x/position_y` về DB ở `drag-end` và không trigger `/auto-layout`.
@@ -288,6 +289,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Direct intra priority: cặp ngang `top/top` hoặc `bottom/bottom` không vật cản phải đi tuyến direct/orthogonal ngắn, không bị ép chữ U chỉ vì purpose.
 - [ ] Vertical pair routing: cặp xếp dọc trên‑dưới không dùng rule direct ngang; tuyến giữ dạng orthogonal dọc nhất quán.
 - [ ] Vertical bundle separation: cụm link ưu tiên trục dọc không bị dính/chồng đoạn đứng khi số link tăng.
+- [ ] Stem de-overlap: với cụm port dày, các đoạn đứng rời port và đoạn chuyển tiếp không còn đè lên nhau thành một nét.
 - [ ] Port embedded render: port label hiển thị trong object theo dải top/bottom, không còn nhãn port nổi trên link ở view L1.
 - [ ] Port embedded render: object tự nới rộng/nới cao theo số lượng và độ dài port để không đè chữ.
 - [ ] Dense row spacing: với cụm nhiều uplink giữa 2 hàng thiết bị, auto-layout phải tăng khoảng cách hàng đủ để giảm chèn/đè link.

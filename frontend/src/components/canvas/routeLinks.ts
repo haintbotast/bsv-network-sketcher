@@ -20,16 +20,6 @@ export type RouteLinksParams = {
 
 const LABEL_STUB_PADDING = 4
 const FAN_SPREAD_BASE = 28
-const BUNDLE_OFFSET_MIN = 11
-const BUNDLE_OFFSET_FACTOR = 1.12
-const GLOBAL_LANE_BUCKET_FACTOR = 1.25
-const GLOBAL_LANE_GAP_X_FACTOR = 0.62
-const GLOBAL_LANE_GAP_Y_FACTOR = 1.02
-const GLOBAL_LANE_LIMIT_X = 42
-const GLOBAL_LANE_LIMIT_Y = 58
-const GLOBAL_STEM_BUCKET_BASE_X = 14
-const GLOBAL_STEM_BUCKET_BASE_Y = 18
-const OFFSET_REDUCE_STEPS = [1, 0.78, 0.56, 0.36, 0.18, 0] as const
 
 type PeerPurposeKind = 'stack' | 'ha' | 'hsrp'
 
@@ -46,6 +36,8 @@ const PEER_PURPOSE_VISUAL: Record<PeerPurposeKind, { stroke: string; dash: numbe
   ha: { stroke: '#16a085', dash: [8, 5], strokeWidth: 1.9, opacity: 0.98 },
   hsrp: { stroke: '#9b59b6', dash: [3, 4], strokeWidth: 1.8, opacity: 0.96 },
 }
+
+// --- Fan ranking: group links by device+side, assign rank by position ---
 
 function fanAxisOrder(anchor: { x: number; y: number; side: ExitSide }) {
   return (anchor.side === 'top' || anchor.side === 'bottom') ? anchor.x : anchor.y
@@ -64,66 +56,7 @@ function resolveFanDistance(rank: FanRank | undefined, spread: number) {
   return clamp(rank.index / (rank.total - 1), 0, 1) * spread
 }
 
-function resolveFanCenteredRank(rank: FanRank | undefined) {
-  if (!rank || rank.total <= 1) return 0
-  return rank.index - (rank.total - 1) / 2
-}
-
-function resolveStemOffset(rank: FanRank | undefined, scale: number) {
-  const centered = resolveFanCenteredRank(rank)
-  if (!centered) return 0
-  const gap = Math.max(4.5, 6.4 * scale)
-  const limit = Math.max(9, 24 * scale)
-  return clamp(centered * gap, -limit, limit)
-}
-
-function resolveGlobalStemOffset(rank: FanRank | undefined, side: ExitSide, scale: number) {
-  const centered = resolveFanCenteredRank(rank)
-  if (!centered) return 0
-  const isVerticalStem = side === 'top' || side === 'bottom'
-  const densityBoost = rank && rank.total > 4
-    ? Math.min(1.65, 1 + (rank.total - 4) * 0.09)
-    : 1
-  const gap = isVerticalStem
-    ? Math.max(2.8, 4.2 * scale * densityBoost)
-    : Math.max(2.2, 3.2 * scale * densityBoost)
-  const baseLimit = isVerticalStem ? 22 : 15
-  const dynamicLimit = baseLimit * scale + Math.max(0, (rank?.total ?? 1) - 6) * (isVerticalStem ? 1.2 : 0.8)
-  const limit = Math.max(isVerticalStem ? 10 : 8, dynamicLimit)
-  return clamp(centered * gap, -limit, limit)
-}
-
-function resolveGlobalLaneOffset(
-  rank: FanRank | undefined,
-  axis: 'x' | 'y',
-  scale: number,
-  renderTuning: RenderTuning
-) {
-  const centered = resolveFanCenteredRank(rank)
-  if (!centered) return 0
-  const densityBoost = rank && rank.total > 5
-    ? Math.min(1.8, 1 + (rank.total - 5) * 0.08)
-    : 1
-  const baseGap = Math.max(3.5, (renderTuning.bundle_gap ?? 0) * scale)
-  const axisGap = axis === 'x'
-    ? Math.max(5, baseGap * GLOBAL_LANE_GAP_X_FACTOR * densityBoost)
-    : Math.max(6, baseGap * GLOBAL_LANE_GAP_Y_FACTOR * densityBoost)
-  const baseLimit = axis === 'x' ? GLOBAL_LANE_LIMIT_X : GLOBAL_LANE_LIMIT_Y
-  const dynamicLimit = baseLimit * scale + Math.max(0, (rank?.total ?? 1) - 8) * (axis === 'x' ? 1.3 : 1.7)
-  const limit = Math.max(axis === 'x' ? 16 : 20, dynamicLimit)
-  return clamp(centered * axisGap, -limit, limit)
-}
-
-function buildAreaPairKey(a: string, b: string) {
-  return a < b ? `${a}|${b}` : `${b}|${a}`
-}
-
-function resolveLaneScopeKey(fromAreaId?: string, toAreaId?: string) {
-  if (!fromAreaId && !toAreaId) return 'global'
-  if (!fromAreaId || !toAreaId) return `edge:${fromAreaId || toAreaId}`
-  if (fromAreaId === toAreaId) return `intra:${fromAreaId}`
-  return `inter:${buildAreaPairKey(fromAreaId, toAreaId)}`
-}
+// --- Peer purpose detection ---
 
 function resolvePeerPurposeKind(
   purpose: string,
@@ -140,6 +73,8 @@ function resolvePeerPurposeKind(
   if (key === 'HA' || key.includes('HIGH-AVAILABILITY') || key.includes('HIGH_AVAILABILITY')) return 'ha'
   return null
 }
+
+// --- Path helpers ---
 
 function simplifyPath(path: Point[]) {
   if (path.length <= 2) return path
@@ -176,39 +111,6 @@ function toPointsArray(path: Point[]) {
   return points
 }
 
-function manhattanDistance(a: Point, b: Point) {
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
-}
-
-function pathDistance(path: Point[]) {
-  if (path.length <= 1) return 0
-  let total = 0
-  for (let i = 1; i < path.length; i += 1) {
-    total += manhattanDistance(path[i - 1], path[i])
-  }
-  return total
-}
-
-function isDetourAcceptable(
-  path: Point[],
-  start: Point,
-  end: Point,
-  scale: number,
-  mode: 'normal' | 'boundary' = 'normal'
-) {
-  const direct = Math.max(manhattanDistance(start, end), 1)
-  const traveled = pathDistance(path)
-  const extra = traveled - direct
-  if (mode === 'boundary') {
-    const ratioLimit = 2.2
-    const extraLimit = Math.max(160 * scale, direct * 0.95)
-    return traveled <= direct * ratioLimit && extra <= extraLimit
-  }
-  const ratioLimit = 2.8
-  const extraLimit = Math.max(260 * scale, direct * 1.35)
-  return traveled <= direct * ratioLimit && extra <= extraLimit
-}
-
 function pathBlocked(path: Point[], obstacles: Rect[], clearance: number) {
   for (let i = 1; i < path.length; i += 1) {
     const a = path[i - 1]
@@ -217,6 +119,8 @@ function pathBlocked(path: Point[], obstacles: Rect[], clearance: number) {
   }
   return false
 }
+
+// --- Routing strategies ---
 
 function findUShapePath(start: Point, end: Point, obstacles: Rect[], clearance: number, preferAxis: 'x' | 'y'): Point[] | null {
   if (!obstacles.length) return null
@@ -267,8 +171,7 @@ function buildBoundaryEscapePath(
   end: Point,
   obstacles: Rect[],
   clearance: number,
-  preferAxis: 'x' | 'y',
-  scale: number
+  preferAxis: 'x' | 'y'
 ) {
   if (!obstacles.length) return null
   const windowPad = Math.max(clearance * 12, 180)
@@ -313,47 +216,43 @@ function buildBoundaryEscapePath(
           simplifyPath([start, { x: start.x, y: bottomY }, { x: end.x, y: bottomY }, end]),
         ]
     for (const candidate of candidates) {
-      if (!pathBlocked(candidate, obstacles, clearance) && isDetourAcceptable(candidate, start, end, scale, 'boundary')) {
-        return candidate
-      }
+      if (!pathBlocked(candidate, obstacles, clearance)) return candidate
     }
   }
   return null
 }
 
-function buildOrthPath(
-  start: Point,
-  end: Point,
-  obstacles: Rect[],
-  clearance: number,
-  preferAxis: 'x' | 'y',
-  scale: number
-): Point[] | null {
+// Pipeline: connectOrthogonal → L-shapes → U-shape → per-obstacle → boundary escape → forced L-shape
+// Luôn trả path (không bao giờ null/diagonal).
+function buildOrthPath(start: Point, end: Point, obstacles: Rect[], clearance: number, preferAxis: 'x' | 'y') {
+  // 1. connectOrthogonal (2 L-shapes with obstacle check)
   const orth = connectOrthogonal(start, end, obstacles, clearance, preferAxis)
   if (orth && orth.length >= 2) {
     const candidate = simplifyPath(orth)
-    if (!pathBlocked(candidate, obstacles, clearance) && isDetourAcceptable(candidate, start, end, scale)) return candidate
+    if (!pathBlocked(candidate, obstacles, clearance)) return candidate
   }
 
+  // 2. L-shape preferred axis
   const midpoint = preferAxis === 'x'
     ? { x: end.x, y: start.y }
     : { x: start.x, y: end.y }
   const fallback = simplifyPath([start, midpoint, end])
-  if (!pathBlocked(fallback, obstacles, clearance) && isDetourAcceptable(fallback, start, end, scale)) return fallback
+  if (!pathBlocked(fallback, obstacles, clearance)) return fallback
 
+  // 3. L-shape alternate axis
   const altMid = preferAxis === 'x'
     ? { x: start.x, y: end.y }
     : { x: end.x, y: start.y }
   const alt = simplifyPath([start, altMid, end])
-  if (!pathBlocked(alt, obstacles, clearance) && isDetourAcceptable(alt, start, end, scale)) return alt
+  if (!pathBlocked(alt, obstacles, clearance)) return alt
 
-  // U-shape: đi vòng qua obstacles (chỉ tính bounding box, O(n))
+  // 4. U-shape (bounding box of relevant obstacles)
   const uPath = findUShapePath(start, end, obstacles, clearance, preferAxis)
-  if (uPath && isDetourAcceptable(uPath, start, end, scale)) return uPath
+  if (uPath) return uPath
   const uPathAlt = findUShapePath(start, end, obstacles, clearance, preferAxis === 'x' ? 'y' : 'x')
-  if (uPathAlt && isDetourAcceptable(uPathAlt, start, end, scale)) return uPathAlt
+  if (uPathAlt) return uPathAlt
 
-  // Per-obstacle: thử đi vòng từng obstacle chặn đường (tránh bounding box toàn cục quá rộng)
+  // 5. Per-obstacle avoidance (4 directions around each blocking obstacle)
   const avoidGap = Math.max(clearance, 12)
   for (const obs of obstacles) {
     if (!segmentIntersectsRect(start, end, obs, clearance)) continue
@@ -363,15 +262,19 @@ function buildOrthPath(
       simplifyPath([start, { x: start.x, y: obs.y + obs.height + avoidGap }, { x: end.x, y: obs.y + obs.height + avoidGap }, end]),
       simplifyPath([start, { x: start.x, y: obs.y - avoidGap }, { x: end.x, y: obs.y - avoidGap }, end]),
     ]) {
-      if (!pathBlocked(p, obstacles, clearance) && isDetourAcceptable(p, start, end, scale)) return p
+      if (!pathBlocked(p, obstacles, clearance)) return p
     }
   }
 
-  const escaped = buildBoundaryEscapePath(start, end, obstacles, clearance, preferAxis, scale)
+  // 6. Boundary escape (increasing padding around obstacle bounds)
+  const escaped = buildBoundaryEscapePath(start, end, obstacles, clearance, preferAxis)
   if (escaped) return escaped
 
-  return null
+  // 7. Forced orthogonal (never diagonal, never null)
+  return simplifyPath([start, midpoint, end])
 }
+
+// --- Peer lane ---
 
 function resolvePeerLaneY(
   fromSide: ExitSide,
@@ -396,6 +299,8 @@ function resolvePeerLaneY(
   return (fromCenter.y + toCenter.y) / 2 + laneOffset
 }
 
+// --- Inter-area routing ---
+
 function buildInterAreaPath(
   fromAnchor: Point,
   toAnchor: Point,
@@ -407,8 +312,7 @@ function buildInterAreaPath(
   laneGap: number,
   obstacles: Rect[],
   clearance: number,
-  scale: number,
-): Point[] | null {
+) {
   const laneOffset = lane && lane.total > 1
     ? (lane.index - (lane.total - 1) / 2) * laneGap
     : 0
@@ -420,99 +324,29 @@ function buildInterAreaPath(
   if (useVerticalCorridor) {
     const corridorX = (fromBase.x + toBase.x) / 2 + laneOffset
     const candidate = simplifyPath([
-      fromAnchor,
-      fromBase,
+      fromAnchor, fromBase,
       { x: corridorX, y: fromBase.y },
       { x: corridorX, y: toBase.y },
-      toBase,
-      toAnchor,
+      toBase, toAnchor,
     ])
     if (!pathBlocked(candidate, obstacles, clearance)) return candidate
-    const orth = buildOrthPath(fromBase, toBase, obstacles, clearance, 'x', scale)
-    if (orth) return simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
-    const orthAlt = buildOrthPath(fromBase, toBase, obstacles, clearance, 'y', scale)
-    if (orthAlt) return simplifyPath([fromAnchor, fromBase, ...orthAlt, toBase, toAnchor])
-    return null
+    const orth = buildOrthPath(fromBase, toBase, obstacles, clearance, 'x')
+    return simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
   }
 
   const corridorY = (fromBase.y + toBase.y) / 2 + laneOffset
   const candidate = simplifyPath([
-    fromAnchor,
-    fromBase,
+    fromAnchor, fromBase,
     { x: fromBase.x, y: corridorY },
     { x: toBase.x, y: corridorY },
-    toBase,
-    toAnchor,
+    toBase, toAnchor,
   ])
   if (!pathBlocked(candidate, obstacles, clearance)) return candidate
-  const orth = buildOrthPath(fromBase, toBase, obstacles, clearance, 'y', scale)
-  if (orth) return simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
-  const orthAlt = buildOrthPath(fromBase, toBase, obstacles, clearance, 'x', scale)
-  if (orthAlt) return simplifyPath([fromAnchor, fromBase, ...orthAlt, toBase, toAnchor])
-  return null
+  const orth = buildOrthPath(fromBase, toBase, obstacles, clearance, 'y')
+  return simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
 }
 
-function buildDirectIntraPath(
-  fromAnchor: Point,
-  toAnchor: Point,
-  fromBase: Point,
-  toBase: Point,
-  obstacles: Rect[],
-  clearance: number,
-  preferAxis: 'x' | 'y'
-) {
-  const orth = connectOrthogonal(fromBase, toBase, obstacles, clearance, preferAxis)
-  if (!orth || orth.length < 2) return null
-  const candidate = simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
-  if (pathBlocked(candidate, obstacles, clearance)) return null
-  return candidate
-}
-
-function buildDirectAnchorPath(
-  fromAnchor: Point,
-  toAnchor: Point,
-  obstacles: Rect[],
-  clearance: number
-) {
-  const direct = simplifyPath([fromAnchor, toAnchor])
-  if (pathBlocked(direct, obstacles, clearance)) return null
-  return direct
-}
-
-function buildShiftBridge(
-  base: Point,
-  preferAxis: 'x' | 'y',
-  stemOffset: number,
-  bundleOffset: number
-) {
-  const points: Point[] = []
-  let cursor: Point = { x: base.x, y: base.y }
-
-  if (preferAxis === 'x') {
-    if (Math.abs(stemOffset) > 0.01) {
-      cursor = { x: cursor.x + stemOffset, y: cursor.y }
-      points.push(cursor)
-    }
-    if (Math.abs(bundleOffset) > 0.01) {
-      cursor = { x: cursor.x, y: cursor.y + bundleOffset }
-      points.push(cursor)
-    }
-  } else {
-    if (Math.abs(stemOffset) > 0.01) {
-      cursor = { x: cursor.x, y: cursor.y + stemOffset }
-      points.push(cursor)
-    }
-    if (Math.abs(bundleOffset) > 0.01) {
-      cursor = { x: cursor.x + bundleOffset, y: cursor.y }
-      points.push(cursor)
-    }
-  }
-
-  return {
-    shifted: cursor,
-    bridge: points,
-  }
-}
+// --- Main ---
 
 export function routeLinks(
   linkMetas: Array<LinkMeta | null>,
@@ -531,6 +365,7 @@ export function routeLinks(
   } = ctx
   const clearance = Math.max(rawClearance, 2)
 
+  // --- Pre-pass: resolve anchors + build fan rank (1 hệ thống duy nhất) ---
   const resolvedAnchorsByLink = new Map<string, {
     fromAnchor: { x: number; y: number; side: ExitSide }
     toAnchor: { x: number; y: number; side: ExitSide }
@@ -540,26 +375,21 @@ export function routeLinks(
     endpoint: LinkEndpoint
     order: number
   }>>()
-  const pushFanEntry = (
-    deviceId: string,
-    side: ExitSide,
-    linkId: string,
-    endpoint: LinkEndpoint,
-    order: number
-  ) => {
-    const key = fanGroupKey(deviceId, side)
-    const list = fanGroups.get(key) || []
-    list.push({ linkId, endpoint, order })
-    fanGroups.set(key, list)
-  }
 
   linkMetas.forEach(meta => {
     if (!meta) return
     const fromAnchor = { ...meta.fromAnchor, side: (meta.fromAnchor.side || computeSide(meta.fromView, meta.toCenter)) as ExitSide }
     const toAnchor = { ...meta.toAnchor, side: (meta.toAnchor.side || computeSide(meta.toView, meta.fromCenter)) as ExitSide }
     resolvedAnchorsByLink.set(meta.link.id, { fromAnchor, toAnchor })
-    pushFanEntry(meta.link.fromDeviceId, fromAnchor.side, meta.link.id, 'from', fanAxisOrder(fromAnchor))
-    pushFanEntry(meta.link.toDeviceId, toAnchor.side, meta.link.id, 'to', fanAxisOrder(toAnchor))
+
+    const pushFan = (deviceId: string, side: ExitSide, linkId: string, endpoint: LinkEndpoint, order: number) => {
+      const key = fanGroupKey(deviceId, side)
+      const list = fanGroups.get(key) || []
+      list.push({ linkId, endpoint, order })
+      fanGroups.set(key, list)
+    }
+    pushFan(meta.link.fromDeviceId, fromAnchor.side, meta.link.id, 'from', fanAxisOrder(fromAnchor))
+    pushFan(meta.link.toDeviceId, toAnchor.side, meta.link.id, 'to', fanAxisOrder(toAnchor))
   })
 
   const fanRankByEndpoint = new Map<string, FanRank>()
@@ -571,70 +401,7 @@ export function routeLinks(
     })
   })
 
-  const globalLaneBucket = Math.max(14, (renderTuning.bundle_gap ?? 0) * scale * GLOBAL_LANE_BUCKET_FACTOR)
-  const globalLaneGroups = new Map<string, Array<{ linkId: string; order: number }>>()
-  linkMetas.forEach(meta => {
-    if (!meta) return
-    const anchors = resolvedAnchorsByLink.get(meta.link.id)
-    if (!anchors) return
-    const axis: 'x' | 'y' = Math.abs(meta.toCenter.x - meta.fromCenter.x) >= Math.abs(meta.toCenter.y - meta.fromCenter.y) ? 'x' : 'y'
-    const primary = axis === 'x'
-      ? (anchors.fromAnchor.y + anchors.toAnchor.y) / 2
-      : (anchors.fromAnchor.x + anchors.toAnchor.x) / 2
-    const order = axis === 'x'
-      ? (anchors.fromAnchor.x + anchors.toAnchor.x) / 2
-      : (anchors.fromAnchor.y + anchors.toAnchor.y) / 2
-    const scope = resolveLaneScopeKey(meta.fromAreaId || undefined, meta.toAreaId || undefined)
-    const key = `${scope}|${axis}|${Math.round(primary / globalLaneBucket)}`
-    const list = globalLaneGroups.get(key) || []
-    list.push({ linkId: meta.link.id, order })
-    globalLaneGroups.set(key, list)
-  })
-  const globalLaneRankByLink = new Map<string, FanRank>()
-  globalLaneGroups.forEach(entries => {
-    entries.sort((a, b) => a.order - b.order || a.linkId.localeCompare(b.linkId))
-    const total = entries.length
-    entries.forEach((entry, index) => {
-      globalLaneRankByLink.set(entry.linkId, { index, total })
-    })
-  })
-
-  const globalStemGroups = new Map<string, Array<{ linkId: string; endpoint: LinkEndpoint; order: number }>>()
-  const pushGlobalStemEntry = (
-    linkId: string,
-    endpoint: LinkEndpoint,
-    side: ExitSide,
-    anchor: { x: number; y: number },
-    areaId?: string
-  ) => {
-    const isVerticalStem = side === 'top' || side === 'bottom'
-    const bucketBase = isVerticalStem ? GLOBAL_STEM_BUCKET_BASE_X : GLOBAL_STEM_BUCKET_BASE_Y
-    const stemBucket = Math.max(10, bucketBase * scale)
-    const primary = isVerticalStem ? anchor.x : anchor.y
-    const order = isVerticalStem ? anchor.y : anchor.x
-    const scope = areaId ? `area:${areaId}` : 'area:global'
-    const axis = isVerticalStem ? 'v' : 'h'
-    const key = `${scope}|${axis}|${Math.round(primary / stemBucket)}`
-    const list = globalStemGroups.get(key) || []
-    list.push({ linkId, endpoint, order })
-    globalStemGroups.set(key, list)
-  }
-  linkMetas.forEach(meta => {
-    if (!meta) return
-    const anchors = resolvedAnchorsByLink.get(meta.link.id)
-    if (!anchors) return
-    pushGlobalStemEntry(meta.link.id, 'from', anchors.fromAnchor.side, anchors.fromAnchor, meta.fromAreaId || undefined)
-    pushGlobalStemEntry(meta.link.id, 'to', anchors.toAnchor.side, anchors.toAnchor, meta.toAreaId || undefined)
-  })
-  const globalStemRankByEndpoint = new Map<string, FanRank>()
-  globalStemGroups.forEach(entries => {
-    entries.sort((a, b) => a.order - b.order || a.linkId.localeCompare(b.linkId) || a.endpoint.localeCompare(b.endpoint))
-    const total = entries.length
-    entries.forEach((entry, index) => {
-      globalStemRankByEndpoint.set(fanEndpointKey(entry.linkId, entry.endpoint), { index, total })
-    })
-  })
-
+  // --- Per-link routing ---
   const links = linkMetas
     .map(meta => {
       if (!meta) return null
@@ -662,6 +429,7 @@ export function routeLinks(
       const isIntraArea = !!(fromAreaId && toAreaId && fromAreaId === toAreaId)
       const isInterArea = !!(fromAreaId && toAreaId && fromAreaId !== toAreaId)
 
+      // --- Stub distance + fan (tách link adjacent ports) ---
       const labelScale = clamp(scale, 0.6, 1.15)
       const labelInset = Math.max(2, Math.round(6 * labelScale))
       const labelOffset = (renderTuning.port_label_offset ?? 0) * labelScale
@@ -678,25 +446,14 @@ export function routeLinks(
 
       const baseStub = Math.max(renderTuning.bundle_stub ?? 0, renderTuning.area_clearance ?? 0) * scale
       const fanSpread = FAN_SPREAD_BASE * scale
-      // Fan-out theo rank endpoint active trên từng cạnh device để ổn định khi device rộng/hẹp khác nhau.
-      let fromFan = resolveFanDistance(fanRankByEndpoint.get(fanEndpointKey(link.id, 'from')), fanSpread)
-      let toFan = resolveFanDistance(fanRankByEndpoint.get(fanEndpointKey(link.id, 'to')), fanSpread)
-      const isShortSameSideLink = isL1View &&
-        isIntraArea &&
-        fromAnchor.side === toAnchor.side &&
-        Math.hypot(toAnchor.x - fromAnchor.x, toAnchor.y - fromAnchor.y) <= 220 * scale
-      if (isShortSameSideLink) {
-        const sharedFan = (fromFan + toFan) / 2
-        fromFan = sharedFan
-        toFan = sharedFan
-      }
+      const fromFan = resolveFanDistance(fanRankByEndpoint.get(fanEndpointKey(link.id, 'from')), fanSpread)
+      const toFan = resolveFanDistance(fanRankByEndpoint.get(fanEndpointKey(link.id, 'to')), fanSpread)
       const fromStubDistance = Math.max(baseStub, fromLabelStub, minPortTurnDistance) + fromFan
       const toStubDistance = Math.max(baseStub, toLabelStub, minPortTurnDistance) + toFan
       const fromBase = offsetFromAnchor(fromAnchor, fromStubDistance)
       const toBase = offsetFromAnchor(toAnchor, toStubDistance)
 
-      // selfInset = clearance + 1 đảm bảo anchor trên cạnh device luôn nằm
-      // ngoài vùng (insetRect ± clearance), nên dùng chung 1 list cho cả routing và pathBlocked.
+      // --- Obstacles (self device inset) ---
       const selfInset = Math.max(clearance + 1, 4)
       const obstacles: Rect[] = []
       deviceRects.forEach(({ id, rect }) => {
@@ -720,172 +477,88 @@ export function routeLinks(
         })
       }
 
-      let path: Point[] | null = null
+      // --- Bundle offset (cùng cặp device → tách đường) ---
       const preferAxis: 'x' | 'y' = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
       const bundle = linkBundleIndex.get(link.id)
-      const bundleTotal = bundle?.total ?? 1
-      const isHorizontalPair = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y)
-      const sameSide = fromAnchor.side === toAnchor.side
-      const isTopBottomSidePair = (fromAnchor.side === 'top' || fromAnchor.side === 'bottom')
-        && (toAnchor.side === 'top' || toAnchor.side === 'bottom')
-      const canTryDirectIntra = isL1View && isIntraArea && isHorizontalPair && sameSide && isTopBottomSidePair
-      if (canTryDirectIntra && (peerPurpose !== null || bundleTotal <= 2)) {
-        const areAnchorsAlignedY = Math.abs(fromAnchor.y - toAnchor.y) <= Math.max(1, scale)
-        if (areAnchorsAlignedY) {
-          const anchorPath = buildDirectAnchorPath(
-            { x: fromAnchor.x, y: fromAnchor.y },
-            { x: toAnchor.x, y: toAnchor.y },
-            obstacles,
-            clearance
-          )
-          if (anchorPath) path = anchorPath
-        }
-        if (!path?.length) {
-          const directIntraPath = buildDirectIntraPath(
-            { x: fromAnchor.x, y: fromAnchor.y },
-            { x: toAnchor.x, y: toAnchor.y },
-            fromBase,
-            toBase,
-            obstacles,
-            clearance,
-            preferAxis
-          )
-          if (directIntraPath) path = directIntraPath
-        }
-      }
+      const bundleGap = Math.max(8, (renderTuning.bundle_gap ?? 0) * scale * 0.9)
+      const bundleOffset = bundle && bundle.total > 1
+        ? (bundle.index - (bundle.total - 1) / 2) * bundleGap
+        : 0
 
-      if (!path?.length && isL1View && peerPurpose && isIntraArea) {
-        const laneY = resolvePeerLaneY(fromAnchor.side as ExitSide, toAnchor.side as ExitSide, fromBase, toBase, fromCenter, toCenter, peerPurpose, scale)
+      const fromShifted: Point = preferAxis === 'x'
+        ? { x: fromBase.x, y: fromBase.y + bundleOffset }
+        : { x: fromBase.x + bundleOffset, y: fromBase.y }
+      const toShifted: Point = preferAxis === 'x'
+        ? { x: toBase.x, y: toBase.y + bundleOffset }
+        : { x: toBase.x + bundleOffset, y: toBase.y }
+
+      // --- Route: mọi nhánh đều dùng shifted points (giữ spacing đồng nhất) ---
+      let path: Point[] = []
+
+      // 1. Peer purpose (intra-area HA/stack/hsrp)
+      if (isL1View && peerPurpose && isIntraArea) {
+        const laneY = resolvePeerLaneY(
+          fromAnchor.side as ExitSide, toAnchor.side as ExitSide,
+          fromShifted, toShifted, fromCenter, toCenter, peerPurpose, scale
+        )
         const peerPath = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
-          { x: fromBase.x, y: fromBase.y },
-          { x: fromBase.x, y: laneY },
-          { x: toBase.x, y: laneY },
-          { x: toBase.x, y: toBase.y },
+          { x: fromShifted.x, y: fromShifted.y },
+          { x: fromShifted.x, y: laneY },
+          { x: toShifted.x, y: laneY },
+          { x: toShifted.x, y: toShifted.y },
           { x: toAnchor.x, y: toAnchor.y },
         ])
-
         if (!pathBlocked(peerPath, obstacles, clearance)) path = peerPath
       }
 
-      if (!path?.length) {
-        const bundleGapBase = Math.max(BUNDLE_OFFSET_MIN, (renderTuning.bundle_gap ?? 0) * scale * BUNDLE_OFFSET_FACTOR)
-        const axisBundleGap = preferAxis === 'y'
-          ? Math.max(bundleGapBase * 2.2, 18 * scale)
-          : Math.max(bundleGapBase * 1.35, 13 * scale)
-        const pairBundleOffset = bundle && bundle.total > 1
-          ? (bundle.index - (bundle.total - 1) / 2) * axisBundleGap
-          : 0
-        const globalLaneOffset = isL1View
-          ? resolveGlobalLaneOffset(globalLaneRankByLink.get(link.id), preferAxis, scale, renderTuning)
-          : 0
-        const bundleLimit = preferAxis === 'y'
-          ? Math.max(20, GLOBAL_LANE_LIMIT_Y * scale)
-          : Math.max(18, GLOBAL_LANE_LIMIT_X * scale)
-        const baseBundleOffset = clamp(
-          pairBundleOffset + globalLaneOffset,
-          -bundleLimit,
-          bundleLimit
+      // 2. Inter-area routing
+      if (!path.length && isL1View && isInterArea) {
+        const interLaneGap = Math.max(10, (renderTuning.bundle_gap ?? 0) * scale * 1.6)
+        path = buildInterAreaPath(
+          { x: fromAnchor.x, y: fromAnchor.y },
+          { x: toAnchor.x, y: toAnchor.y },
+          fromShifted,
+          toShifted,
+          fromCenter,
+          toCenter,
+          laneIndex.get(link.id),
+          interLaneGap,
+          obstacles,
+          clearance,
         )
-        const baseFromStemOffset = clamp(
-          resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'from')), scale)
-          + resolveGlobalStemOffset(globalStemRankByEndpoint.get(fanEndpointKey(link.id, 'from')), fromAnchor.side, scale),
-          -Math.max(12, 26 * scale),
-          Math.max(12, 26 * scale)
-        )
-        const baseToStemOffset = clamp(
-          resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'to')), scale)
-          + resolveGlobalStemOffset(globalStemRankByEndpoint.get(fanEndpointKey(link.id, 'to')), toAnchor.side, scale),
-          -Math.max(12, 26 * scale),
-          Math.max(12, 26 * scale)
-        )
-
-        const offsetScales = isL1View ? OFFSET_REDUCE_STEPS : [1]
-        for (const offsetScale of offsetScales) {
-          let candidate: Point[] | null = null
-          if (isL1View && isInterArea) {
-            const interLaneGap = Math.max(12, (renderTuning.bundle_gap ?? 0) * scale * 1.9)
-            const scaledInterLaneGap = Math.max(8 * scale, interLaneGap * (0.45 + offsetScale * 0.55))
-            candidate = buildInterAreaPath(
-              { x: fromAnchor.x, y: fromAnchor.y },
-              { x: toAnchor.x, y: toAnchor.y },
-              fromBase,
-              toBase,
-              fromCenter,
-              toCenter,
-              laneIndex.get(link.id),
-              scaledInterLaneGap,
-              obstacles,
-              clearance,
-              scale,
-            )
-          } else {
-            const fromShift = buildShiftBridge(
-              fromBase,
-              preferAxis,
-              baseFromStemOffset * offsetScale,
-              baseBundleOffset * offsetScale
-            )
-            const toShift = buildShiftBridge(
-              toBase,
-              preferAxis,
-              baseToStemOffset * offsetScale,
-              baseBundleOffset * offsetScale
-            )
-            const orth = buildOrthPath(fromShift.shifted, toShift.shifted, obstacles, clearance, preferAxis, scale)
-            if (orth) {
-              candidate = simplifyPath([
-                { x: fromAnchor.x, y: fromAnchor.y },
-                { x: fromBase.x, y: fromBase.y },
-                ...fromShift.bridge,
-                ...orth,
-                ...toShift.bridge.slice(0, -1).reverse(),
-                { x: toBase.x, y: toBase.y },
-                { x: toAnchor.x, y: toAnchor.y },
-              ])
-            }
-          }
-          if (!candidate?.length) continue
-          if (pathBlocked(candidate, obstacles, clearance)) continue
-          path = candidate
-          break
-        }
-
-        if (!path?.length) {
-          const fallback = buildOrthPath(
-            { x: fromBase.x, y: fromBase.y },
-            { x: toBase.x, y: toBase.y },
-            obstacles,
-            clearance,
-            preferAxis === 'x' ? 'y' : 'x',
-            scale
-          )
-          if (fallback) {
-            path = simplifyPath([
-              { x: fromAnchor.x, y: fromAnchor.y },
-              { x: fromBase.x, y: fromBase.y },
-              ...fallback,
-              { x: toBase.x, y: toBase.y },
-              { x: toAnchor.x, y: toAnchor.y },
-            ])
-          } else {
-            const anchorFallback = buildOrthPath(
-              { x: fromAnchor.x, y: fromAnchor.y },
-              { x: toAnchor.x, y: toAnchor.y },
-              obstacles,
-              clearance,
-              preferAxis,
-              scale
-            )
-            path = anchorFallback ? simplifyPath(anchorFallback) : null
-          }
-        }
       }
 
-      if (!path?.length || pathBlocked(path, obstacles, clearance)) {
-        return null
+      // 3. General orthogonal routing (with bundle offset)
+      if (!path.length) {
+        const orth = buildOrthPath(fromShifted, toShifted, obstacles, clearance, preferAxis)
+        path = simplifyPath([
+          { x: fromAnchor.x, y: fromAnchor.y },
+          { x: fromBase.x, y: fromBase.y },
+          ...orth,
+          { x: toBase.x, y: toBase.y },
+          { x: toAnchor.x, y: toAnchor.y },
+        ])
       }
 
+      // 4. Fallback alternate axis (vẫn giữ fromBase/toBase → giữ fan spacing)
+      if (pathBlocked(path, obstacles, clearance)) {
+        const fallback = buildOrthPath(
+          { x: fromBase.x, y: fromBase.y },
+          { x: toBase.x, y: toBase.y },
+          obstacles, clearance,
+          preferAxis === 'x' ? 'y' : 'x'
+        )
+        path = simplifyPath([
+          { x: fromAnchor.x, y: fromAnchor.y },
+          { x: fromBase.x, y: fromBase.y },
+          ...fallback,
+          { x: toBase.x, y: toBase.y },
+          { x: toAnchor.x, y: toAnchor.y },
+        ])
+      }
+
+      // --- Render ---
       const points = toPointsArray(path)
       if (points.length < 4) return null
       const neutralL1Purposes = new Set(['', 'DEFAULT', 'LAN'])

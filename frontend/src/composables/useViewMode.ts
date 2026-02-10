@@ -1,25 +1,10 @@
 import { computed, ref, type Ref } from 'vue'
 import { getToken } from '../services/api'
+import type { L2AssignmentRecord, L3AddressRecord } from '../models/types'
+
+export type { L2AssignmentRecord, L3AddressRecord }
 
 export type ViewMode = 'L1' | 'L2' | 'L3'
-
-export type L2AssignmentRecord = {
-  id: string
-  device_id: string
-  device_name?: string | null
-  interface_name: string
-  vlan_id?: number | null
-  port_mode: 'access' | 'trunk'
-}
-
-export type L3AddressRecord = {
-  id: string
-  device_id: string
-  device_name?: string | null
-  interface_name: string
-  ip_address: string
-  prefix_length: number
-}
 
 export function useViewMode(
   selectedProjectId: Ref<string | null>,

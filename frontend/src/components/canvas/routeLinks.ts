@@ -304,8 +304,16 @@ export function routeLinks(
         : 0
 
       const baseStub = Math.max(renderTuning.bundle_stub ?? 0, renderTuning.area_clearance ?? 0) * scale
-      const fromStubDistance = Math.max(baseStub, fromLabelStub, minPortTurnDistance)
-      const toStubDistance = Math.max(baseStub, toLabelStub, minPortTurnDistance)
+      // Fan-out: normalize vị trí port theo device width (0→1) × spread cố định → tách đường
+      const fanSpread = 18 * scale
+      const fromFan = (fromAnchor.side === 'bottom' || fromAnchor.side === 'top')
+        ? (fromView.width > 0 ? (fromAnchor.x - fromView.x) / fromView.width : 0) * fanSpread
+        : (fromView.height > 0 ? (fromAnchor.y - fromView.y) / fromView.height : 0) * fanSpread
+      const toFan = (toAnchor.side === 'bottom' || toAnchor.side === 'top')
+        ? (toView.width > 0 ? (toAnchor.x - toView.x) / toView.width : 0) * fanSpread
+        : (toView.height > 0 ? (toAnchor.y - toView.y) / toView.height : 0) * fanSpread
+      const fromStubDistance = Math.max(baseStub, fromLabelStub, minPortTurnDistance) + fromFan
+      const toStubDistance = Math.max(baseStub, toLabelStub, minPortTurnDistance) + toFan
       const fromBase = offsetFromAnchor(fromAnchor, fromStubDistance)
       const toBase = offsetFromAnchor(toAnchor, toStubDistance)
 

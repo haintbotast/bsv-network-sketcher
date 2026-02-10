@@ -26,6 +26,7 @@
 - **endpoint_anchor_alignment_policy:** endpoint của link L1 phải bám đúng anchor ô port (không dời anchor để tách lane).
 - **port_cell_center_alignment_policy:** với port band top/bottom, tọa độ anchor X của link phải trùng tâm ô port render (sai số <= 1px).
 - **l1_auto_side_stability_policy:** auto-pass L1 không tự ép `left/right`; side tự động chỉ dùng `top/bottom` khi không có override thủ công.
+- **l1_override_side_normalization_policy:** với L1, override side phải đồng bộ với port band (`top` giữ nguyên, `left/right/bottom` chuẩn hóa về `bottom`) để tránh lệch anchor và điểm xuất phát link.
 - **l1_no_object_crossing_policy:** tuyến L1 sau chuẩn hóa orthogonal không được xuyên qua device/area không liên quan.
 - **port_turn_clearance_policy:** điểm rẽ đầu tiên của link L1 phải cách port band đủ xa để không dính nhãn port.
 - **l1_stub_fan_rank_policy:** fan-out đoạn stub phải dựa trên rank endpoint active theo `(device, side)`, không phụ thuộc trực tiếp vào bề rộng/cao device.
@@ -34,6 +35,7 @@
 - **l1_vertical_pair_routing_policy:** với cặp nội‑area xếp dọc trên‑dưới, routing không ép theo rule direct ngang; phải giữ tuyến orthogonal dọc dễ đọc.
 - **l1_vertical_bundle_separation_policy:** với bundle ưu tiên trục dọc, khoảng tách lane phải được tăng so với trục ngang để giảm chồng đoạn đứng.
 - **l1_stem_deoverlap_policy:** sau stub rời port, router phải cho phép lệch nhỏ theo rank endpoint để giảm hiện tượng các đoạn đứng/đoạn ngang dính sát nhau.
+- **l1_global_lane_allocator_policy:** ngoài bundle theo cặp thiết bị, router phải có phân bổ lane toàn cục theo hành lang để giảm chồng tuyến ngang/dọc giữa các cặp link khác nhau.
 - **l1_no_edge_hugging_policy:** segment link chạy trùng mép object (colinear với cạnh rect trong clearance) phải bị coi là va chạm và được reroute.
 - **l1_port_exit_orthogonality_policy:** khi dịch tách lane sau stub, tuyến phải giữ các đoạn orthogonal tuần tự, không xuất hiện segment chéo ngay sau port.
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
@@ -284,6 +286,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Endpoint anchor alignment: endpoint link L1 trùng anchor port-cell tương ứng (sai số render <= 1px), lane separation bắt đầu sau stub.
 - [ ] Port-cell center alignment: với device có port dài/ngắn khác nhau, điểm xuất phát link vẫn trùng tâm ô port tương ứng (không lệch sang khe giữa ô).
 - [ ] L1 auto-side stability: khi không có override thủ công, auto anchor không phát sinh side `left/right`.
+- [ ] L1 override side normalization: nếu dữ liệu override `left/right` ở L1 thì anchor render/routing vẫn bám side chuẩn hóa của port band, không tạo đoạn lệch/chéo ngay tại port.
 - [ ] L1 no-object crossing: link sau chuẩn hóa orthogonal không xuyên device/area không liên quan trong các cụm dày.
 - [ ] Port turn clearance: điểm rẽ đầu tiên không dính sát port band/label ở scale 1x (đạt khoảng cách tối thiểu theo profile tuning).
 - [ ] Stub fan rank: endpoint active cùng `(device, side)` được tách fan theo thứ tự ổn định; spread fan không vượt ngưỡng style tại scale hiện hành.
@@ -292,6 +295,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Vertical pair routing: cặp xếp dọc trên‑dưới không dùng rule direct ngang; tuyến giữ dạng orthogonal dọc nhất quán.
 - [ ] Vertical bundle separation: cụm link ưu tiên trục dọc không bị dính/chồng đoạn đứng khi số link tăng.
 - [ ] Stem de-overlap: với cụm port dày, các đoạn đứng rời port và đoạn chuyển tiếp không còn đè lên nhau thành một nét.
+- [ ] Global lane allocator: các tuyến song song khác cặp thiết bị vẫn được tách lane ổn định (không dồn thành một dải ngang/dọc duy nhất).
 - [ ] No edge-hugging: link không bám trùng mép trái/phải/top/bottom của object trong các ca dense routing.
 - [ ] Port exit orthogonality: sau điểm rời port/stub không có đoạn chéo; chỉ có chuỗi bước ngang/dọc.
 - [ ] Port embedded render: port label hiển thị trong object theo dải top/bottom, không còn nhãn port nổi trên link ở view L1.

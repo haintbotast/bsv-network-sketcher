@@ -397,5 +397,5 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 - Quy tắc side của port:
   - `top`: ưu tiên uplink/peer-control.
   - `bottom`: ưu tiên downlink.
-  - `left/right`: chỉ dùng khi cần bám hình học đặc thù hoặc người dùng override.
-- Khi render L1, nếu có xung đột giữa khai báo port và anchor override thủ công: **anchor override** có ưu tiên cao hơn.
+  - `left/right`: dùng cho dữ liệu tham chiếu hoặc view không phải L1; trong L1 được chuẩn hóa về `bottom`.
+- Khi render L1, nếu có xung đột giữa khai báo port và anchor override thủ công: **anchor override** vẫn ưu tiên, nhưng đi qua quy tắc chuẩn hóa side của L1.

@@ -6,7 +6,7 @@ import {
   segmentIntersectsRect,
 } from './linkRoutingUtils'
 import { resolveLinkPurposeColor } from '../../composables/canvasConstants'
-import { connectOrthogonal } from '../../utils/link_routing'
+import { buildGridSpec, connectOrthogonal, routeOrthogonalPath } from '../../utils/link_routing'
 
 export type RouteLinksParams = {
   isL1View: boolean
@@ -271,6 +271,47 @@ function buildBoundaryEscapePath(
   return null
 }
 
+function buildGridRescuePath(
+  start: Point,
+  end: Point,
+  obstacles: Rect[],
+  clearance: number,
+  preferAxis: 'x' | 'y'
+) {
+  const boundsPad = Math.max(clearance * 2, 80)
+  let minX = Math.min(start.x, end.x) - boundsPad
+  let maxX = Math.max(start.x, end.x) + boundsPad
+  let minY = Math.min(start.y, end.y) - boundsPad
+  let maxY = Math.max(start.y, end.y) + boundsPad
+
+  obstacles.forEach(rect => {
+    minX = Math.min(minX, rect.x - boundsPad)
+    maxX = Math.max(maxX, rect.x + rect.width + boundsPad)
+    minY = Math.min(minY, rect.y - boundsPad)
+    maxY = Math.max(maxY, rect.y + rect.height + boundsPad)
+  })
+
+  const grid = buildGridSpec(
+    { minX, minY, maxX, maxY },
+    Math.max(8, Math.min(16, clearance * 0.45)),
+    70000
+  )
+  const routed = routeOrthogonalPath({
+    start,
+    end,
+    obstacles,
+    clearance,
+    grid,
+    preferAxis,
+    maxIterations: grid.cols * grid.rows * 10,
+  })
+  if (!routed || routed.points.length < 2) return null
+
+  const candidate = simplifyPath([start, ...routed.points.slice(1, -1), end])
+  if (pathBlocked(candidate, obstacles, clearance)) return null
+  return candidate
+}
+
 // Pipeline: connectOrthogonal → L-shapes → U-shape → per-obstacle → boundary escape → forced L-shape
 // Luôn trả path (không bao giờ null/diagonal).
 function buildOrthPath(start: Point, end: Point, obstacles: Rect[], clearance: number, preferAxis: 'x' | 'y') {
@@ -318,6 +359,10 @@ function buildOrthPath(start: Point, end: Point, obstacles: Rect[], clearance: n
   // 6. Boundary escape (increasing padding around obstacle bounds)
   const escaped = buildBoundaryEscapePath(start, end, obstacles, clearance, preferAxis)
   if (escaped) return escaped
+
+  // 6.5 Grid rescue: tìm tuyến orthogonal toàn cục khi heuristic cục bộ thất bại.
+  const gridRescue = buildGridRescuePath(start, end, obstacles, clearance, preferAxis)
+  if (gridRescue) return gridRescue
 
   // 7. Forced orthogonal (never diagonal, never null)
   return simplifyPath([start, midpoint, end])
@@ -761,6 +806,27 @@ export function routeLinks(
           { x: toStub.x, y: toStub.y },
           { x: toAnchor.x, y: toAnchor.y },
         ])
+      }
+
+      // 5. Rescue cuối: thử tuyến grid từ shifted points để tránh render path xuyên object.
+      if (pathBlocked(path, obstacles, clearance)) {
+        const rescue = buildGridRescuePath(fromShifted, toShifted, obstacles, clearance, preferAxis)
+        if (rescue) {
+          path = simplifyPath([
+            { x: fromAnchor.x, y: fromAnchor.y },
+            { x: fromStub.x, y: fromStub.y },
+            { x: fromBase.x, y: fromBase.y },
+            ...rescue,
+            { x: toBase.x, y: toBase.y },
+            { x: toStub.x, y: toStub.y },
+            { x: toAnchor.x, y: toAnchor.y },
+          ])
+        }
+      }
+
+      // Chặn cứng: không render link nếu path cuối vẫn va chạm obstacle.
+      if (pathBlocked(path, obstacles, clearance)) {
+        return null
       }
 
       // --- Render ---

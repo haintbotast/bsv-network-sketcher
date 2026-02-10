@@ -30,6 +30,7 @@
 - **l1_no_object_crossing_policy:** tuyến L1 sau chuẩn hóa orthogonal không được xuyên qua device/area không liên quan.
 - **l1_path_validity_gate_policy:** mọi tuyến candidate/fallback sau khi dựng path đều phải pass `pathBlocked`; không được giữ tuyến bị chặn để render.
 - **l1_boundary_escape_fallback_policy:** khi fallback cục bộ thất bại, router phải thử hành lang biên theo cụm obstacle lân cận link trước, chỉ mở rộng phạm vi khi cần.
+- **l1_grid_rescue_fallback_policy:** nếu heuristic cục bộ + boundary escape không tìm được tuyến hợp lệ, router phải thử orthogonal grid rescue trước khi bỏ render path lỗi.
 - **l1_fallback_detour_guard_policy:** candidate fallback có quãng đường vòng quá xa so với khoảng cách trực tiếp phải bị loại.
 - **l1_offset_reduction_retry_policy:** trước khi dùng fallback xa, router phải thử giảm dần độ tách `bundle/stem` để tìm tuyến gần hơn và ít méo hơn.
 - **port_turn_clearance_policy:** điểm rẽ đầu tiên của link L1 phải cách port band đủ xa để không dính nhãn port.
@@ -299,6 +300,7 @@ test.describe('Diagram Editor', () => {
 - [ ] L1 no-object crossing: link sau chuẩn hóa orthogonal không xuyên device/area không liên quan trong các cụm dày.
 - [ ] L1 path validity gate: không có link nào được render nếu còn va chạm obstacle sau các nhánh fallback.
 - [ ] L1 boundary escape fallback: trong ca dense obstacles, router ưu tiên hành lang biên theo cụm gần; chỉ mở rộng xa khi các cách gần đều không hợp lệ.
+- [ ] L1 grid rescue fallback: khi các fallback cục bộ thất bại, router vẫn tìm được tuyến hợp lệ bằng grid rescue hoặc bỏ render link lỗi (không xuyên object).
 - [ ] Port turn clearance: điểm rẽ đầu tiên không dính sát port band/label ở scale 1x (đạt khoảng cách tối thiểu theo profile tuning).
 - [ ] Stub fan rank: endpoint active cùng `(device, side)` được tách fan theo thứ tự ổn định; spread fan không vượt ngưỡng style tại scale hiện hành.
 - [ ] Short same-side fan sync: link nội‑area ngắn có hai đầu cùng side không tạo “hộp nhỏ” sát port (fan hai đầu đồng bộ).

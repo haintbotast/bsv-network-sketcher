@@ -78,6 +78,7 @@
   - Nếu bị cản thì fallback orthogonal đơn giản (không dùng tối ưu toàn cục/A\*).
 - **Path validity gate (L1):** mọi candidate/fallback phải qua kiểm tra va chạm (`pathBlocked`); không chấp nhận tuyến ép xuyên object.
 - **Boundary escape fallback (L1):** khi các tuyến cục bộ đều bị chặn, router thử hành lang biên theo cụm obstacle **lân cận đoạn link trước**, chỉ mở rộng ra xa khi thật sự cần.
+- **Grid rescue fallback (L1):** nếu heuristic cục bộ + boundary escape vẫn thất bại, router dùng orthogonal grid rescue để tìm tuyến toàn cục tránh vật cản trước khi chấp nhận bỏ render path lỗi.
 - **Fallback detour guard (L1):** candidate có quãng đường vòng vượt ngưỡng hợp lý so với khoảng cách trực tiếp phải bị loại, tránh tuyến “đi xa bất thường”.
 - **Offset giảm dần trước fallback (L1):** trước khi chấp nhận fallback xa, router phải thử lại cùng cặp endpoint với mức tách `bundle/stem` giảm dần để tìm tuyến gần hơn.
 - Sau bước chuẩn hóa orthogonal, nếu tuyến cắt qua object thì fallback tuyến orthogonal thay thế để bảo toàn tính hợp lệ.

@@ -29,6 +29,7 @@
 - **l1_override_side_normalization_policy:** ở L1, override side phải được chuẩn hóa theo port band (`top` giữ nguyên, `left/right/bottom` về `bottom`) để tránh lệch anchor so với điểm render port.
 - **l1_no_object_crossing_policy:** tuyến L1 sau chuẩn hóa orthogonal không được xuyên qua device/area không liên quan.
 - **l1_path_validity_gate_policy:** mọi tuyến candidate/fallback sau khi dựng path đều phải pass `pathBlocked`; không được giữ tuyến bị chặn để render.
+- **l1_final_render_gate_policy:** path cuối trước render phải pass `pathBlocked`; link còn va chạm phải bị loại khỏi danh sách render.
 - **l1_boundary_escape_fallback_policy:** khi fallback cục bộ thất bại, router phải thử hành lang biên theo cụm obstacle lân cận link trước, chỉ mở rộng phạm vi khi cần.
 - **l1_fallback_detour_guard_policy:** candidate fallback có quãng đường vòng quá xa so với khoảng cách trực tiếp phải bị loại.
 - **l1_offset_reduction_retry_policy:** trước khi dùng fallback xa, router phải thử giảm dần độ tách `bundle/stem` để tìm tuyến gần hơn và ít méo hơn.
@@ -41,6 +42,7 @@
 - **l1_stem_deoverlap_policy:** sau stub rời port, router phải cho phép lệch nhỏ theo rank endpoint để giảm hiện tượng các đoạn đứng/đoạn ngang dính sát nhau.
 - **l1_global_lane_two_axis_policy:** router phải tách làn chung theo cả 2 hướng ngang/dọc trong cùng cụm gần để giảm dính bó giữa các cặp link khác nhau.
 - **l1_parallel_segment_nudge_policy:** hậu xử lý phải nudge các segment ngang/dọc song song trong cùng corridor, đồng thời bảo toàn segment `anchor→stub` hai đầu để không lệch điểm xuất phát tại port.
+- **l1_post_nudge_rollback_policy:** nếu nudge làm link va chạm obstacle thì phải rollback path về trạng thái trước nudge.
 - **l1_global_corridor_split_policy:** router phải tách làn toàn cục theo corridor (scope + axis + bucket) trước hậu xử lý nudge để giảm dính bó giữa các cặp link khác nhau.
 - **l1_jump_direction_consistency_policy:** tại giao điểm, arc jump phải thống nhất hướng hiển thị (segment ngang nhảy lên, segment dọc nhảy sang phải), không phụ thuộc chiều đi của segment.
 - **l1_jump_turn_guard_policy:** không vẽ arc jump khi giao điểm nằm quá gần đầu/cuối segment để tránh hiện tượng “vừa nhảy xong rẽ ngay”.
@@ -297,6 +299,7 @@ test.describe('Diagram Editor', () => {
 - [ ] L1 override side normalization: dữ liệu override `left/right` ở L1 vẫn phải cho endpoint bám đúng side port band và không tạo đoạn lệch khỏi ô port.
 - [ ] L1 no-object crossing: link sau chuẩn hóa orthogonal không xuyên device/area không liên quan trong các cụm dày.
 - [ ] L1 path validity gate: không có link nào được render nếu còn va chạm obstacle sau các nhánh fallback.
+- [ ] L1 final render gate: link còn blocked sau mọi nhánh routing không được render path lỗi.
 - [ ] L1 boundary escape fallback: trong ca dense obstacles, router ưu tiên hành lang biên theo cụm gần; chỉ mở rộng xa khi các cách gần đều không hợp lệ.
 - [ ] Port turn clearance: điểm rẽ đầu tiên không dính sát port band/label ở scale 1x (đạt khoảng cách tối thiểu theo profile tuning).
 - [ ] Stub fan rank: endpoint active cùng `(device, side)` được tách fan theo thứ tự ổn định; spread fan không vượt ngưỡng style tại scale hiện hành.
@@ -307,6 +310,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Stem de-overlap: với cụm port dày, các đoạn đứng rời port và đoạn chuyển tiếp không còn đè lên nhau thành một nét.
 - [ ] Global lane two-axis: trong cụm dày, cả bó ngang và bó dọc đều được tách làn ổn định giữa nhiều cặp link khác nhau.
 - [ ] Parallel segment nudge: trong cụm line ngang/dọc dày, các segment giữa được tách rõ, còn đoạn `anchor→stub` sát port vẫn giữ ổn định.
+- [ ] Post-nudge rollback: nudge không làm link xuyên object; link bị va chạm sau nudge phải tự rollback path.
 - [ ] Global corridor split: nhiều link khác cặp device nhưng chung hành lang ngang/dọc vẫn có khoảng cách ổn định trước khi áp nudge.
 - [ ] Jump direction consistency: arc jump luôn nhảy lên (đoạn ngang) hoặc sang phải (đoạn dọc) kể cả khi segment đi ngược chiều.
 - [ ] Jump turn guard: giao điểm nằm sát đầu/cuối segment (gần điểm rẽ) không vẽ arc để tránh cảm giác rối.

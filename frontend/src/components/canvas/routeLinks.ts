@@ -152,6 +152,14 @@ function toPointsArray(path: Point[]) {
   return points
 }
 
+function toPathArray(points: number[]) {
+  const path: Point[] = []
+  for (let i = 0; i + 1 < points.length; i += 2) {
+    path.push({ x: points[i], y: points[i + 1] })
+  }
+  return path
+}
+
 function pathBlocked(path: Point[], obstacles: Rect[], clearance: number) {
   for (let i = 1; i < path.length; i += 1) {
     const a = path[i - 1]
@@ -559,6 +567,7 @@ export function routeLinks(
   })
 
   // --- Per-link routing ---
+  const obstaclesByLink = new Map<string, Rect[]>()
   const links = linkMetas
     .map(meta => {
       if (!meta) return null
@@ -652,6 +661,7 @@ export function routeLinks(
           obstacles.push(rect)
         })
       }
+      obstaclesByLink.set(link.id, obstacles)
 
       // --- Bundle offset (cùng cặp device → tách đường) ---
       const preferAxis: 'x' | 'y' = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
@@ -753,6 +763,9 @@ export function routeLinks(
         ])
       }
 
+      // Chốt an toàn trước render: không vẽ link nếu path cuối còn va chạm.
+      if (pathBlocked(path, obstacles, clearance)) return null
+
       // --- Render ---
       const points = toPointsArray(path)
       if (points.length < 4) return null
@@ -793,7 +806,24 @@ export function routeLinks(
     .filter(Boolean) as RenderLink[]
 
   // Post-processing: tách segment song song chồng nhau giữa các link khác nhau
+  const pointsBeforeNudge = new Map<string, number[]>()
+  links.forEach(link => {
+    pointsBeforeNudge.set(link.id, [...link.points])
+  })
   nudgeOverlappingSegments(links, scale)
+
+  // Nudge có thể đẩy segment vào vật cản -> rollback link đó về path trước nudge.
+  links.forEach(link => {
+    const obstacles = obstaclesByLink.get(link.id)
+    if (!obstacles || !obstacles.length) return
+    if (!pathBlocked(toPathArray(link.points), obstacles, clearance)) return
+    const original = pointsBeforeNudge.get(link.id)
+    if (!original) return
+    link.points = [...original]
+  })
+  links.forEach(link => {
+    link.config.points = link.points
+  })
 
   const cache = new Map<string, {
     points: number[]

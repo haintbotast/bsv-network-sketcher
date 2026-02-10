@@ -77,7 +77,7 @@
   - Nối orthogonal bằng thuật toán tuyến tính.
   - Nếu bị cản thì fallback orthogonal đơn giản (không dùng tối ưu toàn cục/A\*).
 - **Path validity gate (L1):** mọi candidate/fallback phải qua kiểm tra va chạm (`pathBlocked`); không chấp nhận tuyến ép xuyên object.
-- **Final render gate (L1):** trước khi render, path cuối phải pass `pathBlocked`; nếu vẫn va chạm thì không render link lỗi.
+- **Final render gate (L1):** trước khi render, path cuối phải pass kiểm tra **hard collision** (clearance = 0); nếu xuyên thân object thì không render link lỗi.
 - **Boundary escape fallback (L1):** khi các tuyến cục bộ đều bị chặn, router thử hành lang biên theo cụm obstacle **lân cận đoạn link trước**, chỉ mở rộng ra xa khi thật sự cần.
 - **Fallback detour guard (L1):** candidate có quãng đường vòng vượt ngưỡng hợp lý so với khoảng cách trực tiếp phải bị loại, tránh tuyến “đi xa bất thường”.
 - **Offset giảm dần trước fallback (L1):** trước khi chấp nhận fallback xa, router phải thử lại cùng cặp endpoint với mức tách `bundle/stem` giảm dần để tìm tuyến gần hơn.
@@ -95,7 +95,7 @@
 - **Port side stability (L1):** side tự động chỉ theo policy `top/bottom`; không tự ép sang `left/right` trong auto pass để tránh lệch giữa anchor và port band.
 - **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng; offset tối thiểu bằng **max(`bundle_gap`, `grid cell`)** và **tự nhân hệ số theo `total`** (nhiều link → khoảng cách lớn hơn). Với tuyến ưu tiên trục dọc, bundle gap được tăng thêm hệ số mạnh hơn để giảm chồng đoạn đứng. Router cho phép **stem de-overlap** (lệch nhỏ sau stub theo rank endpoint) để tách các đoạn đứng/đoạn ngang còn sát nhau, đồng thời áp **chia làn chung 2 hướng (ngang/dọc)** theo cụm gần và theo phạm vi Area để tránh dính bó giữa các cặp link khác nhau.
 - **Parallel segment nudge (L1):** sau routing chính, router thực hiện bước hậu xử lý tách các segment ngang/dọc song song đang chồng nhau; chỉ giữ cố định segment `anchor→stub` ở hai đầu, các segment giữa được nudge theo cụm gần để giảm dải line dày trong corridor.
-- **Post-nudge rollback (L1):** sau nudge, nếu path của link va chạm obstacle thì rollback về path trước nudge để tránh xuyên object.
+- **Post-nudge rollback (L1):** sau nudge, nếu path của link bị **hard collision** (clearance = 0) thì rollback về path trước nudge để tránh xuyên object.
 - **Global corridor split (L1):** trước bước nudge, router tách làn toàn cục theo cụm corridor (`scope Area + axis ngang/dọc + bucket tọa độ`) để các link khác cặp device vẫn giữ khoảng cách ổn định khi đi chung hành lang.
 - **Stub fan theo rank active (L1):** fan-out đoạn stub được tính theo **thứ tự endpoint active** trên cùng `(device, side)` với spread chuẩn `0..28px * scale`, tránh phụ thuộc trực tiếp vào kích thước object.
 - **Short same-side fan sync (L1):** với link nội‑area ngắn và hai đầu cùng side, fan hai đầu được đồng bộ để tránh tạo “hộp nhỏ” sát port band.

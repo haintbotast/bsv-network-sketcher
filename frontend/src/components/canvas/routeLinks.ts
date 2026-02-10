@@ -169,6 +169,11 @@ function pathBlocked(path: Point[], obstacles: Rect[], clearance: number) {
   return false
 }
 
+function pathCrossesObjects(path: Point[], obstacles: Rect[]) {
+  // Hard collision only: chỉ tính xuyên thân object, không tính vùng đệm clearance.
+  return pathBlocked(path, obstacles, 0)
+}
+
 // --- Routing strategies ---
 
 function findUShapePath(start: Point, end: Point, obstacles: Rect[], clearance: number, preferAxis: 'x' | 'y'): Point[] | null {
@@ -763,8 +768,8 @@ export function routeLinks(
         ])
       }
 
-      // Chốt an toàn trước render: không vẽ link nếu path cuối còn va chạm.
-      if (pathBlocked(path, obstacles, clearance)) return null
+      // Chốt an toàn trước render: chỉ loại path xuyên thân object thật.
+      if (pathCrossesObjects(path, obstacles)) return null
 
       // --- Render ---
       const points = toPointsArray(path)
@@ -816,7 +821,7 @@ export function routeLinks(
   links.forEach(link => {
     const obstacles = obstaclesByLink.get(link.id)
     if (!obstacles || !obstacles.length) return
-    if (!pathBlocked(toPathArray(link.points), obstacles, clearance)) return
+    if (!pathCrossesObjects(toPathArray(link.points), obstacles)) return
     const original = pointsBeforeNudge.get(link.id)
     if (!original) return
     link.points = [...original]

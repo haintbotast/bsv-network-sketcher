@@ -853,7 +853,7 @@ function isPositionOnlySave(
   draft: Record<string, any>,
 ) {
   const changedKeys = collectChangedKeysForSave(objectType, original, draft)
-  if (!changedKeys.length) return false
+  if (!changedKeys.length) return true
   const allowSet = objectType === 'Area' ? AREA_POSITION_ONLY_KEYS : DEVICE_POSITION_ONLY_KEYS
   return changedKeys.every(key => allowSet.has(key))
 }

@@ -97,7 +97,7 @@
 - **Parallel segment nudge (L1):** sau routing chính, router thực hiện bước hậu xử lý tách các segment ngang/dọc song song đang chồng nhau; chỉ giữ cố định segment `anchor→stub` ở hai đầu, các segment giữa được nudge theo cụm gần để giảm dải line dày trong corridor.
 - **Post-nudge rollback (L1):** sau nudge, nếu path của link bị **hard collision** (clearance = 0) thì rollback về path trước nudge để tránh xuyên object.
 - **Global corridor split (L1):** trước bước nudge, router tách làn toàn cục theo cụm corridor (`scope Area + axis ngang/dọc + bucket tọa độ`) để các link khác cặp device vẫn giữ khoảng cách ổn định khi đi chung hành lang.
-- **Stub fan theo rank active (L1):** fan-out đoạn stub được tính theo **thứ tự endpoint active** trên cùng `(device, side)` với spread chuẩn `0..28px * scale`, tránh phụ thuộc trực tiếp vào kích thước object.
+- **Stub fan theo rank active (L1):** fan-out đoạn stub được tính theo **thứ tự endpoint active** trên cùng `(device, side)` với spread chuẩn `0..18px * scale`, tránh phụ thuộc trực tiếp vào kích thước object.
 - **Short same-side fan sync (L1):** với link nội‑area ngắn và hai đầu cùng side, fan hai đầu được đồng bộ để tránh tạo “hộp nhỏ” sát port band.
 - **Direct intra ưu tiên theo hình học (L1):** với cặp thiết bị nội‑area theo phương ngang, hai đầu cùng side (`top/top` hoặc `bottom/bottom`) và không bị vật cản, router phải ưu tiên tuyến trực tiếp/orthogonal ngắn trước khi áp lane U cho purpose đặc biệt.
 - **Cặp dọc top-bottom (L1):** khi hai thiết bị xếp dọc (một trên, một dưới), không ép dùng rule direct ngang; giữ routing theo hành lang dọc/orthogonal để tránh tuyến khó đọc.
@@ -223,8 +223,8 @@ Khi hai đường link cắt nhau, đường link có **index render cao hơn** 
 | Convention | Link index cao nhảy qua link index thấp |
 | Áp dụng | Tất cả links: inter-area, intra-area, bundled |
 | Epsilon loại trừ | 1px từ endpoint segment |
-| Turn guard | Không vẽ arc nếu giao điểm cách đầu/cuối segment < 2.2 × radius |
-| Khoảng cách tối thiểu giữa 2 arc | 2.5 × radius |
+| Turn guard | Không vẽ arc nếu giao điểm cách đầu/cuối segment < 2.8 × radius |
+| Khoảng cách tối thiểu giữa 2 arc | 3.0 × radius |
 
 Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), thay thế `v-line`.
 

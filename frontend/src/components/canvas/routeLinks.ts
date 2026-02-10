@@ -19,7 +19,7 @@ export type RouteLinksParams = {
 }
 
 const LABEL_STUB_PADDING = 4
-const FAN_SPREAD_BASE = 28
+const FAN_SPREAD_BASE = 18
 const GLOBAL_LANE_BUCKET_FACTOR = 1.15
 const GLOBAL_LANE_GAP_X_FACTOR = 0.56
 const GLOBAL_LANE_GAP_Y_FACTOR = 0.86
@@ -75,6 +75,58 @@ function resolveLaneScopeKey(fromAreaId?: string, toAreaId?: string) {
   if (!fromAreaId || !toAreaId) return `edge:${fromAreaId || toAreaId}`
   if (fromAreaId === toAreaId) return `intra:${fromAreaId}`
   return `inter:${buildAreaPairKey(fromAreaId, toAreaId)}`
+}
+
+function buildGlobalLaneRanks(
+  linkMetas: Array<LinkMeta | null>,
+  resolvedAnchorsByLink: Map<string, {
+    fromAnchor: { x: number; y: number; side: ExitSide }
+    toAnchor: { x: number; y: number; side: ExitSide }
+  }>,
+  bucketSize: number,
+) {
+  const laneXGroups = new Map<string, Array<{ linkId: string; order: number }>>()
+  const laneYGroups = new Map<string, Array<{ linkId: string; order: number }>>()
+
+  linkMetas.forEach(meta => {
+    if (!meta) return
+    const anchors = resolvedAnchorsByLink.get(meta.link.id)
+    if (!anchors) return
+
+    const scope = resolveLaneScopeKey(meta.fromAreaId || undefined, meta.toAreaId || undefined)
+    const corridorX = (anchors.fromAnchor.x + anchors.toAnchor.x) / 2
+    const corridorY = (anchors.fromAnchor.y + anchors.toAnchor.y) / 2
+    const orderX = (anchors.fromAnchor.x + anchors.toAnchor.x) / 2
+    const orderY = (anchors.fromAnchor.y + anchors.toAnchor.y) / 2
+
+    const keyX = `${scope}|x|${Math.round(corridorX / bucketSize)}`
+    const keyY = `${scope}|y|${Math.round(corridorY / bucketSize)}`
+
+    const xList = laneXGroups.get(keyX) || []
+    xList.push({ linkId: meta.link.id, order: orderY })
+    laneXGroups.set(keyX, xList)
+
+    const yList = laneYGroups.get(keyY) || []
+    yList.push({ linkId: meta.link.id, order: orderX })
+    laneYGroups.set(keyY, yList)
+  })
+
+  const toRankMap = (groups: Map<string, Array<{ linkId: string; order: number }>>) => {
+    const rankMap = new Map<string, FanRank>()
+    groups.forEach(entries => {
+      entries.sort((a, b) => a.order - b.order || a.linkId.localeCompare(b.linkId))
+      const total = entries.length
+      entries.forEach((entry, index) => {
+        rankMap.set(entry.linkId, { index, total })
+      })
+    })
+    return rankMap
+  }
+
+  return {
+    globalLaneRankXByLink: toRankMap(laneXGroups),
+    globalLaneRankYByLink: toRankMap(laneYGroups),
+  }
 }
 
 function resolveGlobalLaneOffset(
@@ -158,6 +210,14 @@ function toPathArray(points: number[]) {
     path.push({ x: points[i], y: points[i + 1] })
   }
   return path
+}
+
+function buildOrthShiftPath(from: Point, to: Point, preferAxis: 'x' | 'y'): Point[] {
+  if (Math.abs(from.x - to.x) < 0.5 && Math.abs(from.y - to.y) < 0.5) return []
+  const corner = preferAxis === 'x'
+    ? { x: from.x, y: to.y }
+    : { x: to.x, y: from.y }
+  return simplifyPath([from, corner, to]).slice(1)
 }
 
 function pathBlocked(path: Point[], obstacles: Rect[], clearance: number) {
@@ -410,11 +470,11 @@ type SegInfo = {
 function nudgeOverlappingSegments(links: RenderLink[], scale: number) {
   if (links.length < 2) return
 
-  const nudgeGap = Math.max(6, 8 * scale)
+  const nudgeGap = Math.max(7, 9 * scale)
   const coordThreshold = Math.max(5, 7 * scale)
   const minSegLen = 10
   const eps = 0.5
-  const skipSegs = 1 // chỉ bỏ anchor→stub ở mỗi đầu; minSegLen lọc segment ngắn
+  const skipSegs = 2 // giữ ổn định đoạn gần port, chỉ nudge corridor giữa
   const maxOffset = Math.max(22, 28 * scale)
 
   const verticals: SegInfo[] = []
@@ -542,34 +602,12 @@ export function routeLinks(
     })
   })
 
-  // Global corridor split: gom link gần nhau theo scope + axis + bucket để tách làn toàn cục.
+  // Global corridor split: tách làn toàn cục theo cả X và Y để giảm dính bó ngang/dọc.
   const globalLaneBucket = Math.max(12, (renderTuning.bundle_gap ?? 0) * scale * GLOBAL_LANE_BUCKET_FACTOR)
-  const globalLaneGroups = new Map<string, Array<{ linkId: string; order: number }>>()
-  linkMetas.forEach(meta => {
-    if (!meta) return
-    const anchors = resolvedAnchorsByLink.get(meta.link.id)
-    if (!anchors) return
-    const axis: 'x' | 'y' = Math.abs(meta.toCenter.x - meta.fromCenter.x) >= Math.abs(meta.toCenter.y - meta.fromCenter.y) ? 'x' : 'y'
-    const corridorCoord = axis === 'x'
-      ? (anchors.fromAnchor.y + anchors.toAnchor.y) / 2
-      : (anchors.fromAnchor.x + anchors.toAnchor.x) / 2
-    const order = axis === 'x'
-      ? (anchors.fromAnchor.x + anchors.toAnchor.x) / 2
-      : (anchors.fromAnchor.y + anchors.toAnchor.y) / 2
-    const scope = resolveLaneScopeKey(meta.fromAreaId || undefined, meta.toAreaId || undefined)
-    const key = `${scope}|${axis}|${Math.round(corridorCoord / globalLaneBucket)}`
-    const list = globalLaneGroups.get(key) || []
-    list.push({ linkId: meta.link.id, order })
-    globalLaneGroups.set(key, list)
-  })
-  const globalLaneRankByLink = new Map<string, FanRank>()
-  globalLaneGroups.forEach(entries => {
-    entries.sort((a, b) => a.order - b.order || a.linkId.localeCompare(b.linkId))
-    const total = entries.length
-    entries.forEach((entry, index) => {
-      globalLaneRankByLink.set(entry.linkId, { index, total })
-    })
-  })
+  const {
+    globalLaneRankXByLink,
+    globalLaneRankYByLink,
+  } = buildGlobalLaneRanks(linkMetas, resolvedAnchorsByLink, globalLaneBucket)
 
   // --- Per-link routing ---
   const obstaclesByLink = new Map<string, Rect[]>()
@@ -675,20 +713,24 @@ export function routeLinks(
       const pairBundleOffset = bundle && bundle.total > 1
         ? (bundle.index - (bundle.total - 1) / 2) * bundleGap
         : 0
-      const globalLaneOffset = isL1View
-        ? resolveGlobalLaneOffset(globalLaneRankByLink.get(link.id), preferAxis, scale, renderTuning)
+      const pairBundleOffsetX = preferAxis === 'y' ? pairBundleOffset : 0
+      const pairBundleOffsetY = preferAxis === 'x' ? pairBundleOffset : 0
+      const globalLaneOffsetX = isL1View
+        ? resolveGlobalLaneOffset(globalLaneRankXByLink.get(link.id), 'y', scale, renderTuning)
         : 0
-      const bundleLimit = preferAxis === 'x'
-        ? Math.max(18, GLOBAL_LANE_LIMIT_X * scale)
-        : Math.max(20, GLOBAL_LANE_LIMIT_Y * scale)
-      const bundleOffset = clamp(pairBundleOffset + globalLaneOffset, -bundleLimit, bundleLimit)
+      const globalLaneOffsetY = isL1View
+        ? resolveGlobalLaneOffset(globalLaneRankYByLink.get(link.id), 'x', scale, renderTuning)
+        : 0
 
-      const fromShifted: Point = preferAxis === 'x'
-        ? { x: fromBase.x, y: fromBase.y + bundleOffset }
-        : { x: fromBase.x + bundleOffset, y: fromBase.y }
-      const toShifted: Point = preferAxis === 'x'
-        ? { x: toBase.x, y: toBase.y + bundleOffset }
-        : { x: toBase.x + bundleOffset, y: toBase.y }
+      const bundleLimitX = Math.max(18, GLOBAL_LANE_LIMIT_X * scale)
+      const bundleLimitY = Math.max(20, GLOBAL_LANE_LIMIT_Y * scale)
+      const bundleOffsetX = clamp(pairBundleOffsetX + globalLaneOffsetX, -bundleLimitX, bundleLimitX)
+      const bundleOffsetY = clamp(pairBundleOffsetY + globalLaneOffsetY, -bundleLimitY, bundleLimitY)
+
+      const fromShifted: Point = { x: fromBase.x + bundleOffsetX, y: fromBase.y + bundleOffsetY }
+      const toShifted: Point = { x: toBase.x + bundleOffsetX, y: toBase.y + bundleOffsetY }
+      const fromShiftPath = buildOrthShiftPath(fromBase, fromShifted, preferAxis)
+      const toShiftPath = buildOrthShiftPath(toShifted, toBase, preferAxis)
 
       // --- Route: mọi nhánh đều dùng shifted points (giữ spacing đồng nhất) ---
       let path: Point[] = []
@@ -703,11 +745,10 @@ export function routeLinks(
           { x: fromAnchor.x, y: fromAnchor.y },
           { x: fromStub.x, y: fromStub.y },
           { x: fromBase.x, y: fromBase.y },
-          { x: fromShifted.x, y: fromShifted.y },
+          ...fromShiftPath,
           { x: fromShifted.x, y: laneY },
           { x: toShifted.x, y: laneY },
-          { x: toShifted.x, y: toShifted.y },
-          { x: toBase.x, y: toBase.y },
+          ...toShiftPath,
           { x: toStub.x, y: toStub.y },
           { x: toAnchor.x, y: toAnchor.y },
         ])
@@ -728,8 +769,9 @@ export function routeLinks(
           { x: fromAnchor.x, y: fromAnchor.y },
           { x: fromStub.x, y: fromStub.y },
           { x: fromBase.x, y: fromBase.y },
+          ...fromShiftPath,
           ...middle,
-          { x: toBase.x, y: toBase.y },
+          ...toShiftPath,
           { x: toStub.x, y: toStub.y },
           { x: toAnchor.x, y: toAnchor.y },
         ])
@@ -742,8 +784,9 @@ export function routeLinks(
           { x: fromAnchor.x, y: fromAnchor.y },
           { x: fromStub.x, y: fromStub.y },
           { x: fromBase.x, y: fromBase.y },
+          ...fromShiftPath,
           ...orth,
-          { x: toBase.x, y: toBase.y },
+          ...toShiftPath,
           { x: toStub.x, y: toStub.y },
           { x: toAnchor.x, y: toAnchor.y },
         ])

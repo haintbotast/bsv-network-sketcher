@@ -16,7 +16,9 @@ export interface LinkForCrossing {
 }
 
 const EPS = 1.0  // epsilon loại trừ giao điểm quá gần endpoint
-const TURN_GUARD_FACTOR = 2.2
+const TURN_GUARD_FACTOR = 2.8
+const MIN_CROSSING_GAP_FACTOR = 3.0
+const MIN_SEGMENT_FOR_JUMP_FACTOR = 4.8
 
 /**
  * Tìm giao điểm 2 đoạn thẳng orthogonal.
@@ -165,6 +167,11 @@ export function drawPolylineWithJumps(
     }
 
     const isHorizontal = Math.abs(y2 - y1) < 0.5
+    const segLength = isHorizontal ? Math.abs(x2 - x1) : Math.abs(y2 - y1)
+    if (segLength < radius * MIN_SEGMENT_FOR_JUMP_FACTOR) {
+      ctx.lineTo(x2, y2)
+      continue
+    }
     const turnGuard = Math.max(radius + 1, radius * TURN_GUARD_FACTOR)
 
     // Lọc crossings quá gần endpoint hoặc quá gần nhau
@@ -176,7 +183,7 @@ export function drawPolylineWithJumps(
       if (filtered.length > 0) {
         const prev = filtered[filtered.length - 1]
         const gap = Math.hypot(c.x - prev.x, c.y - prev.y)
-        if (gap < radius * 2.5) continue  // Quá gần crossing trước
+        if (gap < radius * MIN_CROSSING_GAP_FACTOR) continue  // Quá gần crossing trước
       }
       filtered.push(c)
     }

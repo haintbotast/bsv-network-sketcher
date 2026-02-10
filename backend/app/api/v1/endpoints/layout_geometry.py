@@ -19,6 +19,7 @@ from .layout_constants import (
     PORT_FONT_SIZE_PX,
     PORT_CELL_TEXT_PADDING_PX,
     DEVICE_LABEL_MIN_HEIGHT_PX,
+    DEVICE_STANDARD_TOTAL_HEIGHT_PX,
     DEVICE_MIN_WIDTH_PX,
 )
 
@@ -144,7 +145,7 @@ def estimate_device_rendered_size(
 ) -> tuple[float, float]:
     """Estimate rendered device size matching frontend expandDeviceRectForPorts().
 
-    Splits ports 50/50 (ceil) between top/bottom bands as heuristic.
+    Splits ports by side heuristic to approximate frontend top/bottom bands.
     Returns (width, height) in inches.
     """
     body_width_px = body_width_in * UNIT_PX
@@ -152,7 +153,7 @@ def estimate_device_rendered_size(
 
     if not ports:
         width_px = max(body_width_px, DEVICE_MIN_WIDTH_PX)
-        height_px = max(body_height_px, DEVICE_LABEL_MIN_HEIGHT_PX)
+        height_px = max(body_height_px, DEVICE_STANDARD_TOTAL_HEIGHT_PX)
         return width_px / UNIT_PX, height_px / UNIT_PX
 
     side_a, side_b = _split_ports_for_bands(ports)
@@ -168,9 +169,11 @@ def estimate_device_rendered_size(
     width_px = max(body_width_px, DEVICE_MIN_WIDTH_PX, band_a_width, band_b_width, band_full_width)
 
     band_height = PORT_CELL_HEIGHT_PX + PORT_BAND_PADDING_Y_PX * 2
-    body_rendered_px = max(body_height_px, DEVICE_LABEL_MIN_HEIGHT_PX)
     top_band_h = band_height if side_a else 0
     bottom_band_h = band_height if side_b else 0
+    base_total_px = max(body_height_px, DEVICE_STANDARD_TOTAL_HEIGHT_PX)
+    available_body_px = base_total_px - top_band_h - bottom_band_h
+    body_rendered_px = max(available_body_px, DEVICE_LABEL_MIN_HEIGHT_PX)
     height_px = top_band_h + body_rendered_px + bottom_band_h
 
     return width_px / UNIT_PX, height_px / UNIT_PX

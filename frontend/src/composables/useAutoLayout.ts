@@ -20,6 +20,7 @@ export type ScheduleAutoLayoutOptions = {
 type AutoLayoutRequest = {
   reason: AutoLayoutReason
   force: boolean
+  preserveExistingPositions?: boolean
 }
 
 const AUTO_LAYOUT_REASONS = new Set<AutoLayoutReason>([
@@ -66,7 +67,7 @@ export function useAutoLayout(deps: {
     autoLayoutDebounceTimers.delete(projectId)
   }
 
-  async function executeAutoLayout(projectId: string, _request: AutoLayoutRequest) {
+  async function executeAutoLayout(projectId: string, request: AutoLayoutRequest) {
     if (!deps.devices.value.length) return false
 
     const hasAreas = deps.areas.value.length > 0
@@ -81,7 +82,8 @@ export function useAutoLayout(deps: {
       layout_scope: 'project',
       anchor_routing: true,
       overview_mode: 'l1-only',
-      normalize_topology: false
+      normalize_topology: false,
+      preserve_existing_positions: !!request.preserveExistingPositions,
     })
     await deps.loadProjectData(projectId)
     await invalidateLayoutCache(projectId)
@@ -141,7 +143,7 @@ export function useAutoLayout(deps: {
     }
   }
 
-  async function runAutoLayoutManual() {
+  async function runAutoLayoutManual(options?: { preserveExistingPositions?: boolean }) {
     if (!deps.activeProject.value || autoLayoutManualApplying.value) return
     if (!deps.devices.value.length) {
       deps.setNotice('Chưa có thiết bị để chạy auto-layout.', 'error')
@@ -150,9 +152,21 @@ export function useAutoLayout(deps: {
 
     autoLayoutManualApplying.value = true
     const projectId = deps.activeProject.value.id
+    const preserveExistingPositions = options?.preserveExistingPositions ?? true
     try {
-      const applied = await executeAutoLayout(projectId, { force: true, reason: 'manual' })
-      if (applied) deps.setNotice('Đã chạy lại auto-layout.', 'success')
+      const applied = await executeAutoLayout(projectId, {
+        force: true,
+        reason: 'manual',
+        preserveExistingPositions,
+      })
+      if (applied) {
+        deps.setNotice(
+          preserveExistingPositions
+            ? 'Đã chạy auto-layout và giữ vị trí đã lưu.'
+            : 'Đã chạy auto-layout và ghi đè toàn bộ vị trí.',
+          'success'
+        )
+      }
     } catch (error: any) {
       deps.setNotice(error?.message || 'Chạy lại auto-layout thất bại.', 'error')
     } finally {

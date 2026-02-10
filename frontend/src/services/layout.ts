@@ -15,6 +15,7 @@ export interface AutoLayoutOptions {
   view_mode?: 'L1' | 'L2' | 'L3'
   normalize_topology?: boolean
   auto_resize_devices?: boolean
+  preserve_existing_positions?: boolean
 }
 
 export interface DeviceLayout {

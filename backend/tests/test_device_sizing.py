@@ -19,6 +19,7 @@ from app.api.v1.endpoints.layout_constants import (
     PORT_FONT_SIZE_PX,
     PORT_CELL_TEXT_PADDING_PX,
     DEVICE_LABEL_MIN_HEIGHT_PX,
+    DEVICE_STANDARD_TOTAL_HEIGHT_PX,
     DEVICE_MIN_WIDTH_PX,
 )
 
@@ -54,20 +55,22 @@ class TestEstimateDeviceRenderedSize(unittest.TestCase):
     def test_no_ports(self):
         w, h = estimate_device_rendered_size(1.2, 0.8, [])
         self.assertAlmostEqual(w, max(1.2 * UNIT_PX, DEVICE_MIN_WIDTH_PX) / UNIT_PX)
-        self.assertAlmostEqual(h, max(0.8 * UNIT_PX, DEVICE_LABEL_MIN_HEIGHT_PX) / UNIT_PX)
+        self.assertAlmostEqual(h, max(0.8 * UNIT_PX, DEVICE_STANDARD_TOTAL_HEIGHT_PX) / UNIT_PX)
 
     def test_single_port_top_band_only(self):
         w, h = estimate_device_rendered_size(1.2, 0.8, ["Gi1"])
         # 1 port → ceil(1/2)=1 on side_a, 0 on side_b → top band only
         band_h = PORT_CELL_HEIGHT_PX + PORT_BAND_PADDING_Y_PX * 2
-        body_px = max(0.8 * UNIT_PX, DEVICE_LABEL_MIN_HEIGHT_PX)
+        base_total_px = max(0.8 * UNIT_PX, DEVICE_STANDARD_TOTAL_HEIGHT_PX)
+        body_px = max(base_total_px - band_h, DEVICE_LABEL_MIN_HEIGHT_PX)
         expected_h = (band_h + body_px) / UNIT_PX
         self.assertAlmostEqual(h, expected_h)
 
     def test_two_ports_both_bands(self):
         w, h = estimate_device_rendered_size(1.2, 0.8, ["Gi1", "Gi2"])
         band_h = PORT_CELL_HEIGHT_PX + PORT_BAND_PADDING_Y_PX * 2
-        body_px = max(0.8 * UNIT_PX, DEVICE_LABEL_MIN_HEIGHT_PX)
+        base_total_px = max(0.8 * UNIT_PX, DEVICE_STANDARD_TOTAL_HEIGHT_PX)
+        body_px = max(base_total_px - band_h - band_h, DEVICE_LABEL_MIN_HEIGHT_PX)
         expected_h = (band_h + body_px + band_h) / UNIT_PX
         self.assertAlmostEqual(h, expected_h)
 
@@ -80,7 +83,8 @@ class TestEstimateDeviceRenderedSize(unittest.TestCase):
         ports = ["Gi1", "Gi2", "Gi3", "Gi4", "Gi5", "Gi6"]
         w, h = estimate_device_rendered_size(1.2, 0.8, ports)
         band_h = PORT_CELL_HEIGHT_PX + PORT_BAND_PADDING_Y_PX * 2
-        body_px = max(0.8 * UNIT_PX, DEVICE_LABEL_MIN_HEIGHT_PX)
+        base_total_px = max(0.8 * UNIT_PX, DEVICE_STANDARD_TOTAL_HEIGHT_PX)
+        body_px = max(base_total_px - band_h - band_h, DEVICE_LABEL_MIN_HEIGHT_PX)
         expected_h = (band_h + body_px + band_h) / UNIT_PX
         self.assertAlmostEqual(h, expected_h)
         self.assertGreaterEqual(w, 1.2)
@@ -90,7 +94,8 @@ class TestEstimateDeviceRenderedSize(unittest.TestCase):
         w, h = estimate_device_rendered_size(1.2, 0.8, ports)
         self.assertGreater(w, 2.0)
         band_h = PORT_CELL_HEIGHT_PX + PORT_BAND_PADDING_Y_PX * 2
-        body_px = max(0.8 * UNIT_PX, DEVICE_LABEL_MIN_HEIGHT_PX)
+        base_total_px = max(0.8 * UNIT_PX, DEVICE_STANDARD_TOTAL_HEIGHT_PX)
+        body_px = max(base_total_px - band_h - band_h, DEVICE_LABEL_MIN_HEIGHT_PX)
         expected_h = (band_h + body_px + band_h) / UNIT_PX
         self.assertAlmostEqual(h, expected_h)
 
@@ -98,7 +103,14 @@ class TestEstimateDeviceRenderedSize(unittest.TestCase):
         """Device with ports should always be taller than without."""
         _, h_no_ports = estimate_device_rendered_size(1.2, 0.8, [])
         _, h_with_ports = estimate_device_rendered_size(1.2, 0.8, ["Gi1", "Gi2"])
-        self.assertGreater(h_with_ports, h_no_ports)
+        self.assertGreaterEqual(h_with_ports, h_no_ports)
+
+    def test_small_body_height_uses_standard_total_baseline(self):
+        _, h_no_ports = estimate_device_rendered_size(1.2, 0.5, [])
+        _, h_with_ports = estimate_device_rendered_size(1.2, 0.5, ["Gi1", "Gi2"])
+        self.assertAlmostEqual(h_no_ports, DEVICE_STANDARD_TOTAL_HEIGHT_PX / UNIT_PX)
+        expected_with_ports_px = (PORT_CELL_HEIGHT_PX + PORT_BAND_PADDING_Y_PX * 2) * 2 + DEVICE_LABEL_MIN_HEIGHT_PX
+        self.assertAlmostEqual(h_with_ports, expected_with_ports_px / UNIT_PX)
 
 
 if __name__ == "__main__":

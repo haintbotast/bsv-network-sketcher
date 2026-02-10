@@ -53,6 +53,10 @@ class AutoLayoutOptions(BaseModel):
         default=True,
         description="If True, auto-resize device dimensions based on port count (from links + L2)."
     )
+    preserve_existing_positions: bool = Field(
+        default=False,
+        description="If True, keep existing Area/Device coordinates in DB and only fill missing positions."
+    )
 
     class Config:
         json_schema_extra = {
@@ -66,6 +70,7 @@ class AutoLayoutOptions(BaseModel):
                 "overview_mode": "l1-only",
                 "normalize_topology": False,
                 "auto_resize_devices": True,
+                "preserve_existing_positions": False,
             }
         }
 

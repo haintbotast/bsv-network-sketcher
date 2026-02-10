@@ -140,14 +140,25 @@
             <p>Đăng nhập để sử dụng chức năng bố cục.</p>
           </div>
           <div v-else class="layout-content">
-            <button
-              type="button"
-              class="primary"
-              :disabled="autoLayoutManualApplying || !activeProject || !devices.length"
-              @click="runAutoLayoutManual"
-            >
-              {{ autoLayoutManualApplying ? 'Đang chạy...' : 'Chạy lại auto-layout' }}
-            </button>
+            <div class="layout-actions">
+              <button
+                type="button"
+                class="primary"
+                :disabled="autoLayoutManualApplying || !activeProject || !devices.length"
+                @click="runAutoLayoutManual({ preserveExistingPositions: true })"
+              >
+                {{ autoLayoutManualApplying ? 'Đang chạy...' : 'Auto-layout (giữ vị trí đã lưu)' }}
+              </button>
+              <button
+                type="button"
+                class="ghost"
+                :disabled="autoLayoutManualApplying || !activeProject || !devices.length"
+                @click="runAutoLayoutManual({ preserveExistingPositions: false })"
+              >
+                Ghi đè toàn bộ vị trí
+              </button>
+            </div>
+            <p class="hint-text">Khuyến nghị dùng chế độ giữ vị trí để không mất chỉnh tay trước đó.</p>
 
             <div class="divider"></div>
             <div class="section">
@@ -2322,6 +2333,16 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.layout-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.layout-actions button {
+  width: 100%;
 }
 
 .data-content {

@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-09  
+> **Cập nhật:** 2026-02-10  
 > **Mục tiêu:** Đặc tả yêu cầu kỹ thuật để triển khai web app theo style chung (chuẩn nội bộ).
 
 ---
@@ -40,6 +40,9 @@
 - Với project có `grid_row/grid_col` rõ ràng, macro layout phải bám lưới theo **cột căn giữa (center-slot)** để giảm lệch vị trí khi có area quá rộng, giữ bố cục gần PDF chuẩn.
 - Micro layout trong từng Area phải **căn giữa theo hàng thiết bị** khi tách nhiều hàng để tránh dồn lệch trái và giữ đối xứng so với sơ đồ chuẩn.
 - Cho phép chạy lại auto-layout khi người dùng chủ động từ tab **Bố cục**.
+- Auto-layout thủ công từ tab **Bố cục** phải hỗ trợ 2 chế độ:
+  - `preserve_existing_positions=true` (mặc định): giữ tọa độ `Area/Device` đã có.
+  - `preserve_existing_positions=false`: ghi đè toàn bộ tọa độ theo kết quả layout mới.
 - Nhóm điều khiển viewport/view mode (`zoom/reset view/L1/L2/L3/Sửa vị trí`) hiển thị ở **main navigator panel** để thao tác nhất quán toàn màn hình.
 - Cụm điều khiển viewport/view mode ở main navigator được **canh giữa theo panel** để giảm lệch thị giác khi thao tác.
 - Cho phép bật chế độ **Sửa vị trí** để kéo‑thả trực tiếp `Area/Device` trên canvas; vị trí mới được lưu vào DB tại thời điểm thả chuột.
@@ -54,6 +57,7 @@
 - Với L1, **nhãn port là một phần của object** (port band trên/dưới), không render nhãn nổi giữa đường link.
 - Với L1, điểm đầu/cuối link phải **bám đúng anchor của ô port**; cơ chế tách lane chỉ được áp dụng **sau đoạn stub rời port**, không được dời trực tiếp anchor khỏi ô port.
 - Kích thước object L1 phải **co giãn theo số lượng port và độ dài nhãn port** để giữ rõ ràng theo sơ đồ chuẩn PDF.
+- Chiều cao hiển thị Device L1 phải theo baseline chuẩn **76px @ scale 1x**; thân Device vẫn giữ chiều cao tối thiểu đủ hiển thị nhãn (không thấp hơn mức tối thiểu body).
 - Khoảng cách giữa thiết bị trong auto-layout **tính cả phần mở rộng theo port band** để tránh chồng lấn.
 - Render L1 ưu tiên kiểu kỹ thuật: đường orthogonal/góc vuông rõ, giảm dùng màu nhấn cho link LAN/DEFAULT để hạn chế rối.
 - L1 routing phải **không xuyên qua object khác** (device/area không liên quan); nếu tuyến chuẩn hóa gây va chạm thì phải fallback sang tuyến orthogonal tránh vật cản.

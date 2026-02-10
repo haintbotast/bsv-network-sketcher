@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-06  
+> **Cập nhật:** 2026-02-10  
 > **Phạm vi:** Ứng dụng web Network Sketcher (port từ repo gốc)  
 > **Nguyên tắc:** Tối giản, chính xác tuyệt đối, UX tiện dụng, **không triển khai CLI**.
 
@@ -56,6 +56,7 @@
 - Cho phép **chỉnh anchor port thủ công** (side + offset_ratio) để tinh chỉnh đường kết nối; `offset_ratio` có thể để `null` để giữ **auto offset**.
 - Cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port** ngay trong bảng thuộc tính thiết bị, có kiểm tra trùng và port đã dùng.
 - Auto-layout tự chạy khi mở project và sau CRUD topology; thao tác viewport (`pan/zoom/reset view`) không làm thay đổi layout.
+- Chạy auto-layout thủ công từ tab **Bố cục** phải có chế độ an toàn mặc định **giữ vị trí đã lưu** và chế độ **ghi đè toàn bộ vị trí** khi người dùng cần căn lại toàn cục.
 - Khi có placement map `grid_row/grid_col`, macro layout phải bám lưới theo cơ chế **cột center-slot** để giữ area gần bố cục PDF chuẩn dù có area rộng bất thường.
 - Cho phép bật chế độ chỉnh vị trí thủ công để kéo‑thả `Area/Device`; vị trí được lưu ngay sau drag‑end và không bị auto-layout tự động ghi đè ngay lập tức.
 - Cụm điều khiển chính (`zoom/reset/L1/L2/L3/Sửa vị trí`) cần nằm ở main navigator panel và **canh giữa theo panel**; khi drag object phải có gióng/snap để căn chỉnh nhanh theo object liên quan.

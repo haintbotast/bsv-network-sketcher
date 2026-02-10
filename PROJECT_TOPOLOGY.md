@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.1  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-09  
+> **Cập nhật:** 2026-02-10  
 > **Trạng thái:** Tài liệu kiến trúc vận hành  
 > **Nguyên tắc:** Dự án web tham chiếu Network Sketcher gốc (logic), **không triển khai CLI**; ưu tiên đúng logic và UX tối giản nhưng dùng được ngay.
 
@@ -70,6 +70,9 @@ UI thao tác → REST API → Service → DB → phản hồi → UI render
 ```
 - Auto-layout tự chạy khi mở project **nếu dữ liệu chưa ổn định tọa độ** (thiếu `grid_range` hoặc thiếu `position_x/position_y`) và sau CRUD topology (area/device/link/port-link/anchor override).
 - Thao tác viewport (`pan/zoom/reset view`) chỉ đổi góc nhìn trên client, **không** trigger auto-layout.
+- Auto-layout thủ công từ tab **Bố cục** có 2 chế độ:
+  - `preserve_existing_positions=true` (mặc định, khuyến nghị): giữ tọa độ Area/Device đã có trong DB, chỉ điền vị trí còn thiếu.
+  - `preserve_existing_positions=false`: ghi đè toàn bộ tọa độ theo kết quả auto-layout mới.
 - Macro layout L1 khi có `grid_row/grid_col` dùng cơ chế **center-slot theo cột** (độ rộng cột đại diện theo trung vị) để giữ area bám bố cục chuẩn PDF và giảm lệch do area outlier quá rộng.
 - Micro layout L1 căn giữa các hàng thiết bị trong cùng layer khi phải tách nhiều hàng, giúp vị trí object cân đối hơn theo mẫu kỹ thuật.
 - Kéo‑thả thủ công `Area/Device` (khi bật chế độ sửa vị trí) lưu trực tiếp `position_x/position_y` về DB tại `drag-end` và không trigger auto-layout.

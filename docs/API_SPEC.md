@@ -1,8 +1,8 @@
 ﻿# API Spec (tối giản) - Web Network Sketcher
 
-> **Phiên bản:** 1.2
+> **Phiên bản:** 1.3
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-02-09
+> **Cập nhật:** 2026-02-10
 > **Mục tiêu:** Đặc tả API phục vụ nhập liệu trực tiếp, quản lý dự án và xuất dữ liệu.
 
 ---
@@ -135,7 +135,8 @@ POST /projects/{project_id}/invalidate-layout-cache
   "layout_scope": "project|area",
   "anchor_routing": true,
   "overview_mode": "l1-only",
-  "normalize_topology": false
+  "normalize_topology": false,
+  "preserve_existing_positions": false
 }
 ```
 
@@ -152,6 +153,7 @@ POST /projects/{project_id}/invalidate-layout-cache
 - `group_by_area=true` là mặc định theo AI Context: layout 2 tầng (macro Area + micro Device).
 - `overview_mode="l1-only"` để tránh đè nhãn L2/L3 trong overview.
 - `normalize_topology=true` sẽ tự tạo Area Data Center/Server (nếu thiếu) và chuyển device theo quy ước (Access vào area nghiệp vụ, Server về Server, Edge/Security/DMZ/Core/Dist vào Data Center; Monitor/NOC/NMS gộp vào IT).
+- `preserve_existing_positions=true`: giữ tọa độ `Area/Device` đã tồn tại trong DB, chỉ áp layout cho bản ghi còn thiếu vị trí.
 
 ---
 

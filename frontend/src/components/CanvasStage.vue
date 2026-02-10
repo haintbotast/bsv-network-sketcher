@@ -662,6 +662,9 @@ function resolveDeviceRole(device: DeviceModel) {
   if (name.includes('DIST')) {
     return 'dist'
   }
+  if (device.type === 'Server' || name.includes('SRV') || name.includes('SERVER')) {
+    return 'server'
+  }
   if (device.type === 'Switch' && (name.includes('SRV') || name.includes('SERVER') || name.includes('STORAGE') || name.includes('NAS') || name.includes('SAN'))) {
     return 'server'
   }
@@ -784,19 +787,27 @@ function buildDeviceIconShape(
         ctx.moveTo(cx, cy - r * 0.55)
         ctx.lineTo(cx, cy + r * 0.55)
       } else if (kind === 'switch') {
-        const left = x + size * 0.1
-        const top = y + size * 0.16
-        const width = size * 0.8
-        const height = size * 0.68
+        const left = x + size * 0.08
+        const top = y + size * 0.3
+        const width = size * 0.84
+        const height = size * 0.46
         ctx.rect(left, top, width, height)
         const slotW = size * 0.1
-        const slotH = size * 0.1
-        const slotTop = top + height * 0.55
-        const gap = (width - slotW * 4) / 5
-        for (let i = 0; i < 4; i += 1) {
-          const sx = left + gap + i * (slotW + gap)
-          ctx.rect(sx, slotTop, slotW, slotH)
+        const slotH = size * 0.08
+        const colGap = size * 0.04
+        const rowGap = size * 0.07
+        const row1Y = top + size * 0.07
+        const row2Y = row1Y + slotH + rowGap
+        const startX = left + size * 0.08
+        for (let row = 0; row < 2; row += 1) {
+          for (let col = 0; col < 3; col += 1) {
+            const sx = startX + col * (slotW + colGap)
+            const sy = row === 0 ? row1Y : row2Y
+            ctx.rect(sx, sy, slotW, slotH)
+          }
         }
+        ctx.moveTo(left + size * 0.1, top - size * 0.08)
+        ctx.lineTo(left + width - size * 0.1, top - size * 0.08)
       } else if (kind === 'firewall') {
         const left = x + size * 0.14
         const top = y + size * 0.18
@@ -814,18 +825,24 @@ function buildDeviceIconShape(
         ctx.moveTo(left + width * 0.3, top + (height * 2) / 3)
         ctx.lineTo(left + width * 0.3, top + height)
       } else if (kind === 'server') {
-        const left = x + size * 0.14
-        const top = y + size * 0.14
-        const width = size * 0.72
-        const height = size * 0.72
+        const left = x + size * 0.24
+        const top = y + size * 0.1
+        const width = size * 0.52
+        const height = size * 0.8
         ctx.rect(left, top, width, height)
-        ctx.moveTo(left, top + height / 3)
-        ctx.lineTo(left + width, top + height / 3)
-        ctx.moveTo(left, top + (height * 2) / 3)
-        ctx.lineTo(left + width, top + (height * 2) / 3)
-        const ledR = size * 0.04
-        ctx.moveTo(left + width * 0.86 + ledR, top + height / 6)
-        ctx.arc(left + width * 0.86, top + height / 6, ledR, 0, Math.PI * 2)
+        const bay1Y = top + height * 0.28
+        const bay2Y = top + height * 0.56
+        ctx.moveTo(left, bay1Y)
+        ctx.lineTo(left + width, bay1Y)
+        ctx.moveTo(left, bay2Y)
+        ctx.lineTo(left + width, bay2Y)
+        const ledR = size * 0.03
+        const ledX = left + width * 0.2
+        const ledYs = [top + height * 0.14, top + height * 0.42, top + height * 0.7]
+        ledYs.forEach(ledY => {
+          ctx.moveTo(ledX + ledR, ledY)
+          ctx.arc(ledX, ledY, ledR, 0, Math.PI * 2)
+        })
       } else if (kind === 'storage') {
         const rx = size * 0.28
         const ry = size * 0.12
@@ -849,15 +866,24 @@ function buildDeviceIconShape(
           ctx.arc(cx, cy + size * 0.14, r, Math.PI * 1.18, Math.PI * 1.82)
         })
       } else if (kind === 'endpoint') {
-        const left = x + size * 0.12
+        const left = x + size * 0.08
         const top = y + size * 0.16
-        const width = size * 0.76
-        const height = size * 0.48
+        const width = size * 0.62
+        const height = size * 0.42
+        const screenCx = left + width / 2
         ctx.rect(left, top, width, height)
-        ctx.moveTo(cx, top + height)
-        ctx.lineTo(cx, y + size * 0.82)
-        ctx.moveTo(cx - size * 0.18, y + size * 0.82)
-        ctx.lineTo(cx + size * 0.18, y + size * 0.82)
+        ctx.moveTo(screenCx, top + height)
+        ctx.lineTo(screenCx, y + size * 0.82)
+        ctx.moveTo(screenCx - size * 0.2, y + size * 0.82)
+        ctx.lineTo(screenCx + size * 0.14, y + size * 0.82)
+        const towerX = x + size * 0.76
+        const towerY = y + size * 0.24
+        const towerW = size * 0.14
+        const towerH = size * 0.48
+        ctx.rect(towerX, towerY, towerW, towerH)
+        const btnR = size * 0.02
+        ctx.moveTo(towerX + towerW * 0.5 + btnR, towerY + towerH * 0.18)
+        ctx.arc(towerX + towerW * 0.5, towerY + towerH * 0.18, btnR, 0, Math.PI * 2)
       } else {
         const left = x + size * 0.14
         const top = y + size * 0.14

@@ -9,13 +9,18 @@ from .layout_constants import DEFAULT_DEVICE_WIDTH, DEFAULT_DEVICE_HEIGHT
 from app.services.grid_sync import sync_area_grid_from_geometry, sync_device_grid_from_geometry
 
 
-async def apply_layout_to_db(db: AsyncSession, device_layouts: list[dict]) -> None:
+async def apply_layout_to_db(
+    db: AsyncSession,
+    device_layouts: list[dict],
+    preserve_existing_positions: bool = False,
+) -> None:
     """
     Apply layout coordinates to database.
 
     Args:
         db: Database session
         device_layouts: List of device layout dicts
+        preserve_existing_positions: If True, keep existing coordinates when present
 
     Updates device.position_x and device.position_y in database.
     Also updates area positions based on device bounds.
@@ -39,13 +44,20 @@ async def apply_layout_to_db(db: AsyncSession, device_layouts: list[dict]) -> No
         device = result.scalar_one_or_none()
 
         if device:
-            device.position_x = x
-            device.position_y = y
-            sync_device_grid_from_geometry(
-                device,
-                default_width=DEFAULT_DEVICE_WIDTH,
-                default_height=DEFAULT_DEVICE_HEIGHT,
+            has_existing_position = (
+                device.position_x is not None and device.position_y is not None
             )
+            if preserve_existing_positions and has_existing_position:
+                x = float(device.position_x)
+                y = float(device.position_y)
+            else:
+                device.position_x = x
+                device.position_y = y
+                sync_device_grid_from_geometry(
+                    device,
+                    default_width=DEFAULT_DEVICE_WIDTH,
+                    default_height=DEFAULT_DEVICE_HEIGHT,
+                )
 
             # Track devices by area for bounds calculation
             if device.area_id:
@@ -100,6 +112,7 @@ async def apply_grouped_layout_to_db(
     device_layouts: list[DeviceLayout],
     area_layouts: list[AreaLayout] | None,
     layout_scope: str,
+    preserve_existing_positions: bool = False,
 ) -> None:
     """Apply grouped layout to DB (devices always, areas when scope=project)."""
     from app.db.models import Device, Area
@@ -109,6 +122,11 @@ async def apply_grouped_layout_to_db(
         result = await db.execute(select(Device).where(Device.id == layout.id))
         device = result.scalar_one_or_none()
         if device:
+            has_existing_position = (
+                device.position_x is not None and device.position_y is not None
+            )
+            if preserve_existing_positions and has_existing_position:
+                continue
             device.position_x = layout.x
             device.position_y = layout.y
             sync_device_grid_from_geometry(
@@ -122,6 +140,11 @@ async def apply_grouped_layout_to_db(
             result = await db.execute(select(Area).where(Area.id == layout.id))
             area = result.scalar_one_or_none()
             if area:
+                has_existing_position = (
+                    area.position_x is not None and area.position_y is not None
+                )
+                if preserve_existing_positions and has_existing_position:
+                    continue
                 area.position_x = layout.x
                 area.position_y = layout.y
                 area.width = layout.width

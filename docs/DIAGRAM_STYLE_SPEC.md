@@ -58,6 +58,9 @@
   - **mở project khi dữ liệu thiếu tọa độ ổn định** (`grid_range` hoặc `position_x/position_y`),
   - CRUD dữ liệu topology.
   Thao tác viewport (`pan/zoom/reset view`) chỉ đổi góc nhìn và **không được phép** kích auto-layout.
+- Tab **Bố cục** có 2 chế độ chạy tay:
+  - **Giữ vị trí đã lưu** (`preserve_existing_positions=true`) để không mất chỉnh tay.
+  - **Ghi đè toàn bộ vị trí** (`preserve_existing_positions=false`) khi cần căn lại toàn cục.
 - **Kéo‑thả object thủ công:** chỉ có hiệu lực khi bật chế độ **Sửa vị trí**; áp dụng cho `Area/Device`, lưu `position_x/position_y` tại `drag-end`, và không kích hoạt auto-layout từ chính thao tác kéo‑thả này.
 - **Align guide khi drag:** trong chế độ sửa vị trí, UI hiển thị đường gióng ngang/dọc và snap nhẹ theo object liên quan (device cùng area hoặc area cùng cấp) để chỉnh tay chính xác.
 - **Mốc tọa độ chuẩn:** X/Y thủ công dùng step mặc định **0.25 đv**; drag và nhập tay đều chuẩn hóa về mốc này để tránh số lẻ rời rạc.
@@ -222,12 +225,12 @@ Quy định khi áp dụng:
 | Loại thiết bị | Icon gợi nhớ | Quy tắc hiển thị |
 |---------------|--------------|------------------|
 | Router | Lục giác + trục ngang/dọc | Nét mảnh, không fill |
-| Switch (Core/Dist/Access) | Khối chữ nhật + hàng port mini | Nét mảnh, không fill |
+| Switch (Core/Dist/Access) | Chassis ngang + 2 hàng port mini | Nét mảnh, không fill |
 | Firewall | Khối tường gạch đơn giản | Nét mảnh, không fill |
-| Server | Rack 3 ngăn | Nét mảnh, không fill |
+| Server | Rack đứng 3 khoang + LED trạng thái | Nét mảnh, không fill |
 | Storage | Cylinder | Nét mảnh, không fill |
 | AP | Chấm + 2 cung sóng | Nét mảnh, không fill |
-| Endpoint/PC | Màn hình + chân đế | Nét mảnh, không fill |
+| Endpoint/PC | Màn hình + chân đế + tower | Nét mảnh, không fill |
 | Unknown | Khung vuông + `?` | Nét đứt |
 
 Ràng buộc kỹ thuật:

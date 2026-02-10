@@ -1,6 +1,6 @@
 # Chiến lược kiểm thử
 
-> **Phiên bản:** 1.2
+> **Phiên bản:** 1.3
 > **Tạo:** 2026-01-23
 > **Cập nhật:** 2026-02-10  
 > **Mục tiêu:** Quy định chiến lược kiểm thử và golden files.
@@ -21,6 +21,7 @@
 - **area_compact_render:** L1 hiển thị Area dạng compact theo cụm thiết bị để giảm khoảng trắng nhưng không làm sai dữ liệu area gốc.
 - **l1_device_height_balance_policy:** chiều cao hiển thị Device trên canvas được chuẩn hóa theo mốc chuẩn (76px @ scale 1x), giữ kích thước lớn hơn nếu dữ liệu thực lớn hơn mốc.
 - **l1_device_body_min_height_policy:** thân Device (vùng đặt nhãn) luôn có chiều cao tối thiểu 24px để bảo đảm đọc được tên thiết bị khi có port band.
+- **l1_device_backend_frontend_size_parity_policy:** công thức ước lượng kích thước Device của backend phải khớp baseline render frontend (tổng cao chuẩn 76px và body tối thiểu theo nhãn) để tránh chồng lấn khi auto-layout.
 - **l1_device_icon_mapping_policy:** icon nhận diện loại thiết bị phải map đúng nhóm thiết bị (`Router/Switch/Firewall/Server/Storage/AP/Endpoint/Unknown`) và hiển thị nhất quán giữa các lần render.
 - **l1_device_icon_port_safety_policy:** icon chỉ nằm trong thân device, không chạm port band top/bottom và không làm lệch anchor/port cell.
 - **peer_control_link_render:** `STACK/HA/HSRP` phải có style hiển thị riêng (màu/nét/lane) và không hòa lẫn với uplink/data.
@@ -57,6 +58,8 @@
 - **main_navigator_center_policy:** cụm điều khiển viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) hiển thị canh giữa trong main navigator panel.
 - **manual_position_edit_policy:** khi bật chế độ sửa vị trí, kéo‑thả `Area/Device` phải lưu `position_x/position_y` về DB ở `drag-end` và không trigger `/auto-layout`.
 - **manual_position_property_save_policy:** lưu thuộc tính `Area/Device` nếu chỉ đổi `position_x/position_y/grid_range` thì không trigger `/auto-layout`.
+- **manual_auto_layout_preserve_policy:** chạy auto-layout thủ công với `preserve_existing_positions=true` phải giữ nguyên mọi `Area/Device` đã có tọa độ và chỉ fill bản ghi thiếu tọa độ.
+- **manual_auto_layout_overwrite_policy:** chạy auto-layout thủ công với `preserve_existing_positions=false` phải ghi đè toàn bộ tọa độ `Area/Device` theo kết quả layout mới.
 - **drag_alignment_policy:** trong chế độ sửa vị trí phải hiển thị guide ngang/dọc và snap nhẹ khi object gần mốc align của object liên quan.
 - **position_standard_table_policy:** `position_x/position_y` sau drag hoặc nhập tay phải nằm trên mốc chuẩn (bội số step 0.25 đv).
 - **layout_db_grid_sync_policy:** khi apply auto-layout vào DB (L1/L2/L3 + waypoint), phải đồng bộ chặt `position_*` và `grid_range`; `grid_row/grid_col` của Area được giữ như placement map logic (không bị auto-layout ghi đè).

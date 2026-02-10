@@ -263,13 +263,23 @@ async def compute_auto_layout(
     if options.apply_to_db:
         if view_mode == "L1":
             if options.group_by_area:
-                await apply_grouped_layout_to_db(db, response["devices"], response.get("areas"), options.layout_scope)
+                await apply_grouped_layout_to_db(
+                    db,
+                    response["devices"],
+                    response.get("areas"),
+                    options.layout_scope,
+                    preserve_existing_positions=options.preserve_existing_positions,
+                )
             else:
                 device_dicts = [
                     {"id": d.id, "x": d.x, "y": d.y, "layer": d.layer}
                     for d in response["devices"]
                 ]
-                await apply_layout_to_db(db, device_dicts)
+                await apply_layout_to_db(
+                    db,
+                    device_dicts,
+                    preserve_existing_positions=options.preserve_existing_positions,
+                )
         elif view_mode in ("L2", "L3"):
             for layout in response["devices"]:
                 from app.db.models import Device
@@ -278,6 +288,11 @@ async def compute_auto_layout(
                 result = await db.execute(select(Device).where(Device.id == layout.id))
                 device = result.scalar_one_or_none()
                 if device:
+                    has_existing_position = (
+                        device.position_x is not None and device.position_y is not None
+                    )
+                    if options.preserve_existing_positions and has_existing_position:
+                        continue
                     device.position_x = layout.x
                     device.position_y = layout.y
                     sync_device_grid_from_geometry(

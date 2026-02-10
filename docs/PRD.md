@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.0  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-09  
+> **Cập nhật:** 2026-02-10  
 > **Nguyên tắc:** Tối giản nhưng chính xác tuyệt đối, UX tiện dụng, không CLI.
 
 ---
@@ -39,10 +39,12 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-14:** Cho phép người dùng **chỉnh thủ công anchor của port** (side + offset_ratio, cho phép `offset_ratio = null` để giữ auto offset) và **giữ override khi chạy lại auto-layout**.
 - **FR-15:** Cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port** ngay trong bảng thuộc tính thiết bị, có kiểm tra trùng và port đã dùng.
 - **FR-16:** Auto-layout tự chạy khi mở project và sau CRUD topology; thao tác viewport (`pan/zoom/reset view`) không được trigger auto-layout.
+- **FR-16B:** Tab **Bố cục** phải hỗ trợ chạy auto-layout thủ công theo 2 chế độ: **giữ vị trí đã lưu** (`preserve_existing_positions=true`, mặc định) và **ghi đè toàn bộ vị trí** (`preserve_existing_positions=false`).
 - **FR-16A:** Với project có `grid_row/grid_col` rõ ràng, macro layout phải bám lưới theo cơ chế **center-slot theo cột** để giữ area gần bố cục PDF chuẩn dù có area outlier rất rộng.
 - **FR-17:** L1 port anchor mặc định theo chuẩn: **uplink gắn top**, **non-uplink gắn bottom**; override thủ công là ưu tiên cao nhất.
 - **FR-17A:** Ở L1, endpoint link phải bám đúng ô port; tách lane/bundle chỉ bắt đầu sau đoạn stub rời port (không lane-shift trực tiếp tại anchor).
 - **FR-18:** Trong L1, nhãn port phải hiển thị như **một phần của object** (port band top/bottom) và kích thước object tự nới theo số lượng/độ dài port để khớp sơ đồ chuẩn.
+- **FR-18A:** Chiều cao hiển thị device trên canvas cần theo baseline chuẩn **76px @ scale 1x** (giữ kích thước lớn hơn nếu dữ liệu thực lớn hơn baseline) để các object cân bằng giữa các lớp.
 - **FR-19:** Render L1 theo phong cách kỹ thuật: ưu tiên đường orthogonal/góc vuông rõ và dùng màu trung tính cho link LAN/DEFAULT để giảm rối.
 - **FR-20:** Khung Area ở L1 được phép hiển thị dạng compact theo cụm thiết bị để giảm khoảng trắng, nhưng không thay đổi dữ liệu Area lưu trong DB.
 - **FR-21:** Link `STACK/HA/HSRP` trong L1 phải có style chuyên biệt (màu/nét/lane) và được tách hiển thị khỏi nhóm uplink/data.

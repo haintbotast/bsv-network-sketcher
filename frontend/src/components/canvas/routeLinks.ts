@@ -274,6 +274,22 @@ function buildInterAreaPath(
   return simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
 }
 
+function buildDirectIntraPath(
+  fromAnchor: Point,
+  toAnchor: Point,
+  fromBase: Point,
+  toBase: Point,
+  obstacles: Rect[],
+  clearance: number,
+  preferAxis: 'x' | 'y'
+) {
+  const orth = connectOrthogonal(fromBase, toBase, obstacles, clearance, preferAxis)
+  if (!orth || orth.length < 2) return null
+  const candidate = simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
+  if (pathBlocked(candidate, obstacles, clearance)) return null
+  return candidate
+}
+
 export function routeLinks(
   linkMetas: Array<LinkMeta | null>,
   laneIndex: Map<string, { index: number; total: number }>,
@@ -417,8 +433,30 @@ export function routeLinks(
       }
 
       let path: Point[] = []
+      const preferAxis: 'x' | 'y' = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
+      const bundle = linkBundleIndex.get(link.id)
+      const bundleTotal = bundle?.total ?? 1
+      const isHorizontalPair = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y)
+      const sameSide = fromAnchor.side === toAnchor.side
+      const isTopBottomSidePair = (fromAnchor.side === 'top' || fromAnchor.side === 'bottom')
+        && (toAnchor.side === 'top' || toAnchor.side === 'bottom')
+      const canTryDirectIntra = isL1View && isIntraArea && isHorizontalPair && sameSide && isTopBottomSidePair
+      if (canTryDirectIntra && (peerPurpose !== null || bundleTotal <= 2)) {
+        const directIntraPath = buildDirectIntraPath(
+          { x: fromAnchor.x, y: fromAnchor.y },
+          { x: toAnchor.x, y: toAnchor.y },
+          fromBase,
+          toBase,
+          obstacles,
+          clearance,
+          preferAxis
+        )
+        if (directIntraPath) {
+          path = directIntraPath
+        }
+      }
 
-      if (isL1View && peerPurpose && isIntraArea) {
+      if (!path.length && isL1View && peerPurpose && isIntraArea) {
         const laneY = resolvePeerLaneY(fromAnchor.side as ExitSide, toAnchor.side as ExitSide, fromBase, toBase, fromCenter, toCenter, peerPurpose, scale)
         const peerPath = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
@@ -435,8 +473,6 @@ export function routeLinks(
       }
 
       if (!path.length) {
-        const preferAxis: 'x' | 'y' = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
-        const bundle = linkBundleIndex.get(link.id)
         const bundleOffset = bundle && bundle.total > 1
           ? (bundle.index - (bundle.total - 1) / 2) * Math.max(BUNDLE_OFFSET_MIN, (renderTuning.bundle_gap ?? 0) * scale * BUNDLE_OFFSET_FACTOR)
           : 0

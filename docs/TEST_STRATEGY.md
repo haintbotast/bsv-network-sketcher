@@ -30,6 +30,8 @@
 - **port_turn_clearance_policy:** điểm rẽ đầu tiên của link L1 phải cách port band đủ xa để không dính nhãn port.
 - **l1_stub_fan_rank_policy:** fan-out đoạn stub phải dựa trên rank endpoint active theo `(device, side)`, không phụ thuộc trực tiếp vào bề rộng/cao device.
 - **l1_short_same_side_fan_sync_policy:** link nội‑area ngắn có hai đầu cùng side phải đồng bộ fan hai đầu để tránh “hộp nhỏ” gần port band.
+- **l1_direct_intra_priority_policy:** với cặp nội‑area theo phương ngang, cùng side `top/top` hoặc `bottom/bottom`, nếu tuyến direct/orthogonal ngắn không bị cản thì phải ưu tiên trước lane U theo purpose.
+- **l1_vertical_pair_routing_policy:** với cặp nội‑area xếp dọc trên‑dưới, routing không ép theo rule direct ngang; phải giữ tuyến orthogonal dọc dễ đọc.
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
 - **main_navigator_center_policy:** cụm điều khiển viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) hiển thị canh giữa trong main navigator panel.
 - **manual_position_edit_policy:** khi bật chế độ sửa vị trí, kéo‑thả `Area/Device` phải lưu `position_x/position_y` về DB ở `drag-end` và không trigger `/auto-layout`.
@@ -282,6 +284,8 @@ test.describe('Diagram Editor', () => {
 - [ ] Port turn clearance: điểm rẽ đầu tiên không dính sát port band/label ở scale 1x (đạt khoảng cách tối thiểu theo profile tuning).
 - [ ] Stub fan rank: endpoint active cùng `(device, side)` được tách fan theo thứ tự ổn định; spread fan không vượt ngưỡng style tại scale hiện hành.
 - [ ] Short same-side fan sync: link nội‑area ngắn có hai đầu cùng side không tạo “hộp nhỏ” sát port (fan hai đầu đồng bộ).
+- [ ] Direct intra priority: cặp ngang `top/top` hoặc `bottom/bottom` không vật cản phải đi tuyến direct/orthogonal ngắn, không bị ép chữ U chỉ vì purpose.
+- [ ] Vertical pair routing: cặp xếp dọc trên‑dưới không dùng rule direct ngang; tuyến giữ dạng orthogonal dọc nhất quán.
 - [ ] Port embedded render: port label hiển thị trong object theo dải top/bottom, không còn nhãn port nổi trên link ở view L1.
 - [ ] Port embedded render: object tự nới rộng/nới cao theo số lượng và độ dài port để không đè chữ.
 - [ ] Dense row spacing: với cụm nhiều uplink giữa 2 hàng thiết bị, auto-layout phải tăng khoảng cách hàng đủ để giảm chèn/đè link.

@@ -76,6 +76,8 @@
   - Dựng stub từ anchor port.
   - Nối orthogonal bằng thuật toán tuyến tính.
   - Nếu bị cản thì fallback orthogonal đơn giản (không dùng tối ưu toàn cục/A\*).
+- **Path validity gate (L1):** mọi candidate/fallback phải qua kiểm tra va chạm (`pathBlocked`); không chấp nhận tuyến ép xuyên object.
+- **Boundary escape fallback (L1):** khi các tuyến cục bộ đều bị chặn, router thử hành lang biên theo bao obstacle (obstacle hull) để tìm tuyến orthogonal an toàn.
 - Sau bước chuẩn hóa orthogonal, nếu tuyến cắt qua object thì fallback tuyến orthogonal thay thế để bảo toàn tính hợp lệ.
 - **Pair alignment:** với nhiều link giữa 2 thiết bị kề nhau, anchor được **xếp đồng bộ theo thứ tự port phía đối diện** để giảm chéo.
 - **Same-row alignment:** link giữa **2 thiết bị cùng hàng/cùng cột** sẽ ưu tiên **canh thẳng anchor + ô port** (ngang hoặc dọc). Chỉ áp dụng khi **đường thẳng không bị vật cản**; nếu bị cản thì giữ routing tránh vật cản.
@@ -86,7 +88,7 @@
 - **Quy ước side tự động (L1):** mặc định chỉ dùng **top/bottom** cho anchor port:
   - **uplink => top**
   - **non-uplink => bottom**
-  - **left/right** chỉ dùng khi có **override thủ công**.
+  - **left/right** có thể xuất hiện ở dữ liệu override, nhưng render/routing L1 chuẩn hóa về side port band (`top` hoặc `bottom`) để tránh lệch điểm xuất phát link.
 - **Port side stability (L1):** side tự động chỉ theo policy `top/bottom`; không tự ép sang `left/right` trong auto pass để tránh lệch giữa anchor và port band.
 - **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng; offset tối thiểu bằng **max(`bundle_gap`, `grid cell`)** và **tự nhân hệ số theo `total`** (nhiều link → khoảng cách lớn hơn). Với tuyến ưu tiên trục dọc, bundle gap được tăng thêm hệ số mạnh hơn để giảm chồng đoạn đứng. Router cho phép **stem de-overlap** (lệch nhỏ sau stub theo rank endpoint) để tách các đoạn đứng/đoạn ngang còn sát nhau.
 - **Stub fan theo rank active (L1):** fan-out đoạn stub được tính theo **thứ tự endpoint active** trên cùng `(device, side)` với spread chuẩn `0..28px * scale`, tránh phụ thuộc trực tiếp vào kích thước object.
@@ -397,5 +399,5 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 - Quy tắc side của port:
   - `top`: ưu tiên uplink/peer-control.
   - `bottom`: ưu tiên downlink.
-  - `left/right`: chỉ dùng khi cần bám hình học đặc thù hoặc người dùng override.
-- Khi render L1, nếu có xung đột giữa khai báo port và anchor override thủ công: **anchor override** có ưu tiên cao hơn.
+  - `left/right`: dùng cho dữ liệu override hoặc ngữ cảnh đặc thù; với L1 sẽ chuẩn hóa về `top/bottom` theo quy ước port band.
+- Khi render L1, nếu có xung đột giữa khai báo port và anchor override thủ công: **anchor override** có ưu tiên cao hơn, sau đó áp quy tắc chuẩn hóa side của L1.

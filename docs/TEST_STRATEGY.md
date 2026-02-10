@@ -26,7 +26,10 @@
 - **endpoint_anchor_alignment_policy:** endpoint của link L1 phải bám đúng anchor ô port (không dời anchor để tách lane).
 - **port_cell_center_alignment_policy:** với port band top/bottom, tọa độ anchor X của link phải trùng tâm ô port render (sai số <= 1px).
 - **l1_auto_side_stability_policy:** auto-pass L1 không tự ép `left/right`; side tự động chỉ dùng `top/bottom` khi không có override thủ công.
+- **l1_override_side_normalization_policy:** ở L1, override side phải được chuẩn hóa theo port band (`top` giữ nguyên, `left/right/bottom` về `bottom`) để tránh lệch anchor so với điểm render port.
 - **l1_no_object_crossing_policy:** tuyến L1 sau chuẩn hóa orthogonal không được xuyên qua device/area không liên quan.
+- **l1_path_validity_gate_policy:** mọi tuyến candidate/fallback sau khi dựng path đều phải pass `pathBlocked`; không được giữ tuyến bị chặn để render.
+- **l1_boundary_escape_fallback_policy:** khi fallback cục bộ thất bại, router phải thử hành lang biên theo bao obstacle để tìm tuyến orthogonal an toàn trước khi bỏ link.
 - **port_turn_clearance_policy:** điểm rẽ đầu tiên của link L1 phải cách port band đủ xa để không dính nhãn port.
 - **l1_stub_fan_rank_policy:** fan-out đoạn stub phải dựa trên rank endpoint active theo `(device, side)`, không phụ thuộc trực tiếp vào bề rộng/cao device.
 - **l1_short_same_side_fan_sync_policy:** link nội‑area ngắn có hai đầu cùng side phải đồng bộ fan hai đầu để tránh “hộp nhỏ” gần port band.
@@ -284,7 +287,10 @@ test.describe('Diagram Editor', () => {
 - [ ] Endpoint anchor alignment: endpoint link L1 trùng anchor port-cell tương ứng (sai số render <= 1px), lane separation bắt đầu sau stub.
 - [ ] Port-cell center alignment: với device có port dài/ngắn khác nhau, điểm xuất phát link vẫn trùng tâm ô port tương ứng (không lệch sang khe giữa ô).
 - [ ] L1 auto-side stability: khi không có override thủ công, auto anchor không phát sinh side `left/right`.
+- [ ] L1 override side normalization: dữ liệu override `left/right` ở L1 vẫn phải cho endpoint bám đúng side port band và không tạo đoạn lệch khỏi ô port.
 - [ ] L1 no-object crossing: link sau chuẩn hóa orthogonal không xuyên device/area không liên quan trong các cụm dày.
+- [ ] L1 path validity gate: không có link nào được render nếu còn va chạm obstacle sau các nhánh fallback.
+- [ ] L1 boundary escape fallback: trong ca dense obstacles, router vẫn tìm được tuyến orthogonal an toàn qua hành lang biên bao obstacle.
 - [ ] Port turn clearance: điểm rẽ đầu tiên không dính sát port band/label ở scale 1x (đạt khoảng cách tối thiểu theo profile tuning).
 - [ ] Stub fan rank: endpoint active cùng `(device, side)` được tách fan theo thứ tự ổn định; spread fan không vượt ngưỡng style tại scale hiện hành.
 - [ ] Short same-side fan sync: link nội‑area ngắn có hai đầu cùng side không tạo “hộp nhỏ” sát port (fan hai đầu đồng bộ).

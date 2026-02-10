@@ -27,6 +27,11 @@ export function usePortAnchors(deps: {
   portAnchorOverrides?: ComputedRef<PortAnchorOverrideMap>
 }) {
   const { props, renderTuning, deviceViewMap, portAnchorOverrides } = deps
+  const normalizeOverrideSide = (side: 'left' | 'right' | 'top' | 'bottom') => {
+    if ((props.viewMode || 'L1') !== 'L1') return side
+    if (side === 'top') return 'top'
+    return 'bottom'
+  }
 
   const deviceInfoMap = computed(() => {
     return buildDeviceTierMap((props as { devices?: DeviceModel[] }).devices)
@@ -150,7 +155,7 @@ export function usePortAnchors(deps: {
       portAnchorOverrides.value.forEach((ports, deviceId) => {
         const portSide = resolved.get(deviceId) || new Map<string, string>()
         ports.forEach((override, port) => {
-          portSide.set(port, override.side)
+          portSide.set(port, normalizeOverrideSide(override.side))
         })
         resolved.set(deviceId, portSide)
       })
@@ -285,9 +290,10 @@ export function usePortAnchors(deps: {
       const deviceOverrides = portAnchorOverrides.value.get(deviceId)
       const override = deviceOverrides?.get(portName)
       if (override) {
+        const overrideSide = normalizeOverrideSide(override.side)
         if (overrides) {
           const autoAnchor = overrides.get(deviceId)?.get(portName)
-          if (autoAnchor && autoAnchor.side === override.side) return autoAnchor
+          if (autoAnchor && autoAnchor.side === overrideSide) return autoAnchor
         }
         const inset = renderTuning.value.port_edge_inset ?? 0
         const usableWidth = Math.max(rect.width - inset * 2, 1)
@@ -296,26 +302,26 @@ export function usePortAnchors(deps: {
           const anchors = devicePortAnchors.value.get(deviceId)
           const autoAnchor = anchors?.get(portName)
           if (autoAnchor) return autoAnchor
-          if (override.side === 'left' || override.side === 'right') {
+          if (overrideSide === 'left' || overrideSide === 'right') {
             const ratio = clamp((target.y - rect.y - inset) / usableHeight, 0.1, 0.9)
             const y = rect.y + inset + usableHeight * ratio
-            const x = override.side === 'left' ? rect.x : rect.x + rect.width
-            return { x, y, side: override.side }
+            const x = overrideSide === 'left' ? rect.x : rect.x + rect.width
+            return { x, y, side: overrideSide }
           }
           const ratio = clamp((target.x - rect.x - inset) / usableWidth, 0.1, 0.9)
           const x = rect.x + inset + usableWidth * ratio
-          const y = override.side === 'top' ? rect.y : rect.y + rect.height
-          return { x, y, side: override.side }
+          const y = overrideSide === 'top' ? rect.y : rect.y + rect.height
+          return { x, y, side: overrideSide }
         }
         const ratio = clamp(override.offsetRatio, 0, 1)
-        if (override.side === 'left' || override.side === 'right') {
+        if (overrideSide === 'left' || overrideSide === 'right') {
           const y = rect.y + inset + usableHeight * ratio
-          const x = override.side === 'left' ? rect.x : rect.x + rect.width
-          return { x, y, side: override.side }
+          const x = overrideSide === 'left' ? rect.x : rect.x + rect.width
+          return { x, y, side: overrideSide }
         }
         const x = rect.x + inset + usableWidth * ratio
-        const y = override.side === 'top' ? rect.y : rect.y + rect.height
-        return { x, y, side: override.side }
+        const y = overrideSide === 'top' ? rect.y : rect.y + rect.height
+        return { x, y, side: overrideSide }
       }
     }
     if (portName && overrides) {

@@ -173,10 +173,57 @@ function findUShapePath(start: Point, end: Point, obstacles: Rect[], clearance: 
   return null
 }
 
-function buildOrthPath(start: Point, end: Point, obstacles: Rect[], clearance: number, preferAxis: 'x' | 'y') {
+function buildBoundaryEscapePath(
+  start: Point,
+  end: Point,
+  obstacles: Rect[],
+  clearance: number,
+  preferAxis: 'x' | 'y'
+) {
+  if (!obstacles.length) return null
+  let minX = Math.min(start.x, end.x)
+  let maxX = Math.max(start.x, end.x)
+  let minY = Math.min(start.y, end.y)
+  let maxY = Math.max(start.y, end.y)
+  obstacles.forEach(rect => {
+    minX = Math.min(minX, rect.x)
+    maxX = Math.max(maxX, rect.x + rect.width)
+    minY = Math.min(minY, rect.y)
+    maxY = Math.max(maxY, rect.y + rect.height)
+  })
+  const basePad = Math.max(clearance, 12)
+  const multipliers = [1, 1.5, 2, 3]
+  for (const m of multipliers) {
+    const pad = basePad * m
+    const topY = minY - pad
+    const bottomY = maxY + pad
+    const leftX = minX - pad
+    const rightX = maxX + pad
+    const candidates = preferAxis === 'x'
+      ? [
+          simplifyPath([start, { x: start.x, y: topY }, { x: end.x, y: topY }, end]),
+          simplifyPath([start, { x: start.x, y: bottomY }, { x: end.x, y: bottomY }, end]),
+          simplifyPath([start, { x: leftX, y: start.y }, { x: leftX, y: end.y }, end]),
+          simplifyPath([start, { x: rightX, y: start.y }, { x: rightX, y: end.y }, end]),
+        ]
+      : [
+          simplifyPath([start, { x: leftX, y: start.y }, { x: leftX, y: end.y }, end]),
+          simplifyPath([start, { x: rightX, y: start.y }, { x: rightX, y: end.y }, end]),
+          simplifyPath([start, { x: start.x, y: topY }, { x: end.x, y: topY }, end]),
+          simplifyPath([start, { x: start.x, y: bottomY }, { x: end.x, y: bottomY }, end]),
+        ]
+    for (const candidate of candidates) {
+      if (!pathBlocked(candidate, obstacles, clearance)) return candidate
+    }
+  }
+  return null
+}
+
+function buildOrthPath(start: Point, end: Point, obstacles: Rect[], clearance: number, preferAxis: 'x' | 'y'): Point[] | null {
   const orth = connectOrthogonal(start, end, obstacles, clearance, preferAxis)
   if (orth && orth.length >= 2) {
-    return simplifyPath(orth)
+    const candidate = simplifyPath(orth)
+    if (!pathBlocked(candidate, obstacles, clearance)) return candidate
   }
 
   const midpoint = preferAxis === 'x'
@@ -211,8 +258,10 @@ function buildOrthPath(start: Point, end: Point, obstacles: Rect[], clearance: n
     }
   }
 
-  // Ép orthogonal (không bao giờ trả đường chéo)
-  return simplifyPath([start, midpoint, end])
+  const escaped = buildBoundaryEscapePath(start, end, obstacles, clearance, preferAxis)
+  if (escaped) return escaped
+
+  return null
 }
 
 function resolvePeerLaneY(
@@ -249,7 +298,7 @@ function buildInterAreaPath(
   laneGap: number,
   obstacles: Rect[],
   clearance: number,
-) {
+): Point[] | null {
   const laneOffset = lane && lane.total > 1
     ? (lane.index - (lane.total - 1) / 2) * laneGap
     : 0
@@ -270,7 +319,10 @@ function buildInterAreaPath(
     ])
     if (!pathBlocked(candidate, obstacles, clearance)) return candidate
     const orth = buildOrthPath(fromBase, toBase, obstacles, clearance, 'x')
-    return simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
+    if (orth) return simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
+    const orthAlt = buildOrthPath(fromBase, toBase, obstacles, clearance, 'y')
+    if (orthAlt) return simplifyPath([fromAnchor, fromBase, ...orthAlt, toBase, toAnchor])
+    return null
   }
 
   const corridorY = (fromBase.y + toBase.y) / 2 + laneOffset
@@ -284,7 +336,10 @@ function buildInterAreaPath(
   ])
   if (!pathBlocked(candidate, obstacles, clearance)) return candidate
   const orth = buildOrthPath(fromBase, toBase, obstacles, clearance, 'y')
-  return simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
+  if (orth) return simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
+  const orthAlt = buildOrthPath(fromBase, toBase, obstacles, clearance, 'x')
+  if (orthAlt) return simplifyPath([fromAnchor, fromBase, ...orthAlt, toBase, toAnchor])
+  return null
 }
 
 function buildDirectIntraPath(
@@ -491,7 +546,7 @@ export function routeLinks(
         })
       }
 
-      let path: Point[] = []
+      let path: Point[] | null = null
       const preferAxis: 'x' | 'y' = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
       const bundle = linkBundleIndex.get(link.id)
       const bundleTotal = bundle?.total ?? 1
@@ -509,11 +564,9 @@ export function routeLinks(
             obstacles,
             clearance
           )
-          if (anchorPath) {
-            path = anchorPath
-          }
+          if (anchorPath) path = anchorPath
         }
-        if (!path.length) {
+        if (!path?.length) {
           const directIntraPath = buildDirectIntraPath(
             { x: fromAnchor.x, y: fromAnchor.y },
             { x: toAnchor.x, y: toAnchor.y },
@@ -523,13 +576,11 @@ export function routeLinks(
             clearance,
             preferAxis
           )
-          if (directIntraPath) {
-            path = directIntraPath
-          }
+          if (directIntraPath) path = directIntraPath
         }
       }
 
-      if (!path.length && isL1View && peerPurpose && isIntraArea) {
+      if (!path?.length && isL1View && peerPurpose && isIntraArea) {
         const laneY = resolvePeerLaneY(fromAnchor.side as ExitSide, toAnchor.side as ExitSide, fromBase, toBase, fromCenter, toCenter, peerPurpose, scale)
         const peerPath = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
@@ -540,12 +591,10 @@ export function routeLinks(
           { x: toAnchor.x, y: toAnchor.y },
         ])
 
-        if (!pathBlocked(peerPath, obstacles, clearance)) {
-          path = peerPath
-        }
+        if (!pathBlocked(peerPath, obstacles, clearance)) path = peerPath
       }
 
-      if (!path.length) {
+      if (!path?.length) {
         const bundleGapBase = Math.max(BUNDLE_OFFSET_MIN, (renderTuning.bundle_gap ?? 0) * scale * BUNDLE_OFFSET_FACTOR)
         const axisBundleGap = preferAxis === 'y'
           ? Math.max(bundleGapBase * 1.8, 14 * scale)
@@ -576,30 +625,48 @@ export function routeLinks(
           const fromShifted = fromShift.shifted
           const toShifted = toShift.shifted
           const orth = buildOrthPath(fromShifted, toShifted, obstacles, clearance, preferAxis)
-          path = simplifyPath([
-            { x: fromAnchor.x, y: fromAnchor.y },
-            { x: fromBase.x, y: fromBase.y },
-            ...fromShift.bridge,
-            ...orth,
-            ...toShift.bridge.slice(0, -1).reverse(),
-            { x: toBase.x, y: toBase.y },
-            { x: toAnchor.x, y: toAnchor.y },
-          ])
+          if (orth) {
+            path = simplifyPath([
+              { x: fromAnchor.x, y: fromAnchor.y },
+              { x: fromBase.x, y: fromBase.y },
+              ...fromShift.bridge,
+              ...orth,
+              ...toShift.bridge.slice(0, -1).reverse(),
+              { x: toBase.x, y: toBase.y },
+              { x: toAnchor.x, y: toAnchor.y },
+            ])
+          }
         }
 
-        if (pathBlocked(path, obstacles, clearance)) {
+        if (path?.length && pathBlocked(path, obstacles, clearance)) {
           const fallback = buildOrthPath({ x: fromBase.x, y: fromBase.y }, { x: toBase.x, y: toBase.y }, obstacles, clearance, preferAxis === 'x' ? 'y' : 'x')
-          path = simplifyPath([
-            { x: fromAnchor.x, y: fromAnchor.y },
-            { x: fromBase.x, y: fromBase.y },
-            ...fallback,
-            { x: toBase.x, y: toBase.y },
-            { x: toAnchor.x, y: toAnchor.y },
-          ])
+          if (fallback) {
+            path = simplifyPath([
+              { x: fromAnchor.x, y: fromAnchor.y },
+              { x: fromBase.x, y: fromBase.y },
+              ...fallback,
+              { x: toBase.x, y: toBase.y },
+              { x: toAnchor.x, y: toAnchor.y },
+            ])
+          } else {
+            const anchorFallback = buildOrthPath(
+              { x: fromAnchor.x, y: fromAnchor.y },
+              { x: toAnchor.x, y: toAnchor.y },
+              obstacles,
+              clearance,
+              preferAxis
+            )
+            path = anchorFallback ? simplifyPath(anchorFallback) : null
+          }
         }
       }
 
+      if (!path?.length || pathBlocked(path, obstacles, clearance)) {
+        return null
+      }
+
       const points = toPointsArray(path)
+      if (points.length < 4) return null
       const neutralL1Purposes = new Set(['', 'DEFAULT', 'LAN'])
       const purposeStroke = resolveLinkPurposeColor(link.purpose)
       const peerVisual = peerPurpose ? PEER_PURPOSE_VISUAL[peerPurpose] : null

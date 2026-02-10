@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.2
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-02-09  
+> **Cập nhật:** 2026-02-10  
 > **Mục tiêu:** Quy định chiến lược kiểm thử và golden files.
 
 ## 1. Kiểm thử backend
@@ -27,6 +27,8 @@
 - **l1_auto_side_stability_policy:** auto-pass L1 không tự ép `left/right`; side tự động chỉ dùng `top/bottom` khi không có override thủ công.
 - **l1_no_object_crossing_policy:** tuyến L1 sau chuẩn hóa orthogonal không được xuyên qua device/area không liên quan.
 - **port_turn_clearance_policy:** điểm rẽ đầu tiên của link L1 phải cách port band đủ xa để không dính nhãn port.
+- **l1_stub_fan_rank_policy:** fan-out đoạn stub phải dựa trên rank endpoint active theo `(device, side)`, không phụ thuộc trực tiếp vào bề rộng/cao device.
+- **l1_short_same_side_fan_sync_policy:** link nội‑area ngắn có hai đầu cùng side phải đồng bộ fan hai đầu để tránh “hộp nhỏ” gần port band.
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
 - **main_navigator_center_policy:** cụm điều khiển viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) hiển thị canh giữa trong main navigator panel.
 - **manual_position_edit_policy:** khi bật chế độ sửa vị trí, kéo‑thả `Area/Device` phải lưu `position_x/position_y` về DB ở `drag-end` và không trigger `/auto-layout`.
@@ -276,6 +278,8 @@ test.describe('Diagram Editor', () => {
 - [ ] L1 auto-side stability: khi không có override thủ công, auto anchor không phát sinh side `left/right`.
 - [ ] L1 no-object crossing: link sau chuẩn hóa orthogonal không xuyên device/area không liên quan trong các cụm dày.
 - [ ] Port turn clearance: điểm rẽ đầu tiên không dính sát port band/label ở scale 1x (đạt khoảng cách tối thiểu theo profile tuning).
+- [ ] Stub fan rank: endpoint active cùng `(device, side)` được tách fan theo thứ tự ổn định; spread fan không vượt ngưỡng style tại scale hiện hành.
+- [ ] Short same-side fan sync: link nội‑area ngắn có hai đầu cùng side không tạo “hộp nhỏ” sát port (fan hai đầu đồng bộ).
 - [ ] Port embedded render: port label hiển thị trong object theo dải top/bottom, không còn nhãn port nổi trên link ở view L1.
 - [ ] Port embedded render: object tự nới rộng/nới cao theo số lượng và độ dài port để không đè chữ.
 - [ ] Dense row spacing: với cụm nhiều uplink giữa 2 hàng thiết bị, auto-layout phải tăng khoảng cách hàng đủ để giảm chèn/đè link.

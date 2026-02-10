@@ -24,12 +24,33 @@ type PeerPurposeKind = 'stack' | 'ha' | 'hsrp'
 
 type ExitSide = 'left' | 'right' | 'top' | 'bottom'
 
+type LinkEndpoint = 'from' | 'to'
+
 type Point = { x: number; y: number }
+
+type FanRank = { index: number; total: number }
 
 const PEER_PURPOSE_VISUAL: Record<PeerPurposeKind, { stroke: string; dash: number[]; strokeWidth: number; opacity: number }> = {
   stack: { stroke: '#2d8cf0', dash: [], strokeWidth: 2, opacity: 0.98 },
   ha: { stroke: '#16a085', dash: [8, 5], strokeWidth: 1.9, opacity: 0.98 },
   hsrp: { stroke: '#9b59b6', dash: [3, 4], strokeWidth: 1.8, opacity: 0.96 },
+}
+
+function fanAxisOrder(anchor: { x: number; y: number; side: ExitSide }) {
+  return (anchor.side === 'top' || anchor.side === 'bottom') ? anchor.x : anchor.y
+}
+
+function fanGroupKey(deviceId: string, side: ExitSide) {
+  return `${deviceId}|${side}`
+}
+
+function fanEndpointKey(linkId: string, endpoint: LinkEndpoint) {
+  return `${linkId}:${endpoint}`
+}
+
+function resolveFanDistance(rank: FanRank | undefined, spread: number) {
+  if (!rank || rank.total <= 1) return 0
+  return clamp(rank.index / (rank.total - 1), 0, 1) * spread
 }
 
 function resolvePeerPurposeKind(
@@ -267,6 +288,46 @@ export function routeLinks(
   } = ctx
   const clearance = Math.max(rawClearance, 2)
 
+  const resolvedAnchorsByLink = new Map<string, {
+    fromAnchor: { x: number; y: number; side: ExitSide }
+    toAnchor: { x: number; y: number; side: ExitSide }
+  }>()
+  const fanGroups = new Map<string, Array<{
+    linkId: string
+    endpoint: LinkEndpoint
+    order: number
+  }>>()
+  const pushFanEntry = (
+    deviceId: string,
+    side: ExitSide,
+    linkId: string,
+    endpoint: LinkEndpoint,
+    order: number
+  ) => {
+    const key = fanGroupKey(deviceId, side)
+    const list = fanGroups.get(key) || []
+    list.push({ linkId, endpoint, order })
+    fanGroups.set(key, list)
+  }
+
+  linkMetas.forEach(meta => {
+    if (!meta) return
+    const fromAnchor = { ...meta.fromAnchor, side: (meta.fromAnchor.side || computeSide(meta.fromView, meta.toCenter)) as ExitSide }
+    const toAnchor = { ...meta.toAnchor, side: (meta.toAnchor.side || computeSide(meta.toView, meta.fromCenter)) as ExitSide }
+    resolvedAnchorsByLink.set(meta.link.id, { fromAnchor, toAnchor })
+    pushFanEntry(meta.link.fromDeviceId, fromAnchor.side, meta.link.id, 'from', fanAxisOrder(fromAnchor))
+    pushFanEntry(meta.link.toDeviceId, toAnchor.side, meta.link.id, 'to', fanAxisOrder(toAnchor))
+  })
+
+  const fanRankByEndpoint = new Map<string, FanRank>()
+  fanGroups.forEach(entries => {
+    entries.sort((a, b) => a.order - b.order || a.linkId.localeCompare(b.linkId) || a.endpoint.localeCompare(b.endpoint))
+    const total = entries.length
+    entries.forEach((entry, index) => {
+      fanRankByEndpoint.set(fanEndpointKey(entry.linkId, entry.endpoint), { index, total })
+    })
+  })
+
   const links = linkMetas
     .map(meta => {
       if (!meta) return null
@@ -281,8 +342,13 @@ export function routeLinks(
         toAreaId,
       } = meta
 
-      let fromAnchor = { ...meta.fromAnchor, side: (meta.fromAnchor.side || computeSide(fromView, toCenter)) as ExitSide }
-      let toAnchor = { ...meta.toAnchor, side: (meta.toAnchor.side || computeSide(toView, fromCenter)) as ExitSide }
+      const resolvedAnchors = resolvedAnchorsByLink.get(link.id)
+      const fromAnchor = resolvedAnchors
+        ? { ...resolvedAnchors.fromAnchor }
+        : { ...meta.fromAnchor, side: (meta.fromAnchor.side || computeSide(fromView, toCenter)) as ExitSide }
+      const toAnchor = resolvedAnchors
+        ? { ...resolvedAnchors.toAnchor }
+        : { ...meta.toAnchor, side: (meta.toAnchor.side || computeSide(toView, fromCenter)) as ExitSide }
 
       const purpose = (link.purpose || '').trim().toUpperCase()
       const peerPurpose = resolvePeerPurposeKind(purpose, link.fromPort, link.toPort)
@@ -304,14 +370,19 @@ export function routeLinks(
         : 0
 
       const baseStub = Math.max(renderTuning.bundle_stub ?? 0, renderTuning.area_clearance ?? 0) * scale
-      // Fan-out: normalize vị trí port theo device width (0→1) × spread cố định → tách đường
       const fanSpread = 18 * scale
-      const fromFan = (fromAnchor.side === 'bottom' || fromAnchor.side === 'top')
-        ? (fromView.width > 0 ? (fromAnchor.x - fromView.x) / fromView.width : 0) * fanSpread
-        : (fromView.height > 0 ? (fromAnchor.y - fromView.y) / fromView.height : 0) * fanSpread
-      const toFan = (toAnchor.side === 'bottom' || toAnchor.side === 'top')
-        ? (toView.width > 0 ? (toAnchor.x - toView.x) / toView.width : 0) * fanSpread
-        : (toView.height > 0 ? (toAnchor.y - toView.y) / toView.height : 0) * fanSpread
+      // Fan-out theo rank endpoint active trên từng cạnh device để ổn định khi device rộng/hẹp khác nhau.
+      let fromFan = resolveFanDistance(fanRankByEndpoint.get(fanEndpointKey(link.id, 'from')), fanSpread)
+      let toFan = resolveFanDistance(fanRankByEndpoint.get(fanEndpointKey(link.id, 'to')), fanSpread)
+      const isShortSameSideLink = isL1View &&
+        isIntraArea &&
+        fromAnchor.side === toAnchor.side &&
+        Math.hypot(toAnchor.x - fromAnchor.x, toAnchor.y - fromAnchor.y) <= 220 * scale
+      if (isShortSameSideLink) {
+        const sharedFan = (fromFan + toFan) / 2
+        fromFan = sharedFan
+        toFan = sharedFan
+      }
       const fromStubDistance = Math.max(baseStub, fromLabelStub, minPortTurnDistance) + fromFan
       const toStubDistance = Math.max(baseStub, toLabelStub, minPortTurnDistance) + toFan
       const fromBase = offsetFromAnchor(fromAnchor, fromStubDistance)

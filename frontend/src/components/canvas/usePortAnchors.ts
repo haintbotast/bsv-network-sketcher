@@ -4,6 +4,17 @@ import type { Rect, AnchorOverrideMap, RenderTuning, PortAnchorOverrideMap } fro
 import { clamp, comparePorts, computePortAnchorFallback, computeSide, extractPortIndex } from './linkRoutingUtils'
 import { buildDeviceTierMap, isUplinkPortName, resolveAutoPortSide } from './portSidePolicy'
 
+const DEVICE_PORT_CELL_MIN_WIDTH = 30
+const DEVICE_PORT_CELL_GAP = 2
+const DEVICE_PORT_BAND_PADDING_X = 6
+const DEVICE_PORT_FONT_SIZE = 10
+
+function estimatePortCellWidth(portName: string) {
+  const text = portName.trim()
+  const charWidth = DEVICE_PORT_FONT_SIZE * 0.62
+  return Math.max(DEVICE_PORT_CELL_MIN_WIDTH, Math.ceil(text.length * charWidth + 10))
+}
+
 export function usePortAnchors(deps: {
   props: {
     links: LinkModel[]
@@ -152,6 +163,30 @@ export function usePortAnchors(deps: {
     const map = new Map<string, Map<string, { x: number; y: number; side: string }>>()
     const portEdgeInset = renderTuning.value.port_edge_inset ?? 0
 
+    const resolveSidePortOrder = (deviceId: string, ports: string[]) => {
+      const ordered = [...ports].sort(comparePorts)
+      const overrides = portAnchorOverrides?.value?.get(deviceId)
+      if (!overrides || overrides.size === 0) return ordered
+
+      const total = ordered.length
+      const effectiveRatio = new Map<string, number>()
+      ordered.forEach((port, index) => {
+        const override = overrides.get(port)
+        if (override?.offsetRatio != null) {
+          effectiveRatio.set(port, clamp(override.offsetRatio, 0, 1))
+          return
+        }
+        effectiveRatio.set(port, (index + 1) / (total + 1))
+      })
+
+      ordered.sort((a, b) => {
+        const delta = (effectiveRatio.get(a) ?? 0.5) - (effectiveRatio.get(b) ?? 0.5)
+        if (Math.abs(delta) > 1e-6) return delta
+        return comparePorts(a, b)
+      })
+      return ordered
+    }
+
     devicePortList.value.forEach((ports, deviceId) => {
       const rect = deviceViewMap.value.get(deviceId)
       if (!rect || ports.length === 0) return
@@ -187,24 +222,18 @@ export function usePortAnchors(deps: {
         })
       })
       ;(['top', 'bottom'] as const).forEach(side => {
-        const list = buckets[side]
+        const list = resolveSidePortOrder(deviceId, buckets[side])
         const count = list.length
         if (!count) return
-        list.sort((a, b) => {
-          const byPort = comparePorts(a, b)
-          if (byPort !== 0) return byPort
-          const na = neighborMap.get(a)
-          const nb = neighborMap.get(b)
-          const ax = na ? na.xSum / na.count : rect.x + rect.width / 2
-          const bx = nb ? nb.xSum / nb.count : rect.x + rect.width / 2
-          if (ax !== bx) return ax - bx
-          return 0
-        })
-        const spacing = (rect.width - portEdgeInset * 2) / (count + 1)
+        const cellWidths = list.map(estimatePortCellWidth)
+        const totalWidth = cellWidths.reduce((sum, width) => sum + width, 0) + DEVICE_PORT_CELL_GAP * Math.max(count - 1, 0)
+        let cursorX = Math.max(DEVICE_PORT_BAND_PADDING_X, (rect.width - totalWidth) / 2)
         list.forEach((port, index) => {
-          const x = rect.x + portEdgeInset + spacing * (index + 1)
+          const width = cellWidths[index]
+          const x = rect.x + cursorX + width / 2
           const y = side === 'top' ? rect.y : rect.y + rect.height
           anchors.set(port, { x, y, side })
+          cursorX += width + DEVICE_PORT_CELL_GAP
         })
       })
 

@@ -19,6 +19,9 @@ export type RouteLinksParams = {
 }
 
 const LABEL_STUB_PADDING = 4
+const FAN_SPREAD_BASE = 20
+const BUNDLE_OFFSET_MIN = 7
+const BUNDLE_OFFSET_FACTOR = 0.78
 
 type PeerPurposeKind = 'stack' | 'ha' | 'hsrp'
 
@@ -370,7 +373,7 @@ export function routeLinks(
         : 0
 
       const baseStub = Math.max(renderTuning.bundle_stub ?? 0, renderTuning.area_clearance ?? 0) * scale
-      const fanSpread = 18 * scale
+      const fanSpread = FAN_SPREAD_BASE * scale
       // Fan-out theo rank endpoint active trên từng cạnh device để ổn định khi device rộng/hẹp khác nhau.
       let fromFan = resolveFanDistance(fanRankByEndpoint.get(fanEndpointKey(link.id, 'from')), fanSpread)
       let toFan = resolveFanDistance(fanRankByEndpoint.get(fanEndpointKey(link.id, 'to')), fanSpread)
@@ -435,7 +438,7 @@ export function routeLinks(
         const preferAxis: 'x' | 'y' = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
         const bundle = linkBundleIndex.get(link.id)
         const bundleOffset = bundle && bundle.total > 1
-          ? (bundle.index - (bundle.total - 1) / 2) * Math.max(6, (renderTuning.bundle_gap ?? 0) * scale * 0.7)
+          ? (bundle.index - (bundle.total - 1) / 2) * Math.max(BUNDLE_OFFSET_MIN, (renderTuning.bundle_gap ?? 0) * scale * BUNDLE_OFFSET_FACTOR)
           : 0
 
         const fromShifted: Point = preferAxis === 'x'

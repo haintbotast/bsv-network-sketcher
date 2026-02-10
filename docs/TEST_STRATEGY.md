@@ -24,6 +24,7 @@
 - **port_anchor_swap_quick_action:** thao tác nhanh đổi vị trí 2 port cùng device trong `Anchor port (override)` phải swap đúng `side + offset_ratio`, chỉ ảnh hưởng đúng 2 port được chọn.
 - **uplink_anchor_policy:** L1 auto-anchor phải đặt **uplink ở top** và **non-uplink ở bottom**; chỉ lệch khi có override thủ công.
 - **endpoint_anchor_alignment_policy:** endpoint của link L1 phải bám đúng anchor ô port (không dời anchor để tách lane).
+- **port_cell_center_alignment_policy:** với port band top/bottom, tọa độ anchor X của link phải trùng tâm ô port render (sai số <= 1px).
 - **l1_auto_side_stability_policy:** auto-pass L1 không tự ép `left/right`; side tự động chỉ dùng `top/bottom` khi không có override thủ công.
 - **l1_no_object_crossing_policy:** tuyến L1 sau chuẩn hóa orthogonal không được xuyên qua device/area không liên quan.
 - **port_turn_clearance_policy:** điểm rẽ đầu tiên của link L1 phải cách port band đủ xa để không dính nhãn port.
@@ -275,6 +276,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Uplink anchor policy: override thủ công (`side + offset_ratio`) phải giữ ưu tiên cao nhất.
 - [ ] Port anchor swap quick action: đổi vị trí 2 port cùng device phải cập nhật đúng cặp anchor của 2 port đó, không làm thay đổi anchor các port còn lại.
 - [ ] Endpoint anchor alignment: endpoint link L1 trùng anchor port-cell tương ứng (sai số render <= 1px), lane separation bắt đầu sau stub.
+- [ ] Port-cell center alignment: với device có port dài/ngắn khác nhau, điểm xuất phát link vẫn trùng tâm ô port tương ứng (không lệch sang khe giữa ô).
 - [ ] L1 auto-side stability: khi không có override thủ công, auto anchor không phát sinh side `left/right`.
 - [ ] L1 no-object crossing: link sau chuẩn hóa orthogonal không xuyên device/area không liên quan trong các cụm dày.
 - [ ] Port turn clearance: điểm rẽ đầu tiên không dính sát port band/label ở scale 1x (đạt khoảng cách tối thiểu theo profile tuning).

@@ -296,10 +296,11 @@ export function routeLinks(
 
       const selfInset = Math.max(clearance + 1, 4)
       const obstacles: Rect[] = []
+      const routeObstacles: Rect[] = []
       deviceRects.forEach(({ id, rect }) => {
         if (id === link.fromDeviceId || id === link.toDeviceId) {
           if (rect.width > selfInset * 2 && rect.height > selfInset * 2) {
-            obstacles.push({
+            routeObstacles.push({
               x: rect.x + selfInset,
               y: rect.y + selfInset,
               width: rect.width - selfInset * 2,
@@ -309,11 +310,13 @@ export function routeLinks(
           return
         }
         obstacles.push(rect)
+        routeObstacles.push(rect)
       })
       if (isInterArea) {
         areaRects.forEach(({ id, rect }) => {
           if (id === fromAreaId || id === toAreaId) return
           obstacles.push(rect)
+          routeObstacles.push(rect)
         })
       }
 
@@ -364,7 +367,7 @@ export function routeLinks(
             clearance,
           )
         } else {
-          const orth = buildOrthPath(fromShifted, toShifted, obstacles, clearance, preferAxis)
+          const orth = buildOrthPath(fromShifted, toShifted, routeObstacles, clearance, preferAxis)
           path = simplifyPath([
             { x: fromAnchor.x, y: fromAnchor.y },
             { x: fromBase.x, y: fromBase.y },
@@ -375,7 +378,7 @@ export function routeLinks(
         }
 
         if (pathBlocked(path, obstacles, clearance)) {
-          const fallback = buildOrthPath({ x: fromBase.x, y: fromBase.y }, { x: toBase.x, y: toBase.y }, obstacles, clearance, preferAxis === 'x' ? 'y' : 'x')
+          const fallback = buildOrthPath({ x: fromBase.x, y: fromBase.y }, { x: toBase.x, y: toBase.y }, routeObstacles, clearance, preferAxis === 'x' ? 'y' : 'x')
           path = simplifyPath([
             { x: fromAnchor.x, y: fromAnchor.y },
             { x: fromBase.x, y: fromBase.y },

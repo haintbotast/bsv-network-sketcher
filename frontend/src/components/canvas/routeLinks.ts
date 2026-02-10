@@ -294,9 +294,20 @@ export function routeLinks(
       const fromBase = offsetFromAnchor(fromAnchor, fromStubDistance)
       const toBase = offsetFromAnchor(toAnchor, toStubDistance)
 
+      const selfInset = Math.max(clearance + 1, 4)
       const obstacles: Rect[] = []
       deviceRects.forEach(({ id, rect }) => {
-        if (id === link.fromDeviceId || id === link.toDeviceId) return
+        if (id === link.fromDeviceId || id === link.toDeviceId) {
+          if (rect.width > selfInset * 2 && rect.height > selfInset * 2) {
+            obstacles.push({
+              x: rect.x + selfInset,
+              y: rect.y + selfInset,
+              width: rect.width - selfInset * 2,
+              height: rect.height - selfInset * 2,
+            })
+          }
+          return
+        }
         obstacles.push(rect)
       })
       if (isInterArea) {

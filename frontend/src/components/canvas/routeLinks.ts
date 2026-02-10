@@ -22,8 +22,6 @@ const LABEL_STUB_PADDING = 4
 const FAN_SPREAD_BASE = 28
 const BUNDLE_OFFSET_MIN = 11
 const BUNDLE_OFFSET_FACTOR = 1.12
-const STEM_BUCKET_BASE = 14
-const GLOBAL_LANE_BUCKET_BASE = 16
 
 type PeerPurposeKind = 'stack' | 'ha' | 'hsrp'
 
@@ -68,28 +66,6 @@ function resolveStemOffset(rank: FanRank | undefined, scale: number) {
   if (!centered) return 0
   const gap = Math.max(5, 8 * scale)
   const limit = Math.max(10, 30 * scale)
-  return clamp(centered * gap, -limit, limit)
-}
-
-function resolveGlobalStemOffset(rank: FanRank | undefined, scale: number) {
-  const centered = resolveFanCenteredRank(rank)
-  if (!centered) return 0
-  const gap = Math.max(3, 4.5 * scale)
-  const limit = Math.max(10, 22 * scale)
-  return clamp(centered * gap, -limit, limit)
-}
-
-function resolveGlobalLaneOffset(
-  rank: FanRank | undefined,
-  scale: number,
-  preferAxis: 'x' | 'y',
-) {
-  const centered = resolveFanCenteredRank(rank)
-  if (!centered) return 0
-  const gap = preferAxis === 'x'
-    ? Math.max(4, 6 * scale)
-    : Math.max(5, 7 * scale)
-  const limit = Math.max(14, 28 * scale)
   return clamp(centered * gap, -limit, limit)
 }
 
@@ -340,7 +316,6 @@ function buildDirectAnchorPath(
 
 function buildShiftBridge(
   base: Point,
-  side: ExitSide,
   preferAxis: 'x' | 'y',
   stemOffset: number,
   bundleOffset: number
@@ -348,22 +323,24 @@ function buildShiftBridge(
   const points: Point[] = []
   let cursor: Point = { x: base.x, y: base.y }
 
-  // Stem offset bám theo hướng cạnh port để giữ tuyến ra port tự nhiên.
-  if (Math.abs(stemOffset) > 0.01) {
-    if (side === 'top' || side === 'bottom') {
+  if (preferAxis === 'x') {
+    if (Math.abs(stemOffset) > 0.01) {
       cursor = { x: cursor.x + stemOffset, y: cursor.y }
       points.push(cursor)
-    } else {
+    }
+    if (Math.abs(bundleOffset) > 0.01) {
+      cursor = { x: cursor.x, y: cursor.y + bundleOffset }
+      points.push(cursor)
+    }
+  } else {
+    if (Math.abs(stemOffset) > 0.01) {
       cursor = { x: cursor.x, y: cursor.y + stemOffset }
       points.push(cursor)
     }
-  }
-  // Bundle offset bám theo trục routing chính để tách lane.
-  if (Math.abs(bundleOffset) > 0.01) {
-    cursor = preferAxis === 'x'
-      ? { x: cursor.x, y: cursor.y + bundleOffset }
-      : { x: cursor.x + bundleOffset, y: cursor.y }
-    points.push(cursor)
+    if (Math.abs(bundleOffset) > 0.01) {
+      cursor = { x: cursor.x + bundleOffset, y: cursor.y }
+      points.push(cursor)
+    }
   }
 
   return {
@@ -426,69 +403,6 @@ export function routeLinks(
     const total = entries.length
     entries.forEach((entry, index) => {
       fanRankByEndpoint.set(fanEndpointKey(entry.linkId, entry.endpoint), { index, total })
-    })
-  })
-
-  const stemBucket = Math.max(8, STEM_BUCKET_BASE * scale)
-  const globalStemGroups = new Map<string, Array<{
-    linkId: string
-    endpoint: LinkEndpoint
-    orthOrder: number
-  }>>()
-  const pushGlobalStemEntry = (
-    linkId: string,
-    endpoint: LinkEndpoint,
-    side: ExitSide,
-    anchor: { x: number; y: number }
-  ) => {
-    const primary = side === 'top' || side === 'bottom' ? anchor.x : anchor.y
-    const orth = side === 'top' || side === 'bottom' ? anchor.y : anchor.x
-    const key = `${side}|${Math.round(primary / stemBucket)}`
-    const list = globalStemGroups.get(key) || []
-    list.push({ linkId, endpoint, orthOrder: orth })
-    globalStemGroups.set(key, list)
-  }
-
-  resolvedAnchorsByLink.forEach((anchors, linkId) => {
-    pushGlobalStemEntry(linkId, 'from', anchors.fromAnchor.side, anchors.fromAnchor)
-    pushGlobalStemEntry(linkId, 'to', anchors.toAnchor.side, anchors.toAnchor)
-  })
-
-  const globalStemRankByEndpoint = new Map<string, FanRank>()
-  globalStemGroups.forEach(entries => {
-    entries.sort((a, b) => a.orthOrder - b.orthOrder || a.linkId.localeCompare(b.linkId) || a.endpoint.localeCompare(b.endpoint))
-    const total = entries.length
-    entries.forEach((entry, index) => {
-      globalStemRankByEndpoint.set(fanEndpointKey(entry.linkId, entry.endpoint), { index, total })
-    })
-  })
-
-  const globalLaneBucket = Math.max(10, GLOBAL_LANE_BUCKET_BASE * scale)
-  const globalLaneGroups = new Map<string, Array<{ linkId: string; orthOrder: number }>>()
-
-  linkMetas.forEach(meta => {
-    if (!meta) return
-    const anchors = resolvedAnchorsByLink.get(meta.link.id)
-    if (!anchors) return
-    const preferAxis: 'x' | 'y' = Math.abs(meta.toCenter.x - meta.fromCenter.x) >= Math.abs(meta.toCenter.y - meta.fromCenter.y) ? 'x' : 'y'
-    const lanePrimary = preferAxis === 'x'
-      ? (anchors.fromAnchor.y + anchors.toAnchor.y) / 2
-      : (anchors.fromAnchor.x + anchors.toAnchor.x) / 2
-    const orthOrder = preferAxis === 'x'
-      ? (anchors.fromAnchor.x + anchors.toAnchor.x) / 2
-      : (anchors.fromAnchor.y + anchors.toAnchor.y) / 2
-    const key = `${preferAxis}|${Math.round(lanePrimary / globalLaneBucket)}`
-    const list = globalLaneGroups.get(key) || []
-    list.push({ linkId: meta.link.id, orthOrder })
-    globalLaneGroups.set(key, list)
-  })
-
-  const globalLaneRankByLink = new Map<string, FanRank>()
-  globalLaneGroups.forEach(entries => {
-    entries.sort((a, b) => a.orthOrder - b.orthOrder || a.linkId.localeCompare(b.linkId))
-    const total = entries.length
-    entries.forEach((entry, index) => {
-      globalLaneRankByLink.set(entry.linkId, { index, total })
     })
   })
 
@@ -636,29 +550,11 @@ export function routeLinks(
         const axisBundleGap = preferAxis === 'y'
           ? Math.max(bundleGapBase * 1.8, 14 * scale)
           : bundleGapBase
-        const pairBundleOffset = bundle && bundle.total > 1
+        const bundleOffset = bundle && bundle.total > 1
           ? (bundle.index - (bundle.total - 1) / 2) * axisBundleGap
           : 0
-        const globalLaneOffset = isL1View
-          ? resolveGlobalLaneOffset(globalLaneRankByLink.get(link.id), scale, preferAxis)
-          : 0
-        const bundleOffset = clamp(
-          pairBundleOffset + globalLaneOffset,
-          -Math.max(20, 48 * scale),
-          Math.max(20, 48 * scale)
-        )
-        const fromStemOffset = clamp(
-          resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'from')), scale)
-          + resolveGlobalStemOffset(globalStemRankByEndpoint.get(fanEndpointKey(link.id, 'from')), scale),
-          -Math.max(14, 34 * scale),
-          Math.max(14, 34 * scale)
-        )
-        const toStemOffset = clamp(
-          resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'to')), scale)
-          + resolveGlobalStemOffset(globalStemRankByEndpoint.get(fanEndpointKey(link.id, 'to')), scale),
-          -Math.max(14, 34 * scale),
-          Math.max(14, 34 * scale)
-        )
+        const fromStemOffset = resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'from')), scale)
+        const toStemOffset = resolveStemOffset(fanRankByEndpoint.get(fanEndpointKey(link.id, 'to')), scale)
 
         if (isL1View && isInterArea) {
           const interLaneGap = Math.max(10, (renderTuning.bundle_gap ?? 0) * scale * 1.6)
@@ -675,8 +571,8 @@ export function routeLinks(
             clearance,
           )
         } else {
-          const fromShift = buildShiftBridge(fromBase, fromAnchor.side, preferAxis, fromStemOffset, bundleOffset)
-          const toShift = buildShiftBridge(toBase, toAnchor.side, preferAxis, toStemOffset, bundleOffset)
+          const fromShift = buildShiftBridge(fromBase, preferAxis, fromStemOffset, bundleOffset)
+          const toShift = buildShiftBridge(toBase, preferAxis, toStemOffset, bundleOffset)
           const fromShifted = fromShift.shifted
           const toShifted = toShift.shifted
           const orth = buildOrthPath(fromShifted, toShifted, obstacles, clearance, preferAxis)

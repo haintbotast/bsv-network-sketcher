@@ -86,9 +86,9 @@
 - **Quy ước side tự động (L1):** mặc định chỉ dùng **top/bottom** cho anchor port:
   - **uplink => top**
   - **non-uplink => bottom**
-  - Override **`left/right`** vẫn được lưu ở dữ liệu, nhưng khi render L1 sẽ chuẩn hóa về **`bottom`** để đồng bộ với port band top/bottom.
+  - **left/right** chỉ dùng khi có **override thủ công**.
 - **Port side stability (L1):** side tự động chỉ theo policy `top/bottom`; không tự ép sang `left/right` trong auto pass để tránh lệch giữa anchor và port band.
-- **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng; offset tối thiểu bằng **max(`bundle_gap`, `grid cell`)** và **tự nhân hệ số theo `total`** (nhiều link → khoảng cách lớn hơn). Với tuyến ưu tiên trục dọc, bundle gap được tăng thêm hệ số mạnh hơn để giảm chồng đoạn đứng. Router cho phép **stem de-overlap** (lệch nhỏ sau stub theo rank endpoint) để tách các đoạn đứng/đoạn ngang còn sát nhau. Ngoài bundle theo cặp link, router áp thêm **global lane rank theo hành lang (bucket)** để tách các tuyến ngang/dọc song song giữa nhiều cặp link khác nhau.
+- **Exit bundle (L1):** nhóm link theo **(device, exit side)** và **tách đều offset** để giảm chồng khi nhiều link đi cùng hướng; offset tối thiểu bằng **max(`bundle_gap`, `grid cell`)** và **tự nhân hệ số theo `total`** (nhiều link → khoảng cách lớn hơn). Với tuyến ưu tiên trục dọc, bundle gap được tăng thêm hệ số mạnh hơn để giảm chồng đoạn đứng. Router cho phép **stem de-overlap** (lệch nhỏ sau stub theo rank endpoint) để tách các đoạn đứng/đoạn ngang còn sát nhau.
 - **Stub fan theo rank active (L1):** fan-out đoạn stub được tính theo **thứ tự endpoint active** trên cùng `(device, side)` với spread chuẩn `0..28px * scale`, tránh phụ thuộc trực tiếp vào kích thước object.
 - **Short same-side fan sync (L1):** với link nội‑area ngắn và hai đầu cùng side, fan hai đầu được đồng bộ để tránh tạo “hộp nhỏ” sát port band.
 - **Direct intra ưu tiên theo hình học (L1):** với cặp thiết bị nội‑area theo phương ngang, hai đầu cùng side (`top/top` hoặc `bottom/bottom`) và không bị vật cản, router phải ưu tiên tuyến trực tiếp/orthogonal ngắn trước khi áp lane U cho purpose đặc biệt.
@@ -99,7 +99,7 @@
 - **Bundle song song (L1):** nếu 2 thiết bị **cùng hàng/cột**, không bị vật cản thì ưu tiên **đường thẳng song song** cho các link bundle (bỏ A\*), để tránh “uốn cong” ngay tại port label.
 - **Peer control links (L1):** `STACK/HA/HSRP` ưu tiên tuyến nội‑area ngắn, tách lane riêng theo loại link để không hòa vào bó uplink/data.
 - **Waypoint (L1):** khi có waypoint giữa 2 Area, link đi qua **nhiều tọa độ neo** trên waypoint (theo lane index) để **không chồng lên nhau**.
-- **Override thủ công (per-port):** người dùng có thể **cố định side + offset_ratio** cho từng port; `offset_ratio` có thể để `null` để **giữ auto offset** theo side đã chọn. Trong L1, side override được áp theo chuẩn hóa side của port band (`top` giữ nguyên, `left/right/bottom` quy về `bottom`) để tránh lệch điểm xuất phát link.
+- **Override thủ công (per-port):** người dùng có thể **cố định side + offset_ratio** cho từng port; `offset_ratio` có thể để `null` để **giữ auto offset** theo side đã chọn. Override **giữ side là ưu tiên cao nhất**, nhưng **có thể tự căn lại tọa độ** để **giữ link thẳng hàng** khi 2 thiết bị cùng hàng/cột và side đã phù hợp.
 - **Xác định uplink (L1):** ưu tiên theo quan hệ phân tầng thiết bị (tier thấp nối lên tier cao); nếu không phân biệt được thì fallback theo heuristic `port index = 1`.
 - Liên‑area **tách lane rộng hơn** so với bundle nội‑area để giảm chồng/đè.
 - Intra‑area: nếu đường thẳng cắt thiết bị khác thì bẻ góc (Manhattan) để tránh xuyên qua device.
@@ -397,5 +397,5 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 - Quy tắc side của port:
   - `top`: ưu tiên uplink/peer-control.
   - `bottom`: ưu tiên downlink.
-  - `left/right`: dùng cho dữ liệu tham chiếu hoặc view không phải L1; trong L1 được chuẩn hóa về `bottom`.
-- Khi render L1, nếu có xung đột giữa khai báo port và anchor override thủ công: **anchor override** vẫn ưu tiên, nhưng đi qua quy tắc chuẩn hóa side của L1.
+  - `left/right`: chỉ dùng khi cần bám hình học đặc thù hoặc người dùng override.
+- Khi render L1, nếu có xung đột giữa khai báo port và anchor override thủ công: **anchor override** có ưu tiên cao hơn.

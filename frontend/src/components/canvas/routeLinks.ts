@@ -413,50 +413,6 @@ function resolvePeerLaneY(
   return (fromCenter.y + toCenter.y) / 2 + laneOffset
 }
 
-// --- Inter-area routing ---
-
-// Chỉ trả middle routing (fromBase → ... → toBase), caller tự wrap anchor/stub/base chain.
-function buildInterAreaMiddle(
-  fromBase: Point,
-  toBase: Point,
-  fromCenter: Point,
-  toCenter: Point,
-  lane: { index: number; total: number } | undefined,
-  laneGap: number,
-  obstacles: Rect[],
-  clearance: number,
-) {
-  const laneOffset = lane && lane.total > 1
-    ? (lane.index - (lane.total - 1) / 2) * laneGap
-    : 0
-
-  const dx = toCenter.x - fromCenter.x
-  const dy = toCenter.y - fromCenter.y
-  const useVerticalCorridor = Math.abs(dx) >= Math.abs(dy)
-
-  if (useVerticalCorridor) {
-    const corridorX = (fromBase.x + toBase.x) / 2 + laneOffset
-    const candidate = simplifyPath([
-      fromBase,
-      { x: corridorX, y: fromBase.y },
-      { x: corridorX, y: toBase.y },
-      toBase,
-    ])
-    if (!pathBlocked(candidate, obstacles, clearance)) return candidate
-    return buildOrthPath(fromBase, toBase, obstacles, clearance, 'x')
-  }
-
-  const corridorY = (fromBase.y + toBase.y) / 2 + laneOffset
-  const candidate = simplifyPath([
-    fromBase,
-    { x: fromBase.x, y: corridorY },
-    { x: toBase.x, y: corridorY },
-    toBase,
-  ])
-  if (!pathBlocked(candidate, obstacles, clearance)) return candidate
-  return buildOrthPath(fromBase, toBase, obstacles, clearance, 'y')
-}
-
 // --- Post-processing: tách segment song song chồng nhau ---
 
 type SegInfo = {
@@ -551,8 +507,6 @@ function nudgeOverlappingSegments(links: RenderLink[], scale: number) {
 
 export function routeLinks(
   linkMetas: Array<LinkMeta | null>,
-  laneIndex: Map<string, { index: number; total: number }>,
-  _labelObstacles: Array<{ linkId: string; rect: Rect }>,
   ctx: RouteLinksParams
 ) {
   const {
@@ -755,29 +709,7 @@ export function routeLinks(
         if (!pathBlocked(peerPath, obstacles, clearance)) path = peerPath
       }
 
-      // 2. Inter-area routing
-      if (!path.length && isL1View && isInterArea) {
-        const interLaneGap = Math.max(10, (renderTuning.bundle_gap ?? 0) * scale * 1.6)
-        const middle = buildInterAreaMiddle(
-          fromShifted, toShifted,
-          fromCenter, toCenter,
-          laneIndex.get(link.id),
-          interLaneGap,
-          obstacles, clearance,
-        )
-        path = simplifyPath([
-          { x: fromAnchor.x, y: fromAnchor.y },
-          { x: fromStub.x, y: fromStub.y },
-          { x: fromBase.x, y: fromBase.y },
-          ...fromShiftPath,
-          ...middle,
-          ...toShiftPath,
-          { x: toStub.x, y: toStub.y },
-          { x: toAnchor.x, y: toAnchor.y },
-        ])
-      }
-
-      // 3. General orthogonal routing (with bundle offset)
+      // 2. General orthogonal routing (with bundle offset)
       if (!path.length) {
         const orth = buildOrthPath(fromShifted, toShifted, obstacles, clearance, preferAxis)
         path = simplifyPath([
@@ -792,7 +724,7 @@ export function routeLinks(
         ])
       }
 
-      // 4. Fallback alternate axis (vẫn giữ fromBase/toBase → giữ fan spacing)
+      // 3. Fallback alternate axis (vẫn giữ fromBase/toBase → giữ fan spacing)
       if (pathBlocked(path, obstacles, clearance)) {
         const fallback = buildOrthPath(
           { x: fromBase.x, y: fromBase.y },

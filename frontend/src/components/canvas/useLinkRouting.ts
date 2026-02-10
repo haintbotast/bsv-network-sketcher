@@ -37,8 +37,6 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
   const userPortAnchorOverrides = computed<PortAnchorOverrideMap>(() => props.portAnchorOverrides || new Map())
 
   const {
-    devicePortList,
-    devicePortOrder,
     resolvePortAnchorWithOverrides,
   } = usePortAnchors({
     props,
@@ -60,18 +58,11 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
     const areaRects = Array.from(areaViewMap.value.entries()).map(([id, rect]) => ({ id, rect }))
     const deviceRects = Array.from(deviceViewMap.value.entries()).map(([id, rect]) => ({ id, rect }))
 
-    const areaCenters = new Map<string, { x: number; y: number }>()
-    areaRects.forEach(({ id, rect }) => {
-      areaCenters.set(id, { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 })
-    })
-
     // Unwrap reactive values for standalone functions
     const tuning = renderTuning.value
     const dvMap = deviceViewMap.value
     const avMap = areaViewMap.value
     const daMap = deviceAreaMap.value
-    const dpList = devicePortList.value
-    const dpOrder = devicePortOrder.value
     const lbIndex = linkBundleIndex.value
 
     const metaParams = {
@@ -79,13 +70,9 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
       deviceViewMap: dvMap,
       areaViewMap: avMap,
       deviceAreaMap: daMap,
-      devicePortOrder: dpOrder,
-      devicePortList: dpList,
-      renderTuning: tuning,
       layoutScale: layoutViewport.value.scale,
       isL1View,
       resolvePortAnchorWithOverrides,
-      areaCenters,
     }
 
     const routeCtx = {
@@ -100,7 +87,7 @@ export function useLinkRouting(params: UseLinkRoutingParams) {
 
     // Single-pass: metadata → route để giữ pipeline nhẹ và ổn định trên sơ đồ dày.
     const pass1 = buildLinkMetaData(metaParams)
-    const result = routeLinks(pass1.linkMetas, pass1.laneIndex, pass1.labelObstacles, routeCtx)
+    const result = routeLinks(pass1.linkMetas, routeCtx)
     return { links: result.links, cache: result.cache }
   }
 

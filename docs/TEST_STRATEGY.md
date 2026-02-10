@@ -41,6 +41,7 @@
 - **l1_vertical_bundle_separation_policy:** với bundle ưu tiên trục dọc, khoảng tách lane phải được tăng so với trục ngang để giảm chồng đoạn đứng.
 - **l1_stem_deoverlap_policy:** sau stub rời port, router phải cho phép lệch nhỏ theo rank endpoint để giảm hiện tượng các đoạn đứng/đoạn ngang dính sát nhau.
 - **l1_global_lane_two_axis_policy:** router phải tách làn chung theo cả 2 hướng ngang/dọc trong cùng cụm gần để giảm dính bó giữa các cặp link khác nhau.
+- **l1_unified_lane_pipeline_policy:** inter-area và intra-area dùng chung pipeline lane (`bundle + global lane 2 trục`), không dùng lớp `laneIndex` liên-area tách riêng ở metadata pass.
 - **l1_parallel_segment_nudge_policy:** hậu xử lý phải nudge các segment ngang/dọc song song trong cùng corridor, đồng thời bảo toàn segment `anchor→stub` hai đầu để không lệch điểm xuất phát tại port.
 - **l1_post_nudge_rollback_policy:** nếu nudge làm link bị **hard collision** (clearance = 0) thì phải rollback path về trạng thái trước nudge.
 - **l1_global_corridor_split_policy:** router phải tách làn toàn cục theo corridor (scope + axis + bucket) trước hậu xử lý nudge để giảm dính bó giữa các cặp link khác nhau.
@@ -311,6 +312,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Vertical bundle separation: cụm link ưu tiên trục dọc không bị dính/chồng đoạn đứng khi số link tăng.
 - [ ] Stem de-overlap: với cụm port dày, các đoạn đứng rời port và đoạn chuyển tiếp không còn đè lên nhau thành một nét.
 - [ ] Global lane two-axis: trong cụm dày, cả bó ngang và bó dọc đều được tách làn ổn định giữa nhiều cặp link khác nhau.
+- [ ] Unified lane pipeline: inter-area không dùng lane pass riêng; tuyến được tách từ cùng pipeline `bundle + global lane 2 trục` như intra-area.
 - [ ] Parallel segment nudge: trong cụm line ngang/dọc dày, các segment giữa được tách rõ, còn đoạn `anchor→stub` sát port vẫn giữ ổn định.
 - [ ] Post-nudge rollback: nudge không làm link xuyên thân object; link hard-collision sau nudge phải tự rollback path.
 - [ ] Global corridor split: nhiều link khác cặp device nhưng chung hành lang ngang/dọc vẫn có khoảng cách ổn định trước khi áp nudge.

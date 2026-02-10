@@ -19,9 +19,9 @@ export type RouteLinksParams = {
 }
 
 const LABEL_STUB_PADDING = 4
-const FAN_SPREAD_BASE = 20
-const BUNDLE_OFFSET_MIN = 7
-const BUNDLE_OFFSET_FACTOR = 0.78
+const FAN_SPREAD_BASE = 24
+const BUNDLE_OFFSET_MIN = 9
+const BUNDLE_OFFSET_FACTOR = 0.95
 
 type PeerPurposeKind = 'stack' | 'ha' | 'hsrp'
 
@@ -290,6 +290,17 @@ function buildDirectIntraPath(
   return candidate
 }
 
+function buildDirectAnchorPath(
+  fromAnchor: Point,
+  toAnchor: Point,
+  obstacles: Rect[],
+  clearance: number
+) {
+  const direct = simplifyPath([fromAnchor, toAnchor])
+  if (pathBlocked(direct, obstacles, clearance)) return null
+  return direct
+}
+
 export function routeLinks(
   linkMetas: Array<LinkMeta | null>,
   laneIndex: Map<string, { index: number; total: number }>,
@@ -442,17 +453,31 @@ export function routeLinks(
         && (toAnchor.side === 'top' || toAnchor.side === 'bottom')
       const canTryDirectIntra = isL1View && isIntraArea && isHorizontalPair && sameSide && isTopBottomSidePair
       if (canTryDirectIntra && (peerPurpose !== null || bundleTotal <= 2)) {
-        const directIntraPath = buildDirectIntraPath(
-          { x: fromAnchor.x, y: fromAnchor.y },
-          { x: toAnchor.x, y: toAnchor.y },
-          fromBase,
-          toBase,
-          obstacles,
-          clearance,
-          preferAxis
-        )
-        if (directIntraPath) {
-          path = directIntraPath
+        const areAnchorsAlignedY = Math.abs(fromAnchor.y - toAnchor.y) <= Math.max(1, scale)
+        if (areAnchorsAlignedY) {
+          const anchorPath = buildDirectAnchorPath(
+            { x: fromAnchor.x, y: fromAnchor.y },
+            { x: toAnchor.x, y: toAnchor.y },
+            obstacles,
+            clearance
+          )
+          if (anchorPath) {
+            path = anchorPath
+          }
+        }
+        if (!path.length) {
+          const directIntraPath = buildDirectIntraPath(
+            { x: fromAnchor.x, y: fromAnchor.y },
+            { x: toAnchor.x, y: toAnchor.y },
+            fromBase,
+            toBase,
+            obstacles,
+            clearance,
+            preferAxis
+          )
+          if (directIntraPath) {
+            path = directIntraPath
+          }
         }
       }
 
@@ -473,8 +498,12 @@ export function routeLinks(
       }
 
       if (!path.length) {
+        const bundleGapBase = Math.max(BUNDLE_OFFSET_MIN, (renderTuning.bundle_gap ?? 0) * scale * BUNDLE_OFFSET_FACTOR)
+        const axisBundleGap = preferAxis === 'y'
+          ? Math.max(bundleGapBase * 1.2, 11 * scale)
+          : bundleGapBase
         const bundleOffset = bundle && bundle.total > 1
-          ? (bundle.index - (bundle.total - 1) / 2) * Math.max(BUNDLE_OFFSET_MIN, (renderTuning.bundle_gap ?? 0) * scale * BUNDLE_OFFSET_FACTOR)
+          ? (bundle.index - (bundle.total - 1) / 2) * axisBundleGap
           : 0
 
         const fromShifted: Point = preferAxis === 'x'

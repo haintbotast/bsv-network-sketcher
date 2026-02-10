@@ -21,8 +21,8 @@ export type RouteLinksParams = {
 const LABEL_STUB_PADDING = 4
 const FAN_SPREAD_BASE = 18
 const GLOBAL_LANE_BUCKET_FACTOR = 1.15
-const GLOBAL_LANE_GAP_X_FACTOR = 0.56
-const GLOBAL_LANE_GAP_Y_FACTOR = 0.86
+const GLOBAL_LANE_GAP_X_FACTOR = 0.64
+const GLOBAL_LANE_GAP_Y_FACTOR = 0.96
 const GLOBAL_LANE_LIMIT_X = 44
 const GLOBAL_LANE_LIMIT_Y = 56
 
@@ -137,13 +137,13 @@ function resolveGlobalLaneOffset(
 ) {
   const centered = resolveFanCenteredRank(rank)
   if (!centered) return 0
-  const densityBoost = rank && rank.total > 5
-    ? Math.min(1.6, 1 + (rank.total - 5) * 0.07)
+  const densityBoost = rank && rank.total > 4
+    ? Math.min(1.9, 1 + (rank.total - 4) * 0.09)
     : 1
   const baseGap = Math.max(3.5, (renderTuning.bundle_gap ?? 0) * scale)
   const axisGap = axis === 'x'
-    ? Math.max(5, baseGap * GLOBAL_LANE_GAP_X_FACTOR * densityBoost)
-    : Math.max(6, baseGap * GLOBAL_LANE_GAP_Y_FACTOR * densityBoost)
+    ? Math.max(5.5, baseGap * GLOBAL_LANE_GAP_X_FACTOR * densityBoost)
+    : Math.max(6.5, baseGap * GLOBAL_LANE_GAP_Y_FACTOR * densityBoost)
   const baseLimit = axis === 'x' ? GLOBAL_LANE_LIMIT_X : GLOBAL_LANE_LIMIT_Y
   const limit = Math.max(axis === 'x' ? 16 : 20, baseLimit * scale)
   return clamp(centered * axisGap, -limit, limit)
@@ -426,12 +426,12 @@ type SegInfo = {
 function nudgeOverlappingSegments(links: RenderLink[], scale: number) {
   if (links.length < 2) return
 
-  const nudgeGap = Math.max(7, 9 * scale)
-  const coordThreshold = Math.max(5, 7 * scale)
-  const minSegLen = 10
+  const nudgeGap = Math.max(7.5, 9.5 * scale)
+  const coordThreshold = Math.max(5, 7.5 * scale)
+  const minSegLen = 8
   const eps = 0.5
-  const skipSegs = 2 // giữ ổn định đoạn gần port, chỉ nudge corridor giữa
-  const maxOffset = Math.max(22, 28 * scale)
+  const skipSegs = 1 // giữ segment anchor->stub, cho phép tách sớm các đoạn sau stub
+  const maxOffset = Math.max(24, 30 * scale)
 
   const verticals: SegInfo[] = []
   const horizontals: SegInfo[] = []
@@ -597,7 +597,16 @@ export function routeLinks(
       const labelInset = Math.max(2, Math.round(6 * labelScale))
       const labelOffset = (renderTuning.port_label_offset ?? 0) * labelScale
       const baseLabelDistance = Math.max(0, labelOffset - labelInset)
-      const minPortTurnDistance = Math.max(28 * scale, labelOffset + 22 * scale)
+      const fromFanRank = fanRankByEndpoint.get(fanEndpointKey(link.id, 'from'))
+      const toFanRank = fanRankByEndpoint.get(fanEndpointKey(link.id, 'to'))
+      const densePortGroup = Math.max(fromFanRank?.total ?? 1, toFanRank?.total ?? 1)
+      const denseTurnBoost = densePortGroup > 4
+        ? Math.min(8 * scale, (densePortGroup - 4) * 1.6 * scale)
+        : 0
+      const minPortTurnDistance = Math.max(
+        30 * scale + denseTurnBoost,
+        labelOffset + 24 * scale + denseTurnBoost
+      )
       const fromLabelWidth = meta.fromLabelWidth ?? 0
       const toLabelWidth = meta.toLabelWidth ?? 0
       const fromLabelStub = isL1View && fromLabelWidth > 0
@@ -609,8 +618,6 @@ export function routeLinks(
 
       const baseStub = Math.max(renderTuning.bundle_stub ?? 0, renderTuning.area_clearance ?? 0) * scale
       const fanSpread = FAN_SPREAD_BASE * scale
-      const fromFanRank = fanRankByEndpoint.get(fanEndpointKey(link.id, 'from'))
-      const toFanRank = fanRankByEndpoint.get(fanEndpointKey(link.id, 'to'))
       const fromFan = resolveFanDistance(fromFanRank, fanSpread)
       const toFan = resolveFanDistance(toFanRank, fanSpread)
       const fromStubDistance = Math.max(baseStub, fromLabelStub, minPortTurnDistance) + fromFan

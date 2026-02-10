@@ -245,12 +245,13 @@ export function routeLinks(
   const {
     isL1View,
     scale,
-    clearance,
+    clearance: rawClearance,
     renderTuning,
     areaRects,
     deviceRects,
     linkBundleIndex,
   } = ctx
+  const clearance = Math.max(rawClearance, 2)
 
   const links = linkMetas
     .map(meta => {
@@ -342,7 +343,7 @@ export function routeLinks(
         const preferAxis: 'x' | 'y' = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
         const bundle = linkBundleIndex.get(link.id)
         const bundleOffset = bundle && bundle.total > 1
-          ? (bundle.index - (bundle.total - 1) / 2) * Math.max(4, (renderTuning.bundle_gap ?? 0) * scale * 0.45)
+          ? (bundle.index - (bundle.total - 1) / 2) * Math.max(6, (renderTuning.bundle_gap ?? 0) * scale * 0.7)
           : 0
 
         const fromShifted: Point = preferAxis === 'x'

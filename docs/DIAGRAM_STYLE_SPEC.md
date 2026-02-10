@@ -54,7 +54,10 @@
 - **Khi pan/drag:** UI có thể **tạm ẩn nhãn port/L2/L3** để tối ưu hiệu năng; nhãn hiển thị lại khi dừng kéo.
 - **Khi zoom:** UI ưu tiên **scale nhanh** và **không tái tính toán** trong lúc zoom; chỉ tính lại khi dữ liệu/layout đổi.
 - Cụm điều khiển viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) đặt ở **main navigator panel** và hiển thị **canh giữa theo panel** để ổn định trọng tâm thao tác.
-- Trigger auto-layout chỉ đến từ **mở project** và CRUD dữ liệu topology; thao tác viewport (`pan/zoom/reset view`) chỉ đổi góc nhìn và **không được phép** kích auto-layout.
+- Trigger auto-layout chỉ đến từ:
+  - **mở project khi dữ liệu thiếu tọa độ ổn định** (`grid_range` hoặc `position_x/position_y`),
+  - CRUD dữ liệu topology.
+  Thao tác viewport (`pan/zoom/reset view`) chỉ đổi góc nhìn và **không được phép** kích auto-layout.
 - **Kéo‑thả object thủ công:** chỉ có hiệu lực khi bật chế độ **Sửa vị trí**; áp dụng cho `Area/Device`, lưu `position_x/position_y` tại `drag-end`, và không kích hoạt auto-layout từ chính thao tác kéo‑thả này.
 - **Align guide khi drag:** trong chế độ sửa vị trí, UI hiển thị đường gióng ngang/dọc và snap nhẹ theo object liên quan (device cùng area hoặc area cùng cấp) để chỉnh tay chính xác.
 - **Mốc tọa độ chuẩn:** X/Y thủ công dùng step mặc định **0.25 đv**; drag và nhập tay đều chuẩn hóa về mốc này để tránh số lẻ rời rạc.

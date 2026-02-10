@@ -35,7 +35,7 @@
 - Sơ đồ L1/L2/L3 hiển thị và chỉnh sửa.
 - Đồng bộ dữ liệu L1→L2→L3 theo quy tắc logic chuẩn (validation chặt chẽ).
 - Auto-layout theo **2 tầng** (macro Area + micro Device), ưu tiên bố cục top‑to‑bottom.
-- Auto-layout tự động chạy khi **mở project** và sau mọi CRUD topology của project (area/device/link/port-link/anchor override), có debounce để giảm chạy dồn.
+- Auto-layout tự động chạy khi **mở project nếu dữ liệu thiếu tọa độ ổn định** (`grid_range` hoặc `position_x/position_y`) và sau mọi CRUD topology của project (area/device/link/port-link/anchor override), có debounce để giảm chạy dồn.
 - Auto-layout **không được trigger** bởi thao tác viewport để xem sơ đồ (`pan`, `zoom`, `reset view`).
 - Với project có `grid_row/grid_col` rõ ràng, macro layout phải bám lưới theo **cột căn giữa (center-slot)** để giảm lệch vị trí khi có area quá rộng, giữ bố cục gần PDF chuẩn.
 - Micro layout trong từng Area phải **căn giữa theo hàng thiết bị** khi tách nhiều hàng để tránh dồn lệch trái và giữ đối xứng so với sơ đồ chuẩn.

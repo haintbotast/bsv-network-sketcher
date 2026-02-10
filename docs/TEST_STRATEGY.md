@@ -51,7 +51,7 @@
 - **l1_jump_turn_guard_policy:** không vẽ arc jump khi giao điểm nằm quá gần đầu/cuối segment để tránh hiện tượng “vừa nhảy xong rẽ ngay”.
 - **l1_no_edge_hugging_policy:** segment link chạy trùng mép object (colinear với cạnh rect trong clearance) phải bị coi là va chạm và được reroute.
 - **l1_port_exit_orthogonality_policy:** khi dịch tách lane sau stub, tuyến phải giữ các đoạn orthogonal tuần tự, không xuất hiện segment chéo ngay sau port.
-- **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
+- **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project **nếu thiếu tọa độ ổn định** (`grid_range` hoặc `position_x/position_y`) và khi CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
 - **main_navigator_center_policy:** cụm điều khiển viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) hiển thị canh giữa trong main navigator panel.
 - **manual_position_edit_policy:** khi bật chế độ sửa vị trí, kéo‑thả `Area/Device` phải lưu `position_x/position_y` về DB ở `drag-end` và không trigger `/auto-layout`.
 - **manual_position_property_save_policy:** lưu thuộc tính `Area/Device` nếu chỉ đổi `position_x/position_y/grid_range` thì không trigger `/auto-layout`.
@@ -280,7 +280,7 @@ test.describe('Diagram Editor', () => {
 - [ ] L1 routing: cặp area có nhiều link vẫn bám hành lang orthogonal đơn giản, lane offset theo bundle đủ để tránh dính sát nhau.
 - [ ] L1 routing: pipeline single-pass (không A\*) vẫn trả tuyến hợp lệ, không tạo vòng lặp dựng đường.
 - [ ] L1 routing: link peer-control `top/top` đi trên và `bottom/bottom` đi dưới thiết bị, không cắt xuyên thân thiết bị.
-- [ ] Trigger policy: mở project chạy auto-layout đúng 1 lượt.
+- [ ] Trigger policy: mở project chỉ chạy auto-layout khi dữ liệu thiếu tọa độ ổn định; dữ liệu đã có `grid_range`/`position_*` thì không chạy.
 - [ ] Trigger policy: CRUD area/device/link/port-link/anchor đều trigger auto-layout.
 - [ ] Trigger policy: pan/zoom/reset view không phát sinh request `/auto-layout`.
 - [ ] Main navigator panel: cụm `zoom/reset/L1/L2/L3/Sửa vị trí` hiển thị canh giữa panel ở desktop.

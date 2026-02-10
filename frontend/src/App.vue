@@ -1815,6 +1815,17 @@ function handleSelect(payload: { id: string; type?: 'device' | 'area' }) {
   rightPanelTab.value = 'properties'
 }
 
+function hasStableProjectLayout() {
+  if (!devices.value.length) return false
+  const areaStable = areas.value.every(area =>
+    !!area.grid_range || (area.position_x != null && area.position_y != null)
+  )
+  const deviceStable = devices.value.every(device =>
+    !!device.grid_range || (device.position_x != null && device.position_y != null)
+  )
+  return areaStable && deviceStable
+}
+
 async function onAuthSuccess() {
   await loadAdminConfig()
   await loadProjects()
@@ -1980,7 +1991,9 @@ watch(selectedProjectId, async (projectId) => {
 
   if (projectId) {
     await loadProjectData(projectId)
-    scheduleAutoLayout(projectId, { force: true, reason: 'project-open' })
+    if (!hasStableProjectLayout()) {
+      scheduleAutoLayout(projectId, { force: true, reason: 'project-open' })
+    }
   } else {
     areas.value = []
     devices.value = []

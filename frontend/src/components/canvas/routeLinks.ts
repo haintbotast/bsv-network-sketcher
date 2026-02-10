@@ -160,6 +160,20 @@ function buildOrthPath(start: Point, end: Point, obstacles: Rect[], clearance: n
   const uPathAlt = findUShapePath(start, end, obstacles, clearance, preferAxis === 'x' ? 'y' : 'x')
   if (uPathAlt) return uPathAlt
 
+  // Per-obstacle: thử đi vòng từng obstacle chặn đường (tránh bounding box toàn cục quá rộng)
+  const avoidGap = Math.max(clearance, 12)
+  for (const obs of obstacles) {
+    if (!segmentIntersectsRect(start, end, obs, clearance)) continue
+    for (const p of [
+      simplifyPath([start, { x: obs.x + obs.width + avoidGap, y: start.y }, { x: obs.x + obs.width + avoidGap, y: end.y }, end]),
+      simplifyPath([start, { x: obs.x - avoidGap, y: start.y }, { x: obs.x - avoidGap, y: end.y }, end]),
+      simplifyPath([start, { x: start.x, y: obs.y + obs.height + avoidGap }, { x: end.x, y: obs.y + obs.height + avoidGap }, end]),
+      simplifyPath([start, { x: start.x, y: obs.y - avoidGap }, { x: end.x, y: obs.y - avoidGap }, end]),
+    ]) {
+      if (!pathBlocked(p, obstacles, clearance)) return p
+    }
+  }
+
   // Ép orthogonal (không bao giờ trả đường chéo)
   return simplifyPath([start, midpoint, end])
 }

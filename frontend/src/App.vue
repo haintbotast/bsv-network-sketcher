@@ -257,10 +257,10 @@
               :columns="areaColumns"
               :rows="areas"
               :default-row="defaultAreaRow"
-              @update:rows="(rows: any) => updateAreaRows(rows)"
-              @row:add="(row: any) => handleAreaAdd(row)"
-              @row:change="(payload: any) => handleAreaChange({ row: payload.row })"
-              @row:remove="(row: any) => handleAreaRemove(row)"
+              @update:rows="updateAreaRows"
+              @row:add="handleAreaAdd"
+              @row:change="payload => handleAreaChange({ row: payload.row })"
+              @row:remove="handleAreaRemove"
             />
             <DataGrid
               title="Devices"
@@ -268,10 +268,10 @@
               :rows="devices"
               :default-row="defaultDeviceRow"
               :show-add="canAddDevice"
-              @update:rows="(rows: any) => updateDeviceRows(rows)"
-              @row:add="(row: any) => handleDeviceAdd(row)"
-              @row:change="(payload: any) => handleDeviceChange({ row: payload.row })"
-              @row:remove="(row: any) => handleDeviceRemove(row)"
+              @update:rows="updateDeviceRows"
+              @row:add="handleDeviceAdd"
+              @row:change="payload => handleDeviceChange({ row: payload.row })"
+              @row:remove="handleDeviceRemove"
             />
             <DataGrid
               title="Links"
@@ -279,10 +279,10 @@
               :rows="links"
               :default-row="defaultLinkRow"
               :show-add="canAddLink"
-              @update:rows="(rows: any) => updateLinkRows(rows)"
-              @row:add="(row: any) => handleLinkAdd(row)"
-              @row:change="(payload: any) => handleLinkChange({ row: payload.row })"
-              @row:remove="(row: any) => handleLinkRemove(row)"
+              @update:rows="updateLinkRows"
+              @row:add="handleLinkAdd"
+              @row:change="payload => handleLinkChange({ row: payload.row })"
+              @row:remove="handleLinkRemove"
             />
           </div>
         </div>
@@ -520,7 +520,7 @@
                       </select>
                     </div>
                     <div class="port-link-actions">
-                      <button type="button" class="secondary" @click="savePortLink({ ...conn, port: entry.port })">
+                      <button type="button" class="secondary" @click="savePortLink(conn)">
                         Lưu
                       </button>
                       <button type="button" class="ghost" @click="removePortLink(conn)">

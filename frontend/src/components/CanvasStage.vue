@@ -1567,14 +1567,12 @@ function onObjectDragEnd(event: any, id: string, type: 'device' | 'area') {
   dragContext.value = null
   clearDragGuides()
 
-  const logicalX = viewToLogical(x, layoutViewport.value.scale, layoutViewport.value.offsetX)
-  const logicalY = viewToLogical(y, layoutViewport.value.scale, layoutViewport.value.offsetY)
-  const snappedLogicalX = Math.round(logicalX / POSITION_STANDARD_STEP_PX) * POSITION_STANDARD_STEP_PX
-  const snappedLogicalY = Math.round(logicalY / POSITION_STANDARD_STEP_PX) * POSITION_STANDARD_STEP_PX
-  const snappedViewX = logicalToView(snappedLogicalX, layoutViewport.value.scale, layoutViewport.value.offsetX)
-  const snappedViewY = logicalToView(snappedLogicalY, layoutViewport.value.scale, layoutViewport.value.offsetY)
-  if (Math.abs(snappedViewX - x) > 0.01) target.x(snappedViewX)
-  if (Math.abs(snappedViewY - y) > 0.01) target.y(snappedViewY)
+  // target.x()/y() đã ở hệ tọa độ logic của layer (không phải screen/view),
+  // nên không được convert thêm viewToLogical lần nữa.
+  const snappedLogicalX = Math.round(x / POSITION_STANDARD_STEP_PX) * POSITION_STANDARD_STEP_PX
+  const snappedLogicalY = Math.round(y / POSITION_STANDARD_STEP_PX) * POSITION_STANDARD_STEP_PX
+  if (Math.abs(snappedLogicalX - x) > 0.01) target.x(snappedLogicalX)
+  if (Math.abs(snappedLogicalY - y) > 0.01) target.y(snappedLogicalY)
   emit('object:position-change', {
     id,
     type,

@@ -40,6 +40,7 @@
 - **l1_vertical_bundle_separation_policy:** với bundle ưu tiên trục dọc, khoảng tách lane phải được tăng so với trục ngang để giảm chồng đoạn đứng.
 - **l1_stem_deoverlap_policy:** sau stub rời port, router phải cho phép lệch nhỏ theo rank endpoint để giảm hiện tượng các đoạn đứng/đoạn ngang dính sát nhau.
 - **l1_global_lane_two_axis_policy:** router phải tách làn chung theo cả 2 hướng ngang/dọc trong cùng cụm gần để giảm dính bó giữa các cặp link khác nhau.
+- **l1_parallel_segment_nudge_policy:** hậu xử lý phải nudge các segment ngang/dọc song song trong cùng corridor, đồng thời bảo toàn segment `anchor→stub` hai đầu để không lệch điểm xuất phát tại port.
 - **l1_no_edge_hugging_policy:** segment link chạy trùng mép object (colinear với cạnh rect trong clearance) phải bị coi là va chạm và được reroute.
 - **l1_port_exit_orthogonality_policy:** khi dịch tách lane sau stub, tuyến phải giữ các đoạn orthogonal tuần tự, không xuất hiện segment chéo ngay sau port.
 - **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project và CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
@@ -302,6 +303,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Vertical bundle separation: cụm link ưu tiên trục dọc không bị dính/chồng đoạn đứng khi số link tăng.
 - [ ] Stem de-overlap: với cụm port dày, các đoạn đứng rời port và đoạn chuyển tiếp không còn đè lên nhau thành một nét.
 - [ ] Global lane two-axis: trong cụm dày, cả bó ngang và bó dọc đều được tách làn ổn định giữa nhiều cặp link khác nhau.
+- [ ] Parallel segment nudge: trong cụm line ngang/dọc dày, các segment giữa được tách rõ, còn đoạn `anchor→stub` sát port vẫn giữ ổn định.
 - [ ] Fallback detour guard: tuyến fallback không xuất hiện vòng xa bất thường (độ dài route trong ngưỡng cho phép theo profile scale).
 - [ ] Offset reduction retry: khi tăng spacing làm route thất bại, router tự giảm dần offset và vẫn tìm được tuyến hợp lệ gần endpoint.
 - [ ] No edge-hugging: link không bám trùng mép trái/phải/top/bottom của object trong các ca dense routing.

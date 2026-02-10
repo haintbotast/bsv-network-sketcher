@@ -301,9 +301,8 @@ function resolvePeerLaneY(
 
 // --- Inter-area routing ---
 
-function buildInterAreaPath(
-  fromAnchor: Point,
-  toAnchor: Point,
+// Chỉ trả middle routing (fromBase → ... → toBase), caller tự wrap anchor/stub/base chain.
+function buildInterAreaMiddle(
   fromBase: Point,
   toBase: Point,
   fromCenter: Point,
@@ -324,26 +323,114 @@ function buildInterAreaPath(
   if (useVerticalCorridor) {
     const corridorX = (fromBase.x + toBase.x) / 2 + laneOffset
     const candidate = simplifyPath([
-      fromAnchor, fromBase,
+      fromBase,
       { x: corridorX, y: fromBase.y },
       { x: corridorX, y: toBase.y },
-      toBase, toAnchor,
+      toBase,
     ])
     if (!pathBlocked(candidate, obstacles, clearance)) return candidate
-    const orth = buildOrthPath(fromBase, toBase, obstacles, clearance, 'x')
-    return simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
+    return buildOrthPath(fromBase, toBase, obstacles, clearance, 'x')
   }
 
   const corridorY = (fromBase.y + toBase.y) / 2 + laneOffset
   const candidate = simplifyPath([
-    fromAnchor, fromBase,
+    fromBase,
     { x: fromBase.x, y: corridorY },
     { x: toBase.x, y: corridorY },
-    toBase, toAnchor,
+    toBase,
   ])
   if (!pathBlocked(candidate, obstacles, clearance)) return candidate
-  const orth = buildOrthPath(fromBase, toBase, obstacles, clearance, 'y')
-  return simplifyPath([fromAnchor, fromBase, ...orth, toBase, toAnchor])
+  return buildOrthPath(fromBase, toBase, obstacles, clearance, 'y')
+}
+
+// --- Post-processing: tách segment song song chồng nhau ---
+
+type SegInfo = {
+  linkIdx: number
+  ptIdx: number      // index trong flat points[] (x của điểm đầu segment)
+  coord: number      // x cho vertical, y cho horizontal
+  rangeMin: number
+  rangeMax: number
+}
+
+function nudgeOverlappingSegments(links: RenderLink[], scale: number) {
+  if (links.length < 2) return
+
+  const nudgeGap = Math.max(6, 8 * scale)
+  const coordThreshold = Math.max(5, 7 * scale)
+  const minSegLen = 10
+  const eps = 0.5
+  const skipSegs = 1 // chỉ bỏ anchor→stub ở mỗi đầu; minSegLen lọc segment ngắn
+  const maxOffset = Math.max(22, 28 * scale)
+
+  const verticals: SegInfo[] = []
+  const horizontals: SegInfo[] = []
+
+  links.forEach((link, linkIdx) => {
+    const pts = link.points
+    const minIdx = skipSegs * 2
+    const maxIdx = pts.length - (skipSegs + 1) * 2
+    if (minIdx >= maxIdx) return
+
+    for (let i = minIdx; i < maxIdx; i += 2) {
+      const x1 = pts[i], y1 = pts[i + 1]
+      const x2 = pts[i + 2], y2 = pts[i + 3]
+
+      if (Math.abs(x1 - x2) < eps && Math.abs(y1 - y2) > minSegLen) {
+        verticals.push({ linkIdx, ptIdx: i, coord: (x1 + x2) / 2, rangeMin: Math.min(y1, y2), rangeMax: Math.max(y1, y2) })
+      } else if (Math.abs(y1 - y2) < eps && Math.abs(x1 - x2) > minSegLen) {
+        horizontals.push({ linkIdx, ptIdx: i, coord: (y1 + y2) / 2, rangeMin: Math.min(x1, x2), rangeMax: Math.max(x1, x2) })
+      }
+    }
+  })
+
+  function applyNudge(segs: SegInfo[], isVertical: boolean) {
+    if (segs.length < 2) return
+    segs.sort((a, b) => a.coord - b.coord)
+
+    const used = new Uint8Array(segs.length)
+
+    for (let i = 0; i < segs.length; i++) {
+      if (used[i]) continue
+      const group = [segs[i]]
+      used[i] = 1
+
+      for (let j = i + 1; j < segs.length; j++) {
+        if (used[j]) continue
+        if (segs[j].coord - segs[i].coord > coordThreshold * 3) break
+        const sj = segs[j]
+        if (group.some(g =>
+          Math.abs(g.coord - sj.coord) <= coordThreshold &&
+          Math.max(g.rangeMin, sj.rangeMin) < Math.min(g.rangeMax, sj.rangeMax)
+        )) {
+          group.push(sj)
+          used[j] = 1
+        }
+      }
+
+      // Chỉ nudge khi có >= 2 link khác nhau
+      const uniqueLinks = new Set(group.map(s => s.linkIdx))
+      if (uniqueLinks.size < 2 || group.length < 2) continue
+
+      group.forEach((seg, rank) => {
+        const rawOffset = (rank - (group.length - 1) / 2) * nudgeGap
+        const offset = clamp(rawOffset, -maxOffset, maxOffset)
+        if (Math.abs(offset) < 0.3) return
+
+        const pts = links[seg.linkIdx].points
+        if (isVertical) {
+          pts[seg.ptIdx] += offset
+          pts[seg.ptIdx + 2] += offset
+        } else {
+          pts[seg.ptIdx + 1] += offset
+          pts[seg.ptIdx + 3] += offset
+        }
+      })
+    }
+  }
+
+  applyNudge(verticals, true)
+  applyNudge(horizontals, false)
 }
 
 // --- Main ---
@@ -446,12 +533,31 @@ export function routeLinks(
 
       const baseStub = Math.max(renderTuning.bundle_stub ?? 0, renderTuning.area_clearance ?? 0) * scale
       const fanSpread = FAN_SPREAD_BASE * scale
-      const fromFan = resolveFanDistance(fanRankByEndpoint.get(fanEndpointKey(link.id, 'from')), fanSpread)
-      const toFan = resolveFanDistance(fanRankByEndpoint.get(fanEndpointKey(link.id, 'to')), fanSpread)
+      const fromFanRank = fanRankByEndpoint.get(fanEndpointKey(link.id, 'from'))
+      const toFanRank = fanRankByEndpoint.get(fanEndpointKey(link.id, 'to'))
+      const fromFan = resolveFanDistance(fromFanRank, fanSpread)
+      const toFan = resolveFanDistance(toFanRank, fanSpread)
       const fromStubDistance = Math.max(baseStub, fromLabelStub, minPortTurnDistance) + fromFan
       const toStubDistance = Math.max(baseStub, toLabelStub, minPortTurnDistance) + toFan
-      const fromBase = offsetFromAnchor(fromAnchor, fromStubDistance)
-      const toBase = offsetFromAnchor(toAnchor, toStubDistance)
+      // fromStub = cuối đoạn stub thẳng (cùng trục với anchor)
+      const fromStub = offsetFromAnchor(fromAnchor, fromStubDistance)
+      const toStub = offsetFromAnchor(toAnchor, toStubDistance)
+
+      // Stem jog: tách link cùng port bằng offset vuông góc với stub
+      // anchor → stub (thẳng) → base (jog ngang/dọc) → shifted (bundle) → routing
+      const stemGap = Math.max(3, 4.5 * scale)
+      const fromStem = fromFanRank && fromFanRank.total > 1
+        ? (fromFanRank.index - (fromFanRank.total - 1) / 2) * stemGap
+        : 0
+      const toStem = toFanRank && toFanRank.total > 1
+        ? (toFanRank.index - (toFanRank.total - 1) / 2) * stemGap
+        : 0
+      const fromBase: Point = (fromAnchor.side === 'bottom' || fromAnchor.side === 'top')
+        ? { x: fromStub.x + fromStem, y: fromStub.y }
+        : { x: fromStub.x, y: fromStub.y + fromStem }
+      const toBase: Point = (toAnchor.side === 'bottom' || toAnchor.side === 'top')
+        ? { x: toStub.x + toStem, y: toStub.y }
+        : { x: toStub.x, y: toStub.y + toStem }
 
       // --- Obstacles (self device inset) ---
       const selfInset = Math.max(clearance + 1, 4)
@@ -503,10 +609,14 @@ export function routeLinks(
         )
         const peerPath = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
+          { x: fromStub.x, y: fromStub.y },
+          { x: fromBase.x, y: fromBase.y },
           { x: fromShifted.x, y: fromShifted.y },
           { x: fromShifted.x, y: laneY },
           { x: toShifted.x, y: laneY },
           { x: toShifted.x, y: toShifted.y },
+          { x: toBase.x, y: toBase.y },
+          { x: toStub.x, y: toStub.y },
           { x: toAnchor.x, y: toAnchor.y },
         ])
         if (!pathBlocked(peerPath, obstacles, clearance)) path = peerPath
@@ -515,18 +625,22 @@ export function routeLinks(
       // 2. Inter-area routing
       if (!path.length && isL1View && isInterArea) {
         const interLaneGap = Math.max(10, (renderTuning.bundle_gap ?? 0) * scale * 1.6)
-        path = buildInterAreaPath(
-          { x: fromAnchor.x, y: fromAnchor.y },
-          { x: toAnchor.x, y: toAnchor.y },
-          fromShifted,
-          toShifted,
-          fromCenter,
-          toCenter,
+        const middle = buildInterAreaMiddle(
+          fromShifted, toShifted,
+          fromCenter, toCenter,
           laneIndex.get(link.id),
           interLaneGap,
-          obstacles,
-          clearance,
+          obstacles, clearance,
         )
+        path = simplifyPath([
+          { x: fromAnchor.x, y: fromAnchor.y },
+          { x: fromStub.x, y: fromStub.y },
+          { x: fromBase.x, y: fromBase.y },
+          ...middle,
+          { x: toBase.x, y: toBase.y },
+          { x: toStub.x, y: toStub.y },
+          { x: toAnchor.x, y: toAnchor.y },
+        ])
       }
 
       // 3. General orthogonal routing (with bundle offset)
@@ -534,9 +648,11 @@ export function routeLinks(
         const orth = buildOrthPath(fromShifted, toShifted, obstacles, clearance, preferAxis)
         path = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
+          { x: fromStub.x, y: fromStub.y },
           { x: fromBase.x, y: fromBase.y },
           ...orth,
           { x: toBase.x, y: toBase.y },
+          { x: toStub.x, y: toStub.y },
           { x: toAnchor.x, y: toAnchor.y },
         ])
       }
@@ -551,9 +667,11 @@ export function routeLinks(
         )
         path = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
+          { x: fromStub.x, y: fromStub.y },
           { x: fromBase.x, y: fromBase.y },
           ...fallback,
           { x: toBase.x, y: toBase.y },
+          { x: toStub.x, y: toStub.y },
           { x: toAnchor.x, y: toAnchor.y },
         ])
       }
@@ -596,6 +714,9 @@ export function routeLinks(
       } as RenderLink
     })
     .filter(Boolean) as RenderLink[]
+
+  // Post-processing: tách segment song song chồng nhau giữa các link khác nhau
+  nudgeOverlappingSegments(links, scale)
 
   const cache = new Map<string, {
     points: number[]

@@ -38,7 +38,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-13:** Export/preview gắn metadata phiên bản (version label, time, user).
 - **FR-14:** Cho phép người dùng **chỉnh thủ công anchor của port** (side + offset_ratio, cho phép `offset_ratio = null` để giữ auto offset) và **giữ override khi chạy lại auto-layout**.
 - **FR-15:** Cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port** ngay trong bảng thuộc tính thiết bị, có kiểm tra trùng và port đã dùng.
-- **FR-16:** Auto-layout tự chạy khi mở project và sau CRUD topology; thao tác viewport (`pan/zoom/reset view`) không được trigger auto-layout.
+- **FR-16:** Auto-layout tự chạy khi mở project và sau CRUD topology; thao tác viewport (`pan/zoom/reset view/fit khung`) không được trigger auto-layout.
 - **FR-16B:** Tab **Bố cục** phải hỗ trợ chạy auto-layout thủ công theo 2 chế độ: **giữ vị trí đã lưu** (`preserve_existing_positions=true`, mặc định) và **ghi đè toàn bộ vị trí** (`preserve_existing_positions=false`).
 - **FR-16A:** Với project có `grid_row/grid_col` rõ ràng, macro layout phải bám lưới theo cơ chế **center-slot theo cột** để giữ area gần bố cục PDF chuẩn dù có area outlier rất rộng.
 - **FR-17:** L1 port anchor mặc định theo chuẩn: **uplink gắn top**, **non-uplink gắn bottom**; override thủ công là ưu tiên cao nhất.
@@ -49,7 +49,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-20:** Khung Area ở L1 được phép hiển thị dạng compact theo cụm thiết bị để giảm khoảng trắng, nhưng không thay đổi dữ liệu Area lưu trong DB.
 - **FR-21:** Link `STACK/HA/HSRP` trong L1 phải có style chuyên biệt (màu/nét/lane) và được tách hiển thị khỏi nhóm uplink/data.
 - **FR-22:** Cho phép bật chế độ **Sửa vị trí** để kéo‑thả trực tiếp `Area/Device` trên canvas; lưu `position_x/position_y` ngay khi thả và **không trigger auto-layout** từ thao tác này.
-- **FR-23:** Nhóm điều khiển `zoom/reset/L1/L2/L3/Sửa vị trí` đặt ở **main navigator panel**, hiển thị **canh giữa theo panel**; khi drag object trong chế độ sửa vị trí phải có **đường gióng/snap alignment** theo object liên quan.
+- **FR-23:** Nhóm điều khiển `zoom/reset/fit khung/L1/L2/L3/Sửa vị trí` đặt ở **main navigator panel**, hiển thị **canh giữa theo panel**; khi drag object trong chế độ sửa vị trí phải có **đường gióng/snap alignment** theo object liên quan.
 - **FR-24:** Hệ tọa độ thủ công phải dùng **mốc chuẩn X/Y** (step mặc định 0.25 đv); thao tác drag hoặc nhập tay đều được chuẩn hóa về mốc này.
 - **FR-25:** Tab **Bố cục** phải có thành phần **khai báo nhanh peer-control** (`HA/STACK/HSRP`) và hiển thị **legend màu/nét/chú giải** để vận hành nhận biết đúng loại kết nối.
 - **FR-26:** L1 routing phải giữ khoảng cách an toàn với object (không xuyên device/area không liên quan), đồng thời bảo đảm điểm rẽ đầu tiên không dính sát port band ở sơ đồ mật độ cao.
@@ -65,6 +65,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-36:** L1 routing ưu tiên thuật toán tuyến tính/địa phương (orthogonal + fallback) thay cho tối ưu toàn cục để giảm độ phức tạp vận hành.
 - **FR-37:** Quy tắc peer-control (`HA/STACK/HSRP`) phải chọn lane theo hướng side của anchor (`top/top`, `bottom/bottom`, khác side) để tránh route tự xuyên cụm thiết bị.
 - **FR-38:** Trong panel thuộc tính, khi chọn `Area/Device/Link`, UI phải hiển thị rõ **giá trị màu đang dùng** (RGB/HEX); với Link không override màu thì hiển thị màu hiệu lực theo `purpose`.
+- **FR-39:** `device_type` phải có nhóm cloud tường minh (`Cloud`, `Cloud-Network`, `Cloud-Security`, `Cloud-Service`) để người dùng chọn trực tiếp icon cloud theo loại chức năng, không bắt buộc phụ thuộc tên object.
 
 ## 5. Yêu cầu phi chức năng (NFR)
 

@@ -414,6 +414,9 @@ Response (400 Bad Request - trùng tên):
 
 **POST /api/v1/projects/{project_id}/devices**
 
+`device_type` cho phép các giá trị:
+`Router`, `Switch`, `Firewall`, `Server`, `AP`, `PC`, `Storage`, `Cloud`, `Cloud-Network`, `Cloud-Security`, `Cloud-Service`, `Unknown`.
+
 Request:
 ```json
 {

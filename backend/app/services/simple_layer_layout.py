@@ -48,6 +48,10 @@ def simple_layer_layout(devices: list, links: list, config: LayoutConfig) -> Lay
     # 6: Endpoints (AP/PC/Unknown)
     device_type_layers = {
         "Router": 0,
+        "Cloud": 0,
+        "Cloud-Network": 0,
+        "Cloud-Security": 0,
+        "Cloud-Service": 0,
         "Firewall": 1,
         "Server": 5,
         "Storage": 5,

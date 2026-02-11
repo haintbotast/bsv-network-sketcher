@@ -242,6 +242,7 @@ Ràng buộc kỹ thuật:
 - Kích thước icon khuyến nghị: **18-32 px** tùy chiều cao body.
 - Kích thước icon mặc định triển khai: **18-32 px** (có thể tune qua admin config).
 - Icon canh trái trong thân device; nhãn tên thiết bị dịch sang phải để không chồng icon.
+- Phân loại icon cloud ưu tiên theo `device_type` (`Cloud`, `Cloud-Network`, `Cloud-Security`, `Cloud-Service`), chỉ fallback theo từ khóa trong tên khi `device_type` không chỉ rõ biến thể cloud.
 - Icon không được thay đổi hitbox/collision của device; routing và kiểm tra va chạm vẫn dựa trên khung chữ nhật của object.
 - Màu icon có thể cấu hình qua `render_tuning.icon_color_default` và `render_tuning.icon_colors`.
   - `icon_colors` nhận key theo loại icon, ví dụ: `router`, `security`, `cloud-network`, `cloud-security`, `cloud-service`.

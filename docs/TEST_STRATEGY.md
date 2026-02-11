@@ -24,7 +24,7 @@
 - **l1_device_backend_frontend_size_parity_policy:** công thức ước lượng kích thước Device của backend phải khớp baseline render frontend (tổng cao chuẩn 76px và body tối thiểu theo nhãn) để tránh chồng lấn khi auto-layout.
 - **l1_device_icon_mapping_policy:** icon nhận diện loại thiết bị phải map đúng nhóm thiết bị (`Router/Switch/Firewall/Server/Storage/AP/Endpoint/Unknown`) và hiển thị nhất quán giữa các lần render.
 - **l1_security_icon_mapping_policy:** object có ngữ nghĩa bảo mật (`SECURITY/IDS/IPS/SOC/SIEM/VPN/WAF...`) phải map đúng icon `security` nếu không thuộc loại `firewall` chuyên biệt.
-- **l1_cloud_icon_mapping_policy:** thiết bị/object có định danh cloud (ví dụ `CLOUD/INTERNET/SAAS/PAAS/IAAS/O365`) phải map icon cloud nhất quán.
+- **l1_cloud_icon_mapping_policy:** thiết bị/object cloud phải map icon nhất quán; ưu tiên theo `device_type` (`Cloud/Cloud-Network/Cloud-Security/Cloud-Service`), sau đó mới fallback theo từ khóa tên (`CLOUD/INTERNET/SAAS/PAAS/IAAS/O365`).
 - **l1_cloud_function_icon_mapping_policy:** object cloud phải phân loại theo chức năng (`cloud-network`, `cloud-security`, `cloud-service`, fallback `cloud`) theo từ khóa chuẩn.
 - **l1_device_icon_readability_policy:** icon nhận diện phải đủ lớn để quan sát ở mức zoom mặc định (khuyến nghị 18-32px theo chiều cao body) nhưng không chạm port band.
 - **l1_device_icon_color_tuning_policy:** màu icon phải hỗ trợ override qua `render_tuning.icon_color_default` và `render_tuning.icon_colors`, đồng thời vẫn giữ trạng thái selected nổi bật.
@@ -61,8 +61,8 @@
 - **l1_jump_turn_guard_policy:** không vẽ arc jump khi giao điểm nằm quá gần đầu/cuối segment để tránh hiện tượng “vừa nhảy xong rẽ ngay”.
 - **l1_no_edge_hugging_policy:** segment link chạy trùng mép object (colinear với cạnh rect trong clearance) phải bị coi là va chạm và được reroute.
 - **l1_port_exit_orthogonality_policy:** khi dịch tách lane sau stub, tuyến phải giữ các đoạn orthogonal tuần tự, không xuất hiện segment chéo ngay sau port.
-- **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project **nếu thiếu tọa độ ổn định** (`grid_range` hoặc `position_x/position_y`) và khi CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view`) không được trigger.
-- **main_navigator_center_policy:** cụm điều khiển viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) hiển thị canh giữa trong main navigator panel.
+- **auto_layout_trigger_policy:** auto-layout tự chạy khi mở project **nếu thiếu tọa độ ổn định** (`grid_range` hoặc `position_x/position_y`) và khi CRUD topology (area/device/link/port-link/anchor); thao tác viewport (`pan/zoom/reset view/fit khung`) không được trigger.
+- **main_navigator_center_policy:** cụm điều khiển viewport/view mode (`zoom/reset/fit khung/L1/L2/L3/Sửa vị trí`) hiển thị canh giữa trong main navigator panel.
 - **manual_position_edit_policy:** khi bật chế độ sửa vị trí, kéo‑thả `Area/Device` phải lưu `position_x/position_y` về DB ở `drag-end` và không trigger `/auto-layout`.
 - **manual_position_property_save_policy:** lưu thuộc tính `Area/Device` nếu chỉ đổi `position_x/position_y/grid_range` thì không trigger `/auto-layout`.
 - **manual_auto_layout_preserve_policy:** chạy auto-layout thủ công với `preserve_existing_positions=true` phải giữ nguyên mọi `Area/Device` đã có tọa độ và chỉ fill bản ghi thiếu tọa độ.

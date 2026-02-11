@@ -43,7 +43,20 @@ export const DEFAULT_RENDER_TUNING: RenderTuning = {
   icon_colors: {}           // Override theo loại icon, vd {"router":"#1f6feb"}
 }
 
-export const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']
+export const deviceTypes = [
+  'Router',
+  'Switch',
+  'Firewall',
+  'Server',
+  'AP',
+  'PC',
+  'Storage',
+  'Cloud',
+  'Cloud-Network',
+  'Cloud-Security',
+  'Cloud-Service',
+  'Unknown'
+]
 export const linkPurposes = ['DEFAULT', 'WAN', 'INTERNET', 'DMZ', 'LAN', 'MGMT', 'HA', 'HSRP', 'STACK', 'STORAGE', 'BACKUP', 'VPN']
 export const DEFAULT_LINK_COLOR = '#2b2a28'
 export const LINK_PURPOSE_COLORS: Record<string, string> = {

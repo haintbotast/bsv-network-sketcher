@@ -100,6 +100,8 @@ def compute_layout_l1(
         """Detect device tier with enhanced granularity (0-10)."""
         name = normalize(getattr(device, "name", ""))
         dtype = normalize(getattr(device, "device_type", ""))
+        if dtype in {"cloud", "cloud-network", "cloud-security", "cloud-service"}:
+            return 0
         if dtype == "switch":
             if core_token_re.search(name):
                 return 3

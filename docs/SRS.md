@@ -36,7 +36,7 @@
 - Đồng bộ dữ liệu L1→L2→L3 theo quy tắc logic chuẩn (validation chặt chẽ).
 - Auto-layout theo **2 tầng** (macro Area + micro Device), ưu tiên bố cục top‑to‑bottom.
 - Auto-layout tự động chạy khi **mở project nếu dữ liệu thiếu tọa độ ổn định** (`grid_range` hoặc `position_x/position_y`) và sau mọi CRUD topology của project (area/device/link/port-link/anchor override), có debounce để giảm chạy dồn.
-- Auto-layout **không được trigger** bởi thao tác viewport để xem sơ đồ (`pan`, `zoom`, `reset view`).
+- Auto-layout **không được trigger** bởi thao tác viewport để xem sơ đồ (`pan`, `zoom`, `reset view`, `fit khung`).
 - Với project có `grid_row/grid_col` rõ ràng, macro layout phải bám lưới theo **cột căn giữa (center-slot)** để giảm lệch vị trí khi có area quá rộng, giữ bố cục gần PDF chuẩn.
 - Micro layout trong từng Area phải **căn giữa theo hàng thiết bị** khi tách nhiều hàng để tránh dồn lệch trái và giữ đối xứng so với sơ đồ chuẩn.
 - Cho phép chạy lại auto-layout khi người dùng chủ động từ tab **Bố cục**.
@@ -51,6 +51,7 @@
 - Tọa độ `position_x/position_y` phải được chuẩn hóa theo **bảng vị trí chuẩn X/Y** với bước mặc định **0.25 đv** để tránh số lẻ khó kiểm soát.
 - Hệ tọa độ chuẩn hỗ trợ khai báo theo **grid Excel** (`A1:B2`); với Area/Device, `grid_range` là trường chuẩn, `position_x/position_y` giữ vai trò tương thích ngược.
 - API/UI phải cho phép CRUD **Device Port** độc lập theo thiết bị (`name`, `side`, `offset_ratio`) để tách rõ mô hình port khỏi link.
+- `device_type` preset phải hỗ trợ nhóm cloud tường minh: `Cloud`, `Cloud-Network`, `Cloud-Security`, `Cloud-Service`; khi đã chọn nhóm này thì icon cloud được ưu tiên theo `device_type`, không bắt buộc phụ thuộc từ khóa trong tên.
 - Khi tạo/sửa link L1, endpoint (`from_port`, `to_port`) bắt buộc phải tồn tại trong danh sách port đã khai báo của đúng thiết bị.
 - Tab **Bố cục** cần có thành phần khai báo nhanh kết nối peer-control (`HA/STACK/HSRP`) và hiển thị legend màu/nét/chú giải tương ứng.
 - Với L1, điểm nối port tự động phải theo quy ước: **uplink ở cạnh trên (top)**, **kết nối không phải uplink ở cạnh dưới (bottom)**; chỉ cho phép lệch quy ước khi có **override thủ công**.

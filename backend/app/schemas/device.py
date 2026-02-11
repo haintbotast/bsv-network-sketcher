@@ -7,7 +7,20 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.services.grid_excel import normalize_excel_range
 
-DeviceType = Literal["Router", "Switch", "Firewall", "Server", "AP", "PC", "Storage", "Unknown"]
+DeviceType = Literal[
+    "Router",
+    "Switch",
+    "Firewall",
+    "Server",
+    "AP",
+    "PC",
+    "Storage",
+    "Cloud",
+    "Cloud-Network",
+    "Cloud-Security",
+    "Cloud-Service",
+    "Unknown",
+]
 
 
 class DeviceCreate(BaseModel):

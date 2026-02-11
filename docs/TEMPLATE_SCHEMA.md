@@ -54,6 +54,8 @@
 - `position_x`, `position_y`, `width`, `height` (float, inch)
 - `color_rgb` ([int,int,int])
 
+Preset `device_type` hiện tại: `Router`, `Switch`, `Firewall`, `Server`, `AP`, `PC`, `Storage`, `Cloud`, `Cloud-Network`, `Cloud-Security`, `Cloud-Service`, `Unknown`.
+
 ### 2.3 L1 Links
 - `from_device`, `to_device` (string, required)
 - `from_port`, `to_port` (string, required)
@@ -342,7 +344,7 @@
         },
         "device_type": {
           "type": "string",
-          "enum": ["Router", "Switch", "Firewall", "Server", "AP", "PC", "Storage", "Unknown"],
+          "enum": ["Router", "Switch", "Firewall", "Server", "AP", "PC", "Storage", "Cloud", "Cloud-Network", "Cloud-Security", "Cloud-Service", "Unknown"],
           "default": "Unknown"
         },
         "position_x": {

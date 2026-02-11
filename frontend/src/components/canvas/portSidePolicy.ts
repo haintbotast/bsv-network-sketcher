@@ -7,6 +7,7 @@ function resolveDeviceTier(type: string, name: string) {
   const normalizedType = normalize(type)
   const normalizedName = normalize(name)
 
+  if (['cloud', 'cloud-network', 'cloud-security', 'cloud-service'].includes(normalizedType)) return 0
   if (normalizedType === 'router' || /(router|rtr|edge|wan|internet|isp)/.test(normalizedName)) return 0
   if (normalizedType === 'firewall' || /(firewall|fw|security|ids|ips|vpn|waf)/.test(normalizedName)) return 1
   if (/(core)/.test(normalizedName)) return 2

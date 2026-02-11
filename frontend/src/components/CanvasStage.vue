@@ -772,6 +772,16 @@ function resolveCloudFunctionKind(name: string): DeviceIconKind {
   return 'cloud'
 }
 
+function resolveCloudKindByType(deviceType: string): DeviceIconKind | null {
+  const normalizedType = normalizeKeywordText(deviceType)
+  if (!normalizedType) return null
+  if (normalizedType === 'CLOUD') return 'cloud'
+  if (normalizedType === 'CLOUD-NETWORK' || normalizedType === 'CLOUD_NETWORK') return 'cloud-network'
+  if (normalizedType === 'CLOUD-SECURITY' || normalizedType === 'CLOUD_SECURITY') return 'cloud-security'
+  if (normalizedType === 'CLOUD-SERVICE' || normalizedType === 'CLOUD_SERVICE') return 'cloud-service'
+  return null
+}
+
 function resolveIconColor(kind: DeviceIconKind, isSelected: boolean, tuning?: Record<string, unknown>) {
   if (isSelected) return '#d66c3b'
   const colorMap = (tuning?.icon_colors && typeof tuning.icon_colors === 'object')
@@ -794,6 +804,8 @@ function resolveIconStrokeWidth(tuning?: Record<string, unknown>) {
 
 function resolveDeviceRole(device: DeviceModel) {
   const name = device.name.toUpperCase()
+  const cloudKindFromType = resolveCloudKindByType(device.type || '')
+  if (cloudKindFromType) return 'router'
   if (device.type === 'Router' || name.includes('RTR') || name.includes('ROUTER') || name.includes('ISP')) {
     return 'router'
   }
@@ -820,6 +832,10 @@ function resolveDeviceRole(device: DeviceModel) {
 
 function resolveDeviceIconKind(device: DeviceModel): DeviceIconKind {
   const name = normalizeKeywordText(device.name || '')
+  const cloudKindFromType = resolveCloudKindByType(device.type || '')
+  if (cloudKindFromType) {
+    return cloudKindFromType === 'cloud' ? resolveCloudFunctionKind(name) : cloudKindFromType
+  }
   if (includesAnyKeyword(name, CLOUD_ICON_KEYWORDS)) return resolveCloudFunctionKind(name)
   if (device.type === 'Storage') return 'storage'
   if (device.type === 'AP') return 'ap'

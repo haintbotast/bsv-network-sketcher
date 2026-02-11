@@ -721,7 +721,7 @@ import {
   resolveLinkPurposeColor,
 } from './composables/canvasConstants'
 import { comparePorts, extractPortIndex } from './components/canvas/linkRoutingUtils'
-import { formatExcelCell } from './utils/excelGrid'
+import { formatExcelCell, rectUnitsToExcelRange } from './utils/excelGrid'
 import { useViewport } from './composables/useViewport'
 import { useAuth } from './composables/useAuth'
 import { useProjects } from './composables/useProjects'
@@ -866,6 +866,25 @@ function normalizePositionUnits(value: number) {
   return snapUnitsToStandard(value)
 }
 
+function syncSelectedDraftPosition(type: 'area' | 'device', positionX: number, positionY: number) {
+  if (!selectedDraft.value || selectedId.value == null) return
+  if (selectedId.value !== selectedDraft.value.id) return
+  if (selectedObjectType.value !== 'Area' && selectedObjectType.value !== 'Device') return
+  const fallbackWidth = type === 'area' ? 3 : 1.2
+  const fallbackHeight = type === 'area' ? 1.5 : 0.5
+  const width = Number(selectedDraft.value.width)
+  const height = Number(selectedDraft.value.height)
+  const normalizedWidth = Number.isFinite(width) && width > 0 ? width : fallbackWidth
+  const normalizedHeight = Number.isFinite(height) && height > 0 ? height : fallbackHeight
+  const nextGridRange = rectUnitsToExcelRange(positionX, positionY, normalizedWidth, normalizedHeight)
+
+  syncingDraft = true
+  selectedDraft.value.position_x = positionX
+  selectedDraft.value.position_y = positionY
+  selectedDraft.value.grid_range = nextGridRange
+  syncingDraft = false
+}
+
 async function handleCanvasObjectPositionChange(payload: { id: string; type: 'device' | 'area'; x: number; y: number }) {
   if (!selectedProjectId.value) return
   if (!Number.isFinite(payload.x) || !Number.isFinite(payload.y)) return
@@ -883,9 +902,8 @@ async function handleCanvasObjectPositionChange(payload: { id: string; type: 'de
     }
 
     if (positionSaveSeq.get(key) !== seq) return
-    if (selectedId.value === payload.id && selectedDraft.value && !selectedDraftDirty.value) {
-      selectedDraft.value.position_x = positionX
-      selectedDraft.value.position_y = positionY
+    if (selectedId.value === payload.id) {
+      syncSelectedDraftPosition(payload.type, positionX, positionY)
     }
     const objectLabel = payload.type === 'area' ? 'khu vực' : 'thiết bị'
     setNotice(`Đã lưu vị trí ${objectLabel}.`, 'success')

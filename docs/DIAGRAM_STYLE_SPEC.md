@@ -225,7 +225,7 @@ Quy định khi áp dụng:
 | Loại thiết bị | Icon gợi nhớ | Quy tắc hiển thị |
 |---------------|--------------|------------------|
 | Router | Lục giác + trục ngang/dọc | Nét mảnh, không fill |
-| Switch (Core/Dist/Access) | Chassis ngang + 2 hàng port mini | Nét mảnh, không fill |
+| Switch (Core/Dist/Access) | Chassis ngang + 2 hàng port mini + mũi tên chuyển mạch hai chiều | Nét mảnh, không fill |
 | Firewall | Khối tường gạch đơn giản | Nét mảnh, không fill |
 | Security (IDS/IPS/VPN/SOC...) | Khiên bảo mật | Nét mảnh, không fill |
 | Server | Rack đứng 3 khoang + LED trạng thái | Nét mảnh, không fill |

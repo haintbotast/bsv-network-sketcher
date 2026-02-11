@@ -967,26 +967,42 @@ function buildDeviceIconShape(
         drawArrowHead(cx, cy + axis, cx, cy + r * 0.92, arrowSize)
       } else if (kind === 'switch') {
         const left = x + size * 0.08
-        const top = y + size * 0.3
+        const top = y + size * 0.24
         const width = size * 0.84
-        const height = size * 0.46
+        const height = size * 0.52
         ctx.rect(left, top, width, height)
-        const slotW = size * 0.1
-        const slotH = size * 0.08
-        const colGap = size * 0.04
-        const rowGap = size * 0.07
-        const row1Y = top + size * 0.07
+        const slotW = size * 0.08
+        const slotH = size * 0.06
+        const colGap = size * 0.025
+        const rowGap = size * 0.065
+        const row1Y = top + size * 0.22
         const row2Y = row1Y + slotH + rowGap
-        const startX = left + size * 0.08
+        const startX = left + size * 0.24
         for (let row = 0; row < 2; row += 1) {
-          for (let col = 0; col < 3; col += 1) {
+          for (let col = 0; col < 6; col += 1) {
             const sx = startX + col * (slotW + colGap)
             const sy = row === 0 ? row1Y : row2Y
             ctx.rect(sx, sy, slotW, slotH)
           }
         }
-        ctx.moveTo(left + size * 0.1, top - size * 0.08)
-        ctx.lineTo(left + width - size * 0.1, top - size * 0.08)
+        const ledRadius = size * 0.022
+        const ledX = left + size * 0.15
+        const ledTop = top + size * 0.29
+        const ledBottom = top + size * 0.46
+        ctx.moveTo(ledX + ledRadius, ledTop)
+        ctx.arc(ledX, ledTop, ledRadius, 0, Math.PI * 2)
+        ctx.moveTo(ledX + ledRadius, ledBottom)
+        ctx.arc(ledX, ledBottom, ledRadius, 0, Math.PI * 2)
+
+        const midY = top + size * 0.12
+        const arrowSpan = size * 0.13
+        const arrowHead = size * 0.06
+        ctx.moveTo(cx - arrowSpan, midY)
+        ctx.lineTo(cx + arrowSpan, midY)
+        drawArrowHead(cx + arrowSpan * 0.65, midY, cx + arrowSpan, midY, arrowHead)
+        ctx.moveTo(cx + arrowSpan, midY + size * 0.08)
+        ctx.lineTo(cx - arrowSpan, midY + size * 0.08)
+        drawArrowHead(cx - arrowSpan * 0.65, midY + size * 0.08, cx - arrowSpan, midY + size * 0.08, arrowHead)
       } else if (kind === 'firewall') {
         const left = x + size * 0.14
         const top = y + size * 0.18

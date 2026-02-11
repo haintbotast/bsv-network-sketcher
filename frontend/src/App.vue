@@ -24,6 +24,9 @@
         <button type="button" :class="{ active: viewMode === 'L3' }" @click="setViewMode('L3')">[L3]</button>
         <span class="view-badge">{{ viewModeLabel }}</span>
         <span class="toolbar-divider"></span>
+        <button type="button" :class="{ active: showCanvasGrid }" @click="showCanvasGrid = !showCanvasGrid">
+          Lưới
+        </button>
         <button type="button" class="ghost" @click="toggleRightPanel">
           {{ showRightPanel ? 'Ẩn panel' : 'Hiện panel' }}
         </button>
@@ -98,6 +101,8 @@
           :port-anchor-overrides="effectivePortAnchorMap"
           :device-ports-map="devicePortMap"
           :render-tuning="renderTuning"
+          :show-rulers="showCanvasGrid"
+          :show-grid-lines="showCanvasGrid"
           @select="handleSelect"
           @update:viewport="handleViewportUpdate"
           @object:position-change="handleCanvasObjectPositionChange"
@@ -767,6 +772,8 @@ const {
   resetViewport,
   toggleRightPanel,
 } = useViewport()
+
+const showCanvasGrid = ref(true)
 
 // Viewport interaction không được trigger auto-layout, chỉ cập nhật trạng thái hiển thị.
 function handleViewportUpdate(value: Viewport) {

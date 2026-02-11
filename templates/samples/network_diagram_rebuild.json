@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0",
-  "template_version": "1.2",
+  "template_version": "1.3",
   "metadata": {
     "name": "Phục dựng Network diagram",
-    "description": "Phục dựng sơ đồ từ docs/Network diagram.pdf – v1.2: sửa area assignment (TK-ICT1→Core, TK-SV1/SV2→Server) theo PDF chuẩn",
+    "description": "Phục dựng sơ đồ từ docs/Network diagram.pdf – v1.3: sửa port naming CR (Gi 1/0/x), thêm FW→CR P3-P5, SmartSensor→FW1[P 6], TK-ICT1→CR2[SPAN]",
     "created_at": "2026-02-06T10:00:00Z",
     "author": "recovery"
   },
@@ -42,7 +42,7 @@
 
     { "name": "TK-FW1", "area_name": "Security-TK", "device_type": "Firewall" },
     { "name": "TK-FW2", "area_name": "Security-TK", "device_type": "Firewall" },
-    { "name": "SmartSensor", "area_name": "Security-TK", "device_type": "Server" },
+    { "name": "SmartSensor", "area_name": "Security-TK", "device_type": "Unknown" },
     { "name": "TK-CMC-SS", "area_name": "Security-TK", "device_type": "Switch" },
     { "name": "TK-ICT1", "area_name": "Core", "device_type": "Switch" },
 
@@ -125,19 +125,25 @@
     { "from_device": "CMC", "from_port": "WAN 3", "to_device": "Office365-1", "to_port": "WAN 1", "purpose": "INTERNET" },
     { "from_device": "CMC", "from_port": "WAN 4", "to_device": "Office365-2", "to_port": "WAN 1", "purpose": "INTERNET" },
 
-    { "from_device": "TK-FW1", "from_port": "P 1", "to_device": "TK-CR1", "to_port": "Gi 0/1", "purpose": "LAN" },
-    { "from_device": "TK-FW2", "from_port": "P 1", "to_device": "TK-CR2", "to_port": "Gi 0/1", "purpose": "LAN" },
-    { "from_device": "TK-FW1", "from_port": "P 2", "to_device": "TK-CR2", "to_port": "Gi 0/2", "purpose": "LAN" },
-    { "from_device": "TK-FW2", "from_port": "P 2", "to_device": "TK-CR1", "to_port": "Gi 0/2", "purpose": "LAN" },
+    { "from_device": "TK-FW1", "from_port": "P 1", "to_device": "TK-CR1", "to_port": "Gi 1/0/1", "purpose": "LAN" },
+    { "from_device": "TK-FW1", "from_port": "P 2", "to_device": "TK-CR2", "to_port": "Gi 1/0/2", "purpose": "LAN" },
+    { "from_device": "TK-FW1", "from_port": "P 3", "to_device": "TK-CR1", "to_port": "Gi 1/0/3", "purpose": "LAN" },
+    { "from_device": "TK-FW1", "from_port": "P 4", "to_device": "TK-CR2", "to_port": "Gi 1/0/4", "purpose": "LAN" },
+    { "from_device": "TK-FW1", "from_port": "P 5", "to_device": "TK-CR1", "to_port": "Gi 1/0/5", "purpose": "LAN" },
+    { "from_device": "TK-FW2", "from_port": "P 1", "to_device": "TK-CR2", "to_port": "Gi 1/0/1", "purpose": "LAN" },
+    { "from_device": "TK-FW2", "from_port": "P 2", "to_device": "TK-CR1", "to_port": "Gi 1/0/2", "purpose": "LAN" },
+    { "from_device": "TK-FW2", "from_port": "P 3", "to_device": "TK-CR2", "to_port": "Gi 1/0/3", "purpose": "LAN" },
+    { "from_device": "TK-FW2", "from_port": "P 4", "to_device": "TK-CR1", "to_port": "Gi 1/0/4", "purpose": "LAN" },
+    { "from_device": "TK-FW2", "from_port": "P 5", "to_device": "TK-CR2", "to_port": "Gi 1/0/5", "purpose": "LAN" },
     { "from_device": "TK-FW1", "from_port": "HA 1", "to_device": "TK-FW2", "to_port": "HA 1", "purpose": "HA", "line_style": "dashed" },
     { "from_device": "TK-FW1", "from_port": "LAN 1", "to_device": "TK-CMC-SS", "to_port": "Gi 0/1", "purpose": "LAN" },
     { "from_device": "TK-FW2", "from_port": "LAN 1", "to_device": "TK-CMC-SS", "to_port": "Gi 0/2", "purpose": "LAN" },
-    { "from_device": "SmartSensor", "from_port": "Eth 1", "to_device": "TK-FW1", "to_port": "LAN 2", "purpose": "MGMT" },
-    { "from_device": "TK-ICT1", "from_port": "Gi 0/1", "to_device": "TK-CR2", "to_port": "Gi 0/3", "purpose": "MGMT" },
+    { "from_device": "SmartSensor", "from_port": "Eth 1", "to_device": "TK-FW1", "to_port": "P 6", "purpose": "MGMT" },
+    { "from_device": "TK-ICT1", "from_port": "SPAN 1", "to_device": "TK-CR2", "to_port": "Gi 1/0/7", "purpose": "MGMT" },
 
     { "from_device": "TK-CR1", "from_port": "TenGi 1/1/1", "to_device": "YH-DS1", "to_port": "TenGi 1/1/1", "purpose": "LAN" },
     { "from_device": "TK-CR2", "from_port": "TenGi 1/1/1", "to_device": "YH-DS2", "to_port": "TenGi 1/1/1", "purpose": "LAN" },
-    { "from_device": "TK-CR1", "from_port": "Gi 0/6", "to_device": "TK-CR2", "to_port": "Gi 0/6", "purpose": "HA", "line_style": "dashed" },
+    { "from_device": "TK-CR1", "from_port": "Gi 1/0/6", "to_device": "TK-CR2", "to_port": "Gi 1/0/6", "purpose": "HA", "line_style": "dashed" },
 
     { "from_device": "YH-DS1", "from_port": "Stack 1", "to_device": "YH-DS2", "to_port": "Stack 1", "purpose": "HA", "line_style": "dotted" },
     { "from_device": "YH-DS1", "from_port": "Gi 1/0/1", "to_device": "TK-SV1", "to_port": "Gi 1/0/1", "purpose": "LAN" },

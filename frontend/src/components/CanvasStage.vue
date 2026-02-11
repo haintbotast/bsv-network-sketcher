@@ -1,11 +1,17 @@
 <template>
   <div ref="containerRef" class="canvas-shell">
+    <!-- Ruler bars -->
+    <div v-if="showRulers" class="canvas-ruler-corner" />
+    <canvas v-if="showRulers" ref="rulerHRef" class="canvas-ruler-h" />
+    <canvas v-if="showRulers" ref="rulerVRef" class="canvas-ruler-v" />
+
     <v-stage
       ref="stageRef"
       :config="{
         width: stageSize.width,
         height: stageSize.height
       }"
+      :style="stagePositionStyle"
       @mousedown="onPointerDown"
       @mousemove="onPointerMove"
       @mouseup="onPointerUp"
@@ -16,6 +22,7 @@
     >
       <v-layer ref="gridLayerRef" :config="layerTransform">
         <v-rect :config="gridConfig" />
+        <v-shape v-if="showGridLines && rulerGrid.gridLinesConfig.value" :config="rulerGrid.gridLinesConfig.value" />
       </v-layer>
 
       <!-- L1 View: Areas with minimized visuals -->
@@ -135,6 +142,7 @@ import { useLinkRouting } from './canvas/useLinkRouting'
 import { comparePorts } from './canvas/linkRoutingUtils'
 import { buildDeviceTierMap, resolveAutoPortSide } from './canvas/portSidePolicy'
 import { POSITION_STANDARD_STEP_UNITS, UNIT_PX } from '../composables/canvasConstants'
+import { useRulerGrid, RULER_H_HEIGHT, RULER_V_WIDTH } from './canvas/useRulerGrid'
 
 const props = defineProps<{
   areas: AreaModel[]
@@ -188,6 +196,8 @@ const props = defineProps<{
     device_ids: string[]
     router_id?: string | null
   }>
+  showRulers?: boolean
+  showGridLines?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -199,6 +209,10 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLDivElement | null>(null)
 const stageRef = ref()
 const stageSize = ref({ width: 300, height: 200 })
+const rulerHRef = ref<HTMLCanvasElement | null>(null)
+const rulerVRef = ref<HTMLCanvasElement | null>(null)
+const showRulers = computed(() => props.showRulers !== false)
+const showGridLines = computed(() => props.showGridLines !== false)
 let observer: ResizeObserver | null = null
 const isPanning = ref(false)
 const isObjectDragging = ref(false)
@@ -208,6 +222,22 @@ const panTranslation = ref({ x: 0, y: 0 })
 const pendingTranslation = ref<{ x: number; y: number } | null>(null)
 let panRaf = 0
 const layoutViewport = ref<Viewport>({ ...props.viewport })
+
+const stagePositionStyle = computed(() => {
+  if (!showRulers.value) return {}
+  return {
+    position: 'absolute' as const,
+    top: `${RULER_H_HEIGHT}px`,
+    left: `${RULER_V_WIDTH}px`,
+  }
+})
+
+const rulerGrid = useRulerGrid({
+  viewport: computed(() => props.viewport),
+  stageSize,
+  showRulers,
+  showGridLines,
+})
 
 type DragObjectContext = {
   id: string
@@ -1861,16 +1891,13 @@ const l3Labels = computed(() => {
 function updateSize() {
   const el = containerRef.value
   if (!el) return
-  const rect = {
-    width: el.clientWidth,
-    height: el.clientHeight
-  }
-  if (!rect.width || !rect.height) return
-  if (rect.width === stageSize.value.width && rect.height === stageSize.value.height) return
-  stageSize.value = {
-    width: Math.max(Math.floor(rect.width), 0),
-    height: Math.max(Math.floor(rect.height), 0)
-  }
+  const rulerOffX = showRulers.value ? RULER_V_WIDTH : 0
+  const rulerOffY = showRulers.value ? RULER_H_HEIGHT : 0
+  const w = Math.max(Math.floor(el.clientWidth - rulerOffX), 0)
+  const h = Math.max(Math.floor(el.clientHeight - rulerOffY), 0)
+  if (!w || !h) return
+  if (w === stageSize.value.width && h === stageSize.value.height) return
+  stageSize.value = { width: w, height: h }
 }
 
 function emitSelect(id: string, type: 'device' | 'area') {
@@ -2066,12 +2093,40 @@ function onPointerUp() {
   }
 }
 
+function redrawRulers() {
+  if (!showRulers.value) return
+  const dpr = window.devicePixelRatio || 1
+  const pan = panTranslation.value
+  const hCanvas = rulerHRef.value
+  if (hCanvas) {
+    const w = hCanvas.clientWidth
+    const h = hCanvas.clientHeight
+    hCanvas.width = Math.round(w * dpr)
+    hCanvas.height = Math.round(h * dpr)
+    const ctx = hCanvas.getContext('2d')
+    if (ctx) rulerGrid.drawHRuler(ctx, w, h, pan.x)
+  }
+  const vCanvas = rulerVRef.value
+  if (vCanvas) {
+    const w = vCanvas.clientWidth
+    const h = vCanvas.clientHeight
+    vCanvas.width = Math.round(w * dpr)
+    vCanvas.height = Math.round(h * dpr)
+    const ctx = vCanvas.getContext('2d')
+    if (ctx) rulerGrid.drawVRuler(ctx, w, h, pan.y)
+  }
+}
+
 onMounted(() => {
   updateSize()
-  observer = new ResizeObserver(() => updateSize())
+  observer = new ResizeObserver(() => {
+    updateSize()
+    redrawRulers()
+  })
   if (containerRef.value) {
     observer.observe(containerRef.value)
   }
+  redrawRulers()
 })
 
 onBeforeUnmount(() => {
@@ -2088,6 +2143,10 @@ onBeforeUnmount(() => {
   }
 })
 
+watch(() => props.viewport, () => redrawRulers(), { deep: true })
+watch(panTranslation, () => redrawRulers(), { deep: true })
+watch(showRulers, () => { updateSize(); redrawRulers() })
+
 watch([visibleAreas, visibleDevices, visibleLinks, visibleLinkPortLabels, l2Labels, l3Labels, alignmentGuides, stageSize], () => {
   scheduleBatchDraw()
 })
@@ -2096,6 +2155,7 @@ watch([visibleAreas, visibleDevices, visibleLinks, visibleLinkPortLabels, l2Labe
 
 <style scoped>
 .canvas-shell {
+  position: relative;
   width: 100%;
   height: 100%;
   background: #ffffff;
@@ -2103,5 +2163,32 @@ watch([visibleAreas, visibleDevices, visibleLinks, visibleLinkPortLabels, l2Labe
   border: 1px solid rgba(28, 28, 28, 0.1);
   box-shadow: none;
   overflow: hidden;
+}
+.canvas-ruler-corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 36px;
+  height: 24px;
+  background: #faf8f5;
+  border-right: 1px solid #d0c6bc;
+  border-bottom: 1px solid #d0c6bc;
+  z-index: 3;
+}
+.canvas-ruler-h {
+  position: absolute;
+  top: 0;
+  left: 36px;
+  right: 0;
+  height: 24px;
+  z-index: 2;
+}
+.canvas-ruler-v {
+  position: absolute;
+  top: 24px;
+  left: 0;
+  bottom: 0;
+  width: 36px;
+  z-index: 2;
 }
 </style>

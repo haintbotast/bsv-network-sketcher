@@ -12,7 +12,7 @@ function colLettersToIndex(letters: string): number {
   return value
 }
 
-function colIndexToLetters(index: number): string {
+export function colIndexToLetters(index: number): string {
   if (index < 1) throw new Error('Chỉ số cột phải >= 1')
   let n = index
   let out = ''

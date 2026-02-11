@@ -363,6 +363,7 @@
                 </select>
                 <span class="color-swatch" :style="{ backgroundColor: areaFillColorCss }" aria-hidden="true"></span>
               </div>
+              <span class="hint-text">Đang dùng: {{ areaFillColorInfo }}</span>
             </div>
             <div class="form-group">
               <label>Màu viền area</label>
@@ -374,6 +375,7 @@
                 </select>
                 <span class="color-swatch" :style="{ backgroundColor: areaStrokeColorCss }" aria-hidden="true"></span>
               </div>
+              <span class="hint-text">Đang dùng: {{ areaStrokeColorInfo }}</span>
             </div>
             <div class="form-group">
               <label>Độ dày viền area</label>
@@ -413,6 +415,7 @@
                 </select>
                 <span class="color-swatch" :style="{ backgroundColor: deviceColorCss }" aria-hidden="true"></span>
               </div>
+              <span class="hint-text">Đang dùng: {{ deviceColorInfo }}</span>
             </div>
             <div class="form-group">
               <label>Grid range (Excel)</label>
@@ -666,6 +669,7 @@
                 </select>
                 <span class="color-swatch" :style="{ backgroundColor: linkColorCss }" aria-hidden="true"></span>
               </div>
+              <span class="hint-text">Đang dùng: {{ linkColorInfo }}</span>
               <span class="hint-text">Chọn "Theo purpose" để dùng màu chuẩn theo mục đích link.</span>
             </div>
           </div>
@@ -714,6 +718,7 @@ import {
   defaultAreaStyle,
   deviceTypes,
   linkPurposes,
+  resolveLinkPurposeColor,
 } from './composables/canvasConstants'
 import { comparePorts, extractPortIndex } from './components/canvas/linkRoutingUtils'
 import { formatExcelCell } from './utils/excelGrid'
@@ -1409,6 +1414,31 @@ function rgbTupleToCss(rgb?: number[] | null) {
   return `rgb(${r}, ${g}, ${b})`
 }
 
+function rgbTupleToHex(rgb?: number[] | null) {
+  if (!rgb || rgb.length < 3) return null
+  const [r, g, b] = rgb
+  const toHex = (v: number) => Number(v).toString(16).padStart(2, '0')
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase()
+}
+
+function hexToRgbTuple(hex?: string | null): RgbTuple | null {
+  if (!hex) return null
+  const normalized = hex.trim().replace('#', '')
+  if (normalized.length !== 6) return null
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return null
+  return [
+    Number.parseInt(normalized.slice(0, 2), 16),
+    Number.parseInt(normalized.slice(2, 4), 16),
+    Number.parseInt(normalized.slice(4, 6), 16),
+  ]
+}
+
+function formatColorInfo(rgb?: number[] | null) {
+  if (!rgb || rgb.length < 3) return 'Mặc định'
+  const hex = rgbTupleToHex(rgb)
+  return `RGB(${rgb[0]}, ${rgb[1]}, ${rgb[2]})${hex ? ` | ${hex}` : ''}`
+}
+
 const areaFillColorKey = computed({
   get() {
     if (selectedObjectType.value !== 'Area' || !selectedDraft.value) return rgbTupleToKey(defaultAreaStyle.fill_color_rgb)
@@ -1476,9 +1506,19 @@ const areaFillColorCss = computed(() => {
   return rgbTupleToCss(selectedDraft.value.style?.fill_color_rgb || defaultAreaStyle.fill_color_rgb)
 })
 
+const areaFillColorInfo = computed(() => {
+  if (selectedObjectType.value !== 'Area' || !selectedDraft.value) return formatColorInfo(defaultAreaStyle.fill_color_rgb)
+  return formatColorInfo(selectedDraft.value.style?.fill_color_rgb || defaultAreaStyle.fill_color_rgb)
+})
+
 const areaStrokeColorCss = computed(() => {
   if (selectedObjectType.value !== 'Area' || !selectedDraft.value) return rgbTupleToCss(defaultAreaStyle.stroke_color_rgb)
   return rgbTupleToCss(selectedDraft.value.style?.stroke_color_rgb || defaultAreaStyle.stroke_color_rgb)
+})
+
+const areaStrokeColorInfo = computed(() => {
+  if (selectedObjectType.value !== 'Area' || !selectedDraft.value) return formatColorInfo(defaultAreaStyle.stroke_color_rgb)
+  return formatColorInfo(selectedDraft.value.style?.stroke_color_rgb || defaultAreaStyle.stroke_color_rgb)
 })
 
 const deviceColorKey = computed({
@@ -1499,6 +1539,11 @@ const deviceColorCss = computed(() => {
   return rgbTupleToCss(selectedDraft.value.color_rgb)
 })
 
+const deviceColorInfo = computed(() => {
+  if (selectedObjectType.value !== 'Device' || !selectedDraft.value) return 'Mặc định theo loại thiết bị'
+  return formatColorInfo(selectedDraft.value.color_rgb)
+})
+
 const linkColorKey = computed({
   get() {
     if (selectedObjectType.value !== 'Link' || !selectedDraft.value) return ''
@@ -1513,8 +1558,24 @@ const linkColorKey = computed({
 })
 
 const linkColorCss = computed(() => {
-  if (selectedObjectType.value !== 'Link' || !selectedDraft.value) return '#ffffff'
-  return rgbTupleToCss(selectedDraft.value.color_rgb)
+  if (selectedObjectType.value !== 'Link' || !selectedDraft.value) return rgbTupleToCss([43, 42, 40])
+  const override = selectedDraft.value.color_rgb as number[] | null | undefined
+  if (override && override.length >= 3) return rgbTupleToCss(override)
+  const purposeHex = resolveLinkPurposeColor(selectedDraft.value.purpose || 'DEFAULT')
+  const purposeRgb = hexToRgbTuple(purposeHex)
+  return rgbTupleToCss(purposeRgb || [43, 42, 40])
+})
+
+const linkColorInfo = computed(() => {
+  if (selectedObjectType.value !== 'Link' || !selectedDraft.value) return 'Theo purpose'
+  const override = selectedDraft.value.color_rgb as number[] | null | undefined
+  if (override && override.length >= 3) {
+    return `${formatColorInfo(override)} (override)`
+  }
+  const purpose = (selectedDraft.value.purpose || 'DEFAULT').toUpperCase()
+  const purposeHex = resolveLinkPurposeColor(purpose)
+  const purposeRgb = hexToRgbTuple(purposeHex)
+  return `${formatColorInfo(purposeRgb)} (theo purpose ${purpose})`
 })
 
 const areaColumns: ColumnDef[] = [

@@ -71,6 +71,7 @@
 - Cho phép người dùng **override anchor per-port** bằng `side + offset_ratio` (cho phép `offset_ratio = null` để giữ auto offset); override **được lưu DB** và **không bị auto-layout ghi đè**.
 - Trong bảng thuộc tính thiết bị, phần `Anchor port (override)` phải hỗ trợ thao tác nhanh **đổi vị trí giữa 2 port cùng device** (swap `side + offset_ratio`) bằng một thao tác lưu, chỉ tác động đúng 2 port được chọn.
 - Bảng thuộc tính thiết bị cho phép **xem/chỉnh/tạo/xóa kết nối L1 theo port**, áp dụng kiểm tra **trùng link** và **port đã dùng** trước khi lưu.
+- Panel thuộc tính khi chọn `Area/Device/Link` phải hiển thị **màu hiệu lực hiện tại** dưới dạng RGB/HEX; riêng Link khi không có `color_rgb` override phải hiển thị màu lấy theo `purpose`.
 - Overview (nếu bật) chỉ L1/flow; L2/L3 chỉ hiển thị ở view riêng.  
   **Lưu ý:** UI hiện không hiển thị Overview; dùng L1 thay thế.
 - Liên kết khác Area bắt buộc qua **Waypoint area** (đuôi `_wp_`).

@@ -31,6 +31,7 @@
 - **l1_device_icon_port_safety_policy:** icon chỉ nằm trong thân device, không chạm port band top/bottom và không làm lệch anchor/port cell.
 - **peer_control_link_render:** `STACK/HA/HSRP` phải có style hiển thị riêng (màu/nét/lane) và không hòa lẫn với uplink/data.
 - **link_color_override_policy:** `L1Link.color_rgb` nếu có phải ưu tiên hơn màu theo `purpose`; khi `color_rgb=null` phải quay về palette `purpose`.
+- **color_effective_value_visibility_policy:** panel thuộc tính phải hiển thị đúng giá trị màu hiệu lực (RGB/HEX) của object đang chọn; Link không override phải hiện đúng màu theo `purpose`.
 - **port_anchor_override:** override anchor per-port **được ưu tiên** và **không bị auto-layout ghi đè**; kiểm tra thêm trường hợp `offset_ratio = null` để giữ auto offset.
 - **port_anchor_swap_quick_action:** thao tác nhanh đổi vị trí 2 port cùng device trong `Anchor port (override)` phải swap đúng `side + offset_ratio`, chỉ ảnh hưởng đúng 2 port được chọn.
 - **uplink_anchor_policy:** L1 auto-anchor phải đặt **uplink ở top** và **non-uplink ở bottom**; chỉ lệch khi có override thủ công.
@@ -343,6 +344,7 @@ test.describe('Diagram Editor', () => {
 - [ ] Area compact render: khung Area hiển thị co theo cụm thiết bị (giảm khoảng trắng lớn) và không làm thay đổi lưu trữ area trong DB.
 - [ ] Peer-control render: link `STACK/HA/HSRP` dùng màu/nét đúng quy ước và dễ phân biệt với link mặc định.
 - [ ] Link color override: lưu/sửa/xóa override màu link hoạt động đúng; response trả màu theo override hoặc fallback theo purpose.
+- [ ] Color effective value visibility: khi chọn Area/Device/Link, panel hiển thị đúng RGB/HEX đang dùng; Link ở chế độ "theo purpose" phản ánh đúng purpose hiện tại.
 - [ ] Peer-control quick create: tạo link từ form nhanh trong tab Bố cục phải tạo đúng `from_device/from_port/to_device/to_port/purpose/line_style`.
 - [ ] Peer-control legend: panel hiển thị đủ 3 dòng `STACK/HA/HSRP` với màu/nét/chú giải đúng mapping style.
 - [ ] Peer-control routing: với thiết bị cùng hàng trong nội-area, link `STACK/HA/HSRP` ưu tiên tuyến ngắn, ít giao cắt.

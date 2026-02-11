@@ -64,6 +64,7 @@ Web Network Sketcher là ứng dụng nội bộ giúp tạo/sửa/xuất sơ đ
 - **FR-35:** Trong phần `Anchor port (override)` của bảng thuộc tính thiết bị, cho phép người dùng chọn 2 port cùng device để **đổi vị trí anchor nhanh** (swap `side + offset_ratio`) mà không ảnh hưởng port khác.
 - **FR-36:** L1 routing ưu tiên thuật toán tuyến tính/địa phương (orthogonal + fallback) thay cho tối ưu toàn cục để giảm độ phức tạp vận hành.
 - **FR-37:** Quy tắc peer-control (`HA/STACK/HSRP`) phải chọn lane theo hướng side của anchor (`top/top`, `bottom/bottom`, khác side) để tránh route tự xuyên cụm thiết bị.
+- **FR-38:** Trong panel thuộc tính, khi chọn `Area/Device/Link`, UI phải hiển thị rõ **giá trị màu đang dùng** (RGB/HEX); với Link không override màu thì hiển thị màu hiệu lực theo `purpose`.
 
 ## 5. Yêu cầu phi chức năng (NFR)
 

@@ -295,6 +295,7 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 ### 6.2 Màu link theo purpose
 - Dùng bảng mapping (WAN/DMZ/LAN/MGMT/HA/STORAGE/BACKUP/VPN).
 - UI thuộc tính cho phép override `color_rgb` cho từng Link trong bảng preset; chọn "theo purpose" để quay về mapping chuẩn.
+- Panel thuộc tính phải hiển thị rõ màu hiệu lực hiện tại (RGB/HEX) khi chọn object; với Link để chế độ "theo purpose" thì hiển thị màu suy ra từ `purpose`.
 
 ### 6.3 Bảng preset màu (theo style chung)
 

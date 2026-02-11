@@ -13,7 +13,7 @@
 1) Mở project và chọn tab **Bố cục** trong panel phải (cạnh **Thuộc tính**) → hệ thống tự chạy auto-layout một lượt.
 2) Thực hiện CRUD topology (area/device/link/port-link/anchor override) → hệ thống tự chạy lại auto-layout (debounce).
 3) Điều chỉnh nhóm **Bố cục tổng thể** hoặc **Đường nối & nhãn**
-4) Dùng cụm điều khiển ở **main navigator panel** (`zoom/reset/L1/L2/L3/Sửa vị trí`) để chuyển chế độ xem/chỉnh; cụm này hiển thị **canh giữa theo panel**
+4) Dùng cụm điều khiển ở **main navigator panel** (`zoom/reset/fit khung/L1/L2/L3/Sửa vị trí`) để chuyển chế độ xem/chỉnh; cụm này hiển thị **canh giữa theo panel**
 5) (Tuỳ chọn) Bấm **Chạy lại auto-layout** để áp dụng lại bố cục
 6) (Tuỳ chọn) Khai báo nhanh link peer-control (`STACK/HA/HSRP`) từ tab **Bố cục** và đối chiếu legend màu/nét/chú giải
 7) (Tuỳ chọn) Bật **Sửa vị trí** trên canvas để kéo‑thả `Area/Device` và lưu tọa độ thủ công (có guide/snap alignment, tọa độ chuẩn theo step 0.25 đv, đồng bộ `grid_range` kiểu Excel)

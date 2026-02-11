@@ -69,7 +69,7 @@ Service Layer (Project/Diagram/Export/Import/Auth)
 UI thao tác → REST API → Service → DB → phản hồi → UI render
 ```
 - Auto-layout tự chạy khi mở project **nếu dữ liệu chưa ổn định tọa độ** (thiếu `grid_range` hoặc thiếu `position_x/position_y`) và sau CRUD topology (area/device/link/port-link/anchor override).
-- Thao tác viewport (`pan/zoom/reset view`) chỉ đổi góc nhìn trên client, **không** trigger auto-layout.
+- Thao tác viewport (`pan/zoom/reset view/fit khung`) chỉ đổi góc nhìn trên client, **không** trigger auto-layout.
 - Auto-layout thủ công từ tab **Bố cục** có 2 chế độ:
   - `preserve_existing_positions=true` (mặc định, khuyến nghị): giữ tọa độ Area/Device đã có trong DB, chỉ điền vị trí còn thiếu.
   - `preserve_existing_positions=false`: ghi đè toàn bộ tọa độ theo kết quả auto-layout mới.
@@ -79,7 +79,7 @@ UI thao tác → REST API → Service → DB → phản hồi → UI render
 - Khi kéo‑thả thủ công `Area/Device` đang được chọn, draft ở panel thuộc tính phải đồng bộ đồng thời `position_x/position_y/grid_range` theo vị trí mới để tránh lưu lại giá trị `grid_range` cũ làm reset vị trí.
 - Lưu thuộc tính `Area/Device` nếu chỉ thay đổi nhóm vị trí (`position_x/position_y/grid_range`) thì cập nhật trực tiếp DB, không tự chạy lại auto-layout.
 - Thuộc tính màu/style lưu DB theo từng thực thể: `areas.style_json`, `devices.color_rgb_json`, `l1_links.color_rgb_json`; UI chỉ cho chọn trong palette preset, link không override màu sẽ tự map theo `purpose`.
-- Control viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) tập trung ở main navigator panel và canh giữa theo panel; khi drag object có guide + snap alignment theo object liên quan để chỉnh tay nhanh.
+- Control viewport/view mode (`zoom/reset/fit khung/L1/L2/L3/Sửa vị trí`) tập trung ở main navigator panel và canh giữa theo panel; khi drag object có guide + snap alignment theo object liên quan để chỉnh tay nhanh.
 - Tọa độ thủ công được chuẩn hóa theo mốc chuẩn X/Y (step 0.25 đv) trước khi lưu DB để đồng nhất dữ liệu.
 - Tọa độ chuẩn bổ sung `grid_range` kiểu Excel (`A1:B2`) cho `Area`/`Device`; backend tự đồng bộ `grid_range` ↔ `position_x/position_y/width/height`.
 - Khi startup backend, dữ liệu cũ thiếu `grid_range` sẽ được backfill tự động từ tọa độ/kích thước hiện có để chuẩn hóa về cấu trúc grid mới.

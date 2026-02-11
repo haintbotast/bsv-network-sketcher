@@ -15,6 +15,7 @@
         <button type="button" @click="handleZoomIn">Zoom +</button>
         <button type="button" @click="handleZoomOut">Zoom -</button>
         <button type="button" class="ghost" @click="handleResetViewport">Reset view</button>
+        <button type="button" class="ghost" @click="handleFitViewportToFrame">Fit khung</button>
         <button type="button" :class="{ active: positionEditEnabled }" @click="togglePositionEditMode">
           {{ positionEditEnabled ? 'Khóa vị trí' : 'Sửa vị trí' }}
         </button>
@@ -103,6 +104,7 @@
           :render-tuning="renderTuning"
           :show-rulers="showCanvasGrid"
           :show-grid-lines="showCanvasGrid"
+          :fit-to-frame-token="fitToFrameToken"
           @select="handleSelect"
           @update:viewport="handleViewportUpdate"
           @object:position-change="handleCanvasObjectPositionChange"
@@ -833,6 +835,7 @@ const {
 } = useViewport()
 
 const showCanvasGrid = ref(true)
+const fitToFrameToken = ref(0)
 
 // Viewport interaction không được trigger auto-layout, chỉ cập nhật trạng thái hiển thị.
 function handleViewportUpdate(value: Viewport) {
@@ -849,6 +852,10 @@ function handleZoomOut() {
 
 function handleResetViewport() {
   resetViewport()
+}
+
+function handleFitViewportToFrame() {
+  fitToFrameToken.value += 1
 }
 
 function togglePositionEditMode() {

@@ -198,6 +198,7 @@ const props = defineProps<{
   }>
   showRulers?: boolean
   showGridLines?: boolean
+  fitToFrameToken?: number
 }>()
 
 const emit = defineEmits<{
@@ -261,12 +262,17 @@ const areaLayerRef = ref()
 const linkLayerRef = ref()
 const deviceLayerRef = ref()
 const overlayLayerRef = ref()
+const GRID_FRAME_INSET = 16
+const FIT_FRAME_PADDING = 20
+const VIEWPORT_SCALE_MIN = 0.5
+const VIEWPORT_SCALE_MAX = 3
+let fitFrameRaf = 0
 
 const gridConfig = computed(() => ({
-  x: 16,
-  y: 16,
-  width: Math.max(stageSize.value.width - 32, 0),
-  height: Math.max(stageSize.value.height - 32, 0),
+  x: GRID_FRAME_INSET,
+  y: GRID_FRAME_INSET,
+  width: Math.max(stageSize.value.width - GRID_FRAME_INSET * 2, 0),
+  height: Math.max(stageSize.value.height - GRID_FRAME_INSET * 2, 0),
   stroke: '#d0c6bc',
   strokeWidth: 1,
   dash: [8, 6],
@@ -1835,6 +1841,37 @@ const diagramBounds = computed(() => mergeBounds([
   linkBounds.value
 ]))
 
+function fitDiagramIntoGridFrame() {
+  const bounds = diagramBounds.value
+  if (!bounds) return
+  if (stageSize.value.width <= 0 || stageSize.value.height <= 0) return
+
+  const frameLeft = GRID_FRAME_INSET + FIT_FRAME_PADDING
+  const frameTop = GRID_FRAME_INSET + FIT_FRAME_PADDING
+  const frameRight = stageSize.value.width - GRID_FRAME_INSET - FIT_FRAME_PADDING
+  const frameBottom = stageSize.value.height - GRID_FRAME_INSET - FIT_FRAME_PADDING
+  const frameWidth = Math.max(frameRight - frameLeft, 1)
+  const frameHeight = Math.max(frameBottom - frameTop, 1)
+
+  const boundsWidth = Math.max(bounds.maxX - bounds.minX, 1)
+  const boundsHeight = Math.max(bounds.maxY - bounds.minY, 1)
+  const targetZoomScale = clampNumber(
+    Math.min(frameWidth / boundsWidth, frameHeight / boundsHeight),
+    VIEWPORT_SCALE_MIN / Math.max(layoutViewport.value.scale, 0.001),
+    VIEWPORT_SCALE_MAX / Math.max(layoutViewport.value.scale, 0.001)
+  )
+
+  const translateX = frameLeft + (frameWidth - boundsWidth * targetZoomScale) / 2 - bounds.minX * targetZoomScale
+  const translateY = frameTop + (frameHeight - boundsHeight * targetZoomScale) / 2 - bounds.minY * targetZoomScale
+
+  const nextViewport: Viewport = {
+    scale: clampNumber(layoutViewport.value.scale * targetZoomScale, VIEWPORT_SCALE_MIN, VIEWPORT_SCALE_MAX),
+    offsetX: Number((layoutViewport.value.offsetX + translateX).toFixed(2)),
+    offsetY: Number((layoutViewport.value.offsetY + translateY).toFixed(2)),
+  }
+  emit('update:viewport', nextViewport)
+}
+
 // L2 Labels - VLAN info on devices
 const l2Labels = computed(() => {
   const mode = props.viewMode || 'L1'
@@ -2175,11 +2212,27 @@ onBeforeUnmount(() => {
     cancelAnimationFrame(batchDrawRaf)
     batchDrawRaf = 0
   }
+  if (fitFrameRaf) {
+    cancelAnimationFrame(fitFrameRaf)
+    fitFrameRaf = 0
+  }
 })
 
 watch(() => props.viewport, () => redrawRulers(), { deep: true })
 watch(panTranslation, () => redrawRulers(), { deep: true })
 watch(showRulers, () => { updateSize(); redrawRulers() })
+watch(
+  () => props.fitToFrameToken,
+  (next, prev) => {
+    if (next == null) return
+    if (next === prev) return
+    if (fitFrameRaf) cancelAnimationFrame(fitFrameRaf)
+    fitFrameRaf = requestAnimationFrame(() => {
+      fitFrameRaf = 0
+      fitDiagramIntoGridFrame()
+    })
+  }
+)
 
 watch([visibleAreas, visibleDevices, visibleLinks, visibleLinkPortLabels, l2Labels, l3Labels, alignmentGuides, stageSize], () => {
   scheduleBatchDraw()

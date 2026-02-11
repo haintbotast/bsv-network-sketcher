@@ -43,7 +43,7 @@
 - Auto-layout thủ công từ tab **Bố cục** phải hỗ trợ 2 chế độ:
   - `preserve_existing_positions=true` (mặc định): giữ tọa độ `Area/Device` đã có.
   - `preserve_existing_positions=false`: ghi đè toàn bộ tọa độ theo kết quả layout mới.
-- Nhóm điều khiển viewport/view mode (`zoom/reset view/L1/L2/L3/Sửa vị trí`) hiển thị ở **main navigator panel** để thao tác nhất quán toàn màn hình.
+- Nhóm điều khiển viewport/view mode (`zoom/reset view/fit khung/L1/L2/L3/Sửa vị trí`) hiển thị ở **main navigator panel** để thao tác nhất quán toàn màn hình.
 - Cụm điều khiển viewport/view mode ở main navigator được **canh giữa theo panel** để giảm lệch thị giác khi thao tác.
 - Cho phép bật chế độ **Sửa vị trí** để kéo‑thả trực tiếp `Area/Device` trên canvas; vị trí mới được lưu vào DB tại thời điểm thả chuột.
 - Luồng kéo‑thả chỉnh vị trí thủ công **không trigger auto-layout** để tránh ghi đè bố cục người dùng vừa tinh chỉnh.

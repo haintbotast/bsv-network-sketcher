@@ -30,6 +30,12 @@ export type RenderTuning = {
   inter_area_links_per_channel?: number
   inter_area_max_channels?: number
   inter_area_occupancy_weight?: number
+  icon_scale?: number
+  icon_stroke_width?: number
+  icon_min_size?: number
+  icon_max_size?: number
+  icon_color_default?: string
+  icon_colors?: Record<string, string>
 }
 
 export type AdminConfig = {

@@ -159,6 +159,15 @@ const props = defineProps<{
     label_gap_x?: number
     label_gap_y?: number
     corridor_gap?: number
+    inter_area_links_per_channel?: number
+    inter_area_max_channels?: number
+    inter_area_occupancy_weight?: number
+    icon_scale?: number
+    icon_stroke_width?: number
+    icon_min_size?: number
+    icon_max_size?: number
+    icon_color_default?: string
+    icon_colors?: Record<string, string>
   }
   vlanGroups?: Array<{
     vlan_id: number
@@ -633,21 +642,101 @@ const DEVICE_LABEL_MIN_HEIGHT = 24
 const DEVICE_STANDARD_TOTAL_HEIGHT = 76
 const DEVICE_BODY_VERTICAL_PADDING = 6
 const DEVICE_MIN_WIDTH = 96
-const DEVICE_ICON_STROKE_WIDTH = 1
-const DEVICE_ICON_MIN_SIZE = 14
-const DEVICE_ICON_MAX_SIZE = 24
+const DEVICE_ICON_STROKE_WIDTH = 1.5
+const DEVICE_ICON_MIN_SIZE = 18
+const DEVICE_ICON_MAX_SIZE = 32
 const DEVICE_ICON_MARGIN_LEFT = 10
-const DEVICE_ICON_LABEL_GAP = 10
+const DEVICE_ICON_LABEL_GAP = 12
 const DEVICE_ICON_COLOR = '#4f4a44'
 
-type DeviceIconKind = 'router' | 'switch' | 'firewall' | 'server' | 'storage' | 'ap' | 'endpoint' | 'cloud' | 'unknown'
+type DeviceIconKind =
+  | 'router'
+  | 'switch'
+  | 'firewall'
+  | 'security'
+  | 'server'
+  | 'storage'
+  | 'ap'
+  | 'endpoint'
+  | 'cloud'
+  | 'cloud-network'
+  | 'cloud-security'
+  | 'cloud-service'
+  | 'unknown'
 
-const CLOUD_ICON_KEYWORDS = ['CLOUD', 'INTERNET', 'SAAS', 'PAAS', 'IAAS', 'O365', 'OFFICE365']
+const CLOUD_ICON_KEYWORDS = ['CLOUD', 'INTERNET', 'SAAS', 'PAAS', 'IAAS', 'O365', 'OFFICE365', 'AZURE', 'AWS', 'GCP']
+const SECURITY_ICON_KEYWORDS = ['SECURITY', 'SEC', 'IDS', 'IPS', 'SOC', 'SIEM', 'WAF', 'VPN', 'ZTNA', 'SASE']
+const CLOUD_NETWORK_KEYWORDS = ['INTERNET', 'WAN', 'EDGE', 'BACKBONE', 'TRANSIT', 'PEERING', 'NETWORK', 'VPC', 'VNET']
+const CLOUD_SERVICE_KEYWORDS = ['SAAS', 'PAAS', 'IAAS', 'OFFICE365', 'O365', 'MAIL', 'APP', 'SERVICE', 'CRM', 'ERP']
+
+const DEVICE_ICON_KIND_COLORS: Record<DeviceIconKind, string> = {
+  router: '#1f6feb',
+  switch: '#2f855a',
+  firewall: '#c53030',
+  security: '#b91c1c',
+  server: '#2563eb',
+  storage: '#0f766e',
+  ap: '#7c3aed',
+  endpoint: '#4b5563',
+  cloud: '#0284c7',
+  'cloud-network': '#0369a1',
+  'cloud-security': '#be123c',
+  'cloud-service': '#2563eb',
+  unknown: '#6b7280',
+}
 
 function clampNumber(value: number, min: number, max: number) {
   if (value < min) return min
   if (value > max) return max
   return value
+}
+
+function normalizeKeywordText(value: string) {
+  return value.toUpperCase().trim()
+}
+
+function includesAnyKeyword(text: string, keywords: string[]) {
+  return keywords.some(keyword => text.includes(keyword))
+}
+
+function normalizeColorValue(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const color = value.trim()
+  if (!color) return null
+  return color
+}
+
+function normalizePositiveNumber(value: unknown): number | null {
+  const num = Number(value)
+  if (!Number.isFinite(num) || num <= 0) return null
+  return num
+}
+
+function resolveCloudFunctionKind(name: string): DeviceIconKind {
+  if (includesAnyKeyword(name, SECURITY_ICON_KEYWORDS)) return 'cloud-security'
+  if (includesAnyKeyword(name, CLOUD_NETWORK_KEYWORDS)) return 'cloud-network'
+  if (includesAnyKeyword(name, CLOUD_SERVICE_KEYWORDS)) return 'cloud-service'
+  return 'cloud'
+}
+
+function resolveIconColor(kind: DeviceIconKind, isSelected: boolean, tuning?: Record<string, unknown>) {
+  if (isSelected) return '#d66c3b'
+  const colorMap = (tuning?.icon_colors && typeof tuning.icon_colors === 'object')
+    ? tuning.icon_colors as Record<string, unknown>
+    : null
+  const kindKey = kind.replace(/-/g, '_')
+  const directFromMap = normalizeColorValue(colorMap?.[kind]) || normalizeColorValue(colorMap?.[kindKey])
+  const cloudFallback = kind.startsWith('cloud-')
+    ? (normalizeColorValue(colorMap?.cloud) || normalizeColorValue(colorMap?.cloud_generic))
+    : null
+  const globalDefault = normalizeColorValue(tuning?.icon_color_default) || normalizeColorValue(colorMap?.default)
+  return directFromMap || cloudFallback || globalDefault || DEVICE_ICON_KIND_COLORS[kind] || DEVICE_ICON_COLOR
+}
+
+function resolveIconStrokeWidth(tuning?: Record<string, unknown>) {
+  const configured = normalizePositiveNumber(tuning?.icon_stroke_width)
+  if (configured == null) return DEVICE_ICON_STROKE_WIDTH
+  return clampNumber(configured, 1, 3)
 }
 
 function resolveDeviceRole(device: DeviceModel) {
@@ -677,11 +766,12 @@ function resolveDeviceRole(device: DeviceModel) {
 }
 
 function resolveDeviceIconKind(device: DeviceModel): DeviceIconKind {
-  const name = (device.name || '').toUpperCase()
-  if (CLOUD_ICON_KEYWORDS.some(keyword => name.includes(keyword))) return 'cloud'
+  const name = normalizeKeywordText(device.name || '')
+  if (includesAnyKeyword(name, CLOUD_ICON_KEYWORDS)) return resolveCloudFunctionKind(name)
   if (device.type === 'Storage') return 'storage'
   if (device.type === 'AP') return 'ap'
   if (device.type === 'PC') return 'endpoint'
+  if (includesAnyKeyword(name, SECURITY_ICON_KEYWORDS)) return 'security'
   const role = resolveDeviceRole(device)
   if (role === 'router') return 'router'
   if (role === 'firewall') return 'firewall'
@@ -740,10 +830,21 @@ type DeviceIconFrame = {
 
 const DEVICE_PORT_BAND_HEIGHT = DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2
 
-function buildDeviceIconFrame(bodyY: number, bodyHeight: number, bodyWidth: number): DeviceIconFrame | null {
-  if (bodyHeight <= 10 || bodyWidth <= DEVICE_ICON_MARGIN_LEFT + DEVICE_ICON_MIN_SIZE + 14) return null
-  const rawSize = Math.min(bodyHeight - 4, bodyWidth * 0.22, DEVICE_ICON_MAX_SIZE)
-  const size = clampNumber(rawSize, DEVICE_ICON_MIN_SIZE, DEVICE_ICON_MAX_SIZE)
+function buildDeviceIconFrame(
+  bodyY: number,
+  bodyHeight: number,
+  bodyWidth: number,
+  tuning?: Record<string, unknown>
+): DeviceIconFrame | null {
+  const minSizeConfigured = normalizePositiveNumber(tuning?.icon_min_size)
+  const maxSizeConfigured = normalizePositiveNumber(tuning?.icon_max_size)
+  const minSize = clampNumber(minSizeConfigured ?? DEVICE_ICON_MIN_SIZE, 12, 42)
+  const maxSize = clampNumber(maxSizeConfigured ?? DEVICE_ICON_MAX_SIZE, minSize, 48)
+  const iconScale = clampNumber(normalizePositiveNumber(tuning?.icon_scale) ?? 1.15, 0.8, 2.2)
+
+  if (bodyHeight <= 10 || bodyWidth <= DEVICE_ICON_MARGIN_LEFT + minSize + 14) return null
+  const rawSize = Math.min(bodyHeight - 2, bodyWidth * 0.28, maxSize) * iconScale
+  const size = clampNumber(rawSize, minSize, maxSize)
   return {
     x: DEVICE_ICON_MARGIN_LEFT,
     y: bodyY + (bodyHeight - size) / 2,
@@ -754,41 +855,69 @@ function buildDeviceIconFrame(bodyY: number, bodyHeight: number, bodyWidth: numb
 function buildDeviceIconShape(
   kind: DeviceIconKind,
   frame: DeviceIconFrame | null,
-  isSelected: boolean
+  isSelected: boolean,
+  tuning?: Record<string, unknown>
 ) {
   if (!frame) return null
   const { x, y, size } = frame
   const cx = x + size / 2
   const cy = y + size / 2
-  const stroke = isSelected ? '#d66c3b' : DEVICE_ICON_COLOR
+  const stroke = resolveIconColor(kind, isSelected, tuning)
+  const strokeWidth = resolveIconStrokeWidth(tuning)
   const dash = kind === 'unknown' ? [2, 2] : []
 
   return {
     x: 0,
     y: 0,
     stroke,
-    strokeWidth: DEVICE_ICON_STROKE_WIDTH,
+    strokeWidth,
     lineCap: 'round',
     lineJoin: 'round',
     dash,
     listening: false,
     sceneFunc: (ctx: CanvasRenderingContext2D, shape: any) => {
       ctx.beginPath()
+      const drawArrowHead = (fromX: number, fromY: number, toX: number, toY: number, headSize: number) => {
+        const angle = Math.atan2(toY - fromY, toX - fromX)
+        const spread = Math.PI / 6
+        ctx.moveTo(toX, toY)
+        ctx.lineTo(
+          toX - headSize * Math.cos(angle - spread),
+          toY - headSize * Math.sin(angle - spread)
+        )
+        ctx.moveTo(toX, toY)
+        ctx.lineTo(
+          toX - headSize * Math.cos(angle + spread),
+          toY - headSize * Math.sin(angle + spread)
+        )
+      }
+      const drawCloudBase = () => {
+        const left = x + size * 0.1
+        const right = x + size * 0.9
+        const bottom = y + size * 0.78
+        ctx.moveTo(left, bottom)
+        ctx.bezierCurveTo(x + size * 0.05, y + size * 0.62, x + size * 0.18, y + size * 0.5, x + size * 0.3, y + size * 0.53)
+        ctx.bezierCurveTo(x + size * 0.34, y + size * 0.34, x + size * 0.5, y + size * 0.3, x + size * 0.6, y + size * 0.44)
+        ctx.bezierCurveTo(x + size * 0.7, y + size * 0.36, x + size * 0.86, y + size * 0.44, right, y + size * 0.58)
+        ctx.bezierCurveTo(right, y + size * 0.7, x + size * 0.8, bottom, x + size * 0.66, bottom)
+        ctx.lineTo(x + size * 0.3, bottom)
+        ctx.bezierCurveTo(x + size * 0.18, bottom, x + size * 0.1, y + size * 0.86, left, bottom)
+      }
 
       if (kind === 'router') {
-        const r = size * 0.42
-        for (let i = 0; i < 6; i += 1) {
-          const angle = Math.PI / 6 + (i * Math.PI) / 3
-          const px = cx + r * Math.cos(angle)
-          const py = cy + r * Math.sin(angle)
-          if (i === 0) ctx.moveTo(px, py)
-          else ctx.lineTo(px, py)
-        }
-        ctx.closePath()
-        ctx.moveTo(cx - r * 0.55, cy)
-        ctx.lineTo(cx + r * 0.55, cy)
-        ctx.moveTo(cx, cy - r * 0.55)
-        ctx.lineTo(cx, cy + r * 0.55)
+        const r = size * 0.36
+        ctx.moveTo(cx + r, cy)
+        ctx.arc(cx, cy, r, 0, Math.PI * 2)
+        const axis = size * 0.2
+        const arrowSize = size * 0.12
+        ctx.moveTo(cx - axis, cy)
+        ctx.lineTo(cx + axis, cy)
+        ctx.moveTo(cx, cy - axis)
+        ctx.lineTo(cx, cy + axis)
+        drawArrowHead(cx + axis, cy, cx + r * 0.92, cy, arrowSize)
+        drawArrowHead(cx - axis, cy, cx - r * 0.92, cy, arrowSize)
+        drawArrowHead(cx, cy - axis, cx, cy - r * 0.92, arrowSize)
+        drawArrowHead(cx, cy + axis, cx, cy + r * 0.92, arrowSize)
       } else if (kind === 'switch') {
         const left = x + size * 0.08
         const top = y + size * 0.3
@@ -827,6 +956,23 @@ function buildDeviceIconShape(
         ctx.lineTo(left + width * 0.7, top + (height * 2) / 3)
         ctx.moveTo(left + width * 0.3, top + (height * 2) / 3)
         ctx.lineTo(left + width * 0.3, top + height)
+      } else if (kind === 'security') {
+        const top = y + size * 0.12
+        const shieldLeft = x + size * 0.2
+        const shieldRight = x + size * 0.8
+        const waistY = y + size * 0.5
+        const bottom = y + size * 0.86
+        ctx.moveTo(cx, top)
+        ctx.lineTo(shieldRight, top + size * 0.16)
+        ctx.lineTo(shieldRight, waistY)
+        ctx.quadraticCurveTo(cx + size * 0.18, bottom - size * 0.04, cx, bottom)
+        ctx.quadraticCurveTo(cx - size * 0.18, bottom - size * 0.04, shieldLeft, waistY)
+        ctx.lineTo(shieldLeft, top + size * 0.16)
+        ctx.closePath()
+        ctx.moveTo(cx, top + size * 0.16)
+        ctx.lineTo(cx, bottom - size * 0.06)
+        ctx.moveTo(cx - size * 0.12, y + size * 0.56)
+        ctx.lineTo(cx + size * 0.12, y + size * 0.56)
       } else if (kind === 'server') {
         const left = x + size * 0.24
         const top = y + size * 0.1
@@ -868,17 +1014,53 @@ function buildDeviceIconShape(
           ctx.moveTo(cx - r * 0.72, cy + size * 0.14)
           ctx.arc(cx, cy + size * 0.14, r, Math.PI * 1.18, Math.PI * 1.82)
         })
-      } else if (kind === 'cloud') {
-        const left = x + size * 0.1
-        const right = x + size * 0.9
-        const bottom = y + size * 0.78
-        ctx.moveTo(left, bottom)
-        ctx.bezierCurveTo(x + size * 0.05, y + size * 0.62, x + size * 0.18, y + size * 0.5, x + size * 0.3, y + size * 0.53)
-        ctx.bezierCurveTo(x + size * 0.34, y + size * 0.34, x + size * 0.5, y + size * 0.3, x + size * 0.6, y + size * 0.44)
-        ctx.bezierCurveTo(x + size * 0.7, y + size * 0.36, x + size * 0.86, y + size * 0.44, right, y + size * 0.58)
-        ctx.bezierCurveTo(right, y + size * 0.7, x + size * 0.8, bottom, x + size * 0.66, bottom)
-        ctx.lineTo(x + size * 0.3, bottom)
-        ctx.bezierCurveTo(x + size * 0.18, bottom, x + size * 0.1, y + size * 0.86, left, bottom)
+      } else if (
+        kind === 'cloud' ||
+        kind === 'cloud-network' ||
+        kind === 'cloud-security' ||
+        kind === 'cloud-service'
+      ) {
+        drawCloudBase()
+        if (kind === 'cloud-network') {
+          const nodeR = size * 0.045
+          const points = [
+            { x: cx - size * 0.14, y: cy + size * 0.02 },
+            { x: cx + size * 0.14, y: cy + size * 0.02 },
+            { x: cx, y: cy + size * 0.18 },
+          ]
+          ctx.moveTo(points[0].x, points[0].y)
+          ctx.lineTo(points[1].x, points[1].y)
+          ctx.lineTo(points[2].x, points[2].y)
+          ctx.lineTo(points[0].x, points[0].y)
+          points.forEach(point => {
+            ctx.moveTo(point.x + nodeR, point.y)
+            ctx.arc(point.x, point.y, nodeR, 0, Math.PI * 2)
+          })
+        } else if (kind === 'cloud-security') {
+          const shieldTop = cy - size * 0.08
+          const shieldBottom = cy + size * 0.24
+          const shieldLeft = cx - size * 0.13
+          const shieldRight = cx + size * 0.13
+          ctx.moveTo(cx, shieldTop)
+          ctx.lineTo(shieldRight, cy)
+          ctx.lineTo(shieldRight, cy + size * 0.12)
+          ctx.quadraticCurveTo(cx + size * 0.08, shieldBottom, cx, shieldBottom)
+          ctx.quadraticCurveTo(cx - size * 0.08, shieldBottom, shieldLeft, cy + size * 0.12)
+          ctx.lineTo(shieldLeft, cy)
+          ctx.closePath()
+        } else if (kind === 'cloud-service') {
+          const boxLeft = cx - size * 0.12
+          const boxTop = cy - size * 0.02
+          const boxW = size * 0.24
+          const boxH = size * 0.2
+          ctx.rect(boxLeft, boxTop, boxW, boxH)
+          ctx.moveTo(boxLeft + boxW * 0.2, boxTop + boxH)
+          ctx.lineTo(boxLeft + boxW * 0.2, boxTop + boxH + size * 0.08)
+          ctx.moveTo(boxLeft + boxW * 0.8, boxTop + boxH)
+          ctx.lineTo(boxLeft + boxW * 0.8, boxTop + boxH + size * 0.08)
+          ctx.moveTo(boxLeft + boxW * 0.2, boxTop + boxH + size * 0.08)
+          ctx.lineTo(boxLeft + boxW * 0.8, boxTop + boxH + size * 0.08)
+        }
       } else if (kind === 'endpoint') {
         const left = x + size * 0.08
         const top = y + size * 0.16
@@ -1234,8 +1416,8 @@ const visibleDevices = computed(() => {
       const bodyY = frame.topBandHeight
       const bodyHeight = frame.bodyHeight
       const iconKind = resolveDeviceIconKind(device)
-      const iconFrame = buildDeviceIconFrame(bodyY, bodyHeight, rect.width)
-      const iconShape = buildDeviceIconShape(iconKind, iconFrame, isSelected)
+      const iconFrame = buildDeviceIconFrame(bodyY, bodyHeight, rect.width, props.renderTuning as Record<string, unknown> | undefined)
+      const iconShape = buildDeviceIconShape(iconKind, iconFrame, isSelected, props.renderTuning as Record<string, unknown> | undefined)
       const labelX = iconFrame
         ? Math.min(iconFrame.x + iconFrame.size + DEVICE_ICON_LABEL_GAP, Math.max(rect.width - 20, 10))
         : 10
@@ -1522,7 +1704,13 @@ const DEFAULT_RENDER_TUNING = {
   corridor_gap: 64,
   inter_area_links_per_channel: 4,
   inter_area_max_channels: 4,
-  inter_area_occupancy_weight: 1.0
+  inter_area_occupancy_weight: 1.0,
+  icon_scale: 1.15,
+  icon_stroke_width: 1.5,
+  icon_min_size: 18,
+  icon_max_size: 32,
+  icon_color_default: '#4f4a44',
+  icon_colors: {}
 }
 const renderTuning = computed(() => ({
   ...DEFAULT_RENDER_TUNING,

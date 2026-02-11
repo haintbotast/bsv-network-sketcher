@@ -1,8 +1,8 @@
 ﻿# Admin Config Schema (tối giản)
 
-> **Phiên bản:** 1.0  
+> **Phiên bản:** 1.1  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-06  
+> **Cập nhật:** 2026-02-11  
 > **Mục tiêu:** Chuẩn hóa cấu hình preset/layout/validation cho hệ thống, tránh hardcode.
 
 ---
@@ -44,7 +44,19 @@
     "corridor_gap": 64,
     "inter_area_links_per_channel": 4,
     "inter_area_max_channels": 4,
-    "inter_area_occupancy_weight": 1.0
+    "inter_area_occupancy_weight": 1.0,
+    "icon_scale": 1.15,
+    "icon_stroke_width": 1.5,
+    "icon_min_size": 18,
+    "icon_max_size": 32,
+    "icon_color_default": "#4f4a44",
+    "icon_colors": {
+      "router": "#1f6feb",
+      "security": "#b91c1c",
+      "cloud-network": "#0369a1",
+      "cloud-security": "#be123c",
+      "cloud-service": "#2563eb"
+    }
   },
   "style": {
     "themes": ["default", "contrast", "light", "dark"],
@@ -82,6 +94,7 @@
 - Khi thay đổi `themes`, cần cập nhật UI chọn theme (không có chọn layout mode).
 - `config_version` tăng khi thay đổi schema.
 - Khi thay đổi `validation.layout_checks`, cần cập nhật `docs/RULE_BASED_CHECKS.md` và test liên quan.
+- Khi thay đổi `render_tuning.icon_*`, cần cập nhật `docs/DIAGRAM_STYLE_SPEC.md` và test liên quan đến icon mapping/readability.
 
 ---
 

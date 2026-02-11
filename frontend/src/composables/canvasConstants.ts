@@ -34,7 +34,13 @@ export const DEFAULT_RENDER_TUNING: RenderTuning = {
   corridor_gap: 64,         // Khoảng cách corridor bên ngoài bounds
   inter_area_links_per_channel: 4, // Số link tối đa trước khi tách thêm corridor channel
   inter_area_max_channels: 4,      // Số channel corridor liên-area tối đa mỗi cặp area
-  inter_area_occupancy_weight: 1.0 // Trọng số tránh đường đã đông khi chọn channel
+  inter_area_occupancy_weight: 1.0, // Trọng số tránh đường đã đông khi chọn channel
+  icon_scale: 1.15,         // Hệ số phóng icon device
+  icon_stroke_width: 1.5,   // Độ dày nét icon
+  icon_min_size: 18,        // Kích thước icon tối thiểu
+  icon_max_size: 32,        // Kích thước icon tối đa
+  icon_color_default: '#4f4a44',
+  icon_colors: {}           // Override theo loại icon, vd {"router":"#1f6feb"}
 }
 
 export const deviceTypes = ['Router', 'Switch', 'Firewall', 'Server', 'AP', 'PC', 'Storage', 'Unknown']

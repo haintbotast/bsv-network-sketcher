@@ -1,8 +1,8 @@
 ﻿# Admin UI Flow (tối giản)
 
-> **Phiên bản:** 1.1  
+> **Phiên bản:** 1.2  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-09  
+> **Cập nhật:** 2026-02-11  
 > **Mục tiêu:** Gợi ý luồng UI cho trang quản trị cấu hình và lịch sử phiên bản topology.
 
 ---
@@ -30,7 +30,7 @@
 **Hiển thị tối thiểu:**
 - `layout.default_mode`, `layout.allowed_modes` (cố định `standard`)
 - `layout_tuning` (layer_gap, node_spacing, port_label_band, area_gap, area_padding, label_band, max_row_width_base, max_nodes_per_row, row_gap, row_stagger)
-- `render_tuning` (bundle_gap, bundle_stub, area_clearance, area_anchor_offset, port_label_offset, label_gap_x/y, corridor_gap)
+- `render_tuning` (bundle_gap, bundle_stub, area_clearance, area_anchor_offset, port_label_offset, label_gap_x/y, corridor_gap, icon_scale, icon_stroke_width, icon_min_size/max_size, icon_color_default, icon_colors)
 - `peer_control` quick editor + legend (`STACK/HA/HSRP`, màu/nét/chú giải)
 - `style.default_theme`, preset size
 - `validation` rule cơ bản + `validation.layout_checks`
@@ -42,6 +42,7 @@
 - Tăng `render_tuning.bundle_stub` và `render_tuning.port_label_offset` để điểm rẽ đầu tiên rời xa port band.
 - Tăng `render_tuning.area_clearance` và `render_tuning.corridor_gap` để giảm tuyến xuyên vùng object khi mật độ cao.
 - Giữ `render_tuning.bundle_gap` ở mức vừa phải để lane offset theo bundle không dính nhau khi cụm link dày.
+- Khi icon khó đọc, tăng `render_tuning.icon_scale` hoặc `icon_min_size`; khi cần chuẩn nhận diện theo domain, chỉnh `icon_colors` theo loại object (`router`, `security`, `cloud-network`, `cloud-security`, `cloud-service`...).
 
 **Lịch sử cấu hình:**
 - Bảng `version`, `created_at`, `created_by`, `note`

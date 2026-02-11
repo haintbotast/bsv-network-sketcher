@@ -1,6 +1,6 @@
 # Đặc tả Style sơ đồ (Diagram Style Spec)
 
-> **Phiên bản:** 1.2  
+> **Phiên bản:** 1.3  
 > **Tạo:** 2026-01-23  
 > **Cập nhật:** 2026-02-11  
 > **Mục tiêu:** Chuẩn hóa hình khối, nét vẽ, màu sắc, chữ và nền cho toàn hệ thống (UI + Konva + export).
@@ -227,17 +227,24 @@ Quy định khi áp dụng:
 | Router | Lục giác + trục ngang/dọc | Nét mảnh, không fill |
 | Switch (Core/Dist/Access) | Chassis ngang + 2 hàng port mini | Nét mảnh, không fill |
 | Firewall | Khối tường gạch đơn giản | Nét mảnh, không fill |
+| Security (IDS/IPS/VPN/SOC...) | Khiên bảo mật | Nét mảnh, không fill |
 | Server | Rack đứng 3 khoang + LED trạng thái | Nét mảnh, không fill |
 | Storage | Cylinder | Nét mảnh, không fill |
 | AP | Chấm + 2 cung sóng | Nét mảnh, không fill |
 | Endpoint/PC | Màn hình + chân đế + tower | Nét mảnh, không fill |
-| Cloud object | Cụm mây nét đơn | Nét mảnh, không fill |
+| Cloud object (generic) | Cụm mây nét đơn | Nét mảnh, không fill |
+| Cloud - Network | Cloud + node mạng | Nét mảnh, không fill |
+| Cloud - Security | Cloud + khiên | Nét mảnh, không fill |
+| Cloud - Service | Cloud + hộp dịch vụ | Nét mảnh, không fill |
 | Unknown | Khung vuông + `?` | Nét đứt |
 
 Ràng buộc kỹ thuật:
-- Kích thước icon khuyến nghị: **14-24 px** tùy chiều cao body.
+- Kích thước icon khuyến nghị: **18-32 px** tùy chiều cao body.
+- Kích thước icon mặc định triển khai: **18-32 px** (có thể tune qua admin config).
 - Icon canh trái trong thân device; nhãn tên thiết bị dịch sang phải để không chồng icon.
 - Icon không được thay đổi hitbox/collision của device; routing và kiểm tra va chạm vẫn dựa trên khung chữ nhật của object.
+- Màu icon có thể cấu hình qua `render_tuning.icon_color_default` và `render_tuning.icon_colors`.
+  - `icon_colors` nhận key theo loại icon, ví dụ: `router`, `security`, `cloud-network`, `cloud-security`, `cloud-service`.
 
 ---
 

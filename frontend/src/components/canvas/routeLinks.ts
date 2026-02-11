@@ -644,28 +644,32 @@ export function routeLinks(
 
       // --- Obstacles (self device inset) ---
       const selfInset = Math.max(clearance + 1, 4)
-      const obstacles: Rect[] = []
+      const deviceObstacles: Rect[] = []
+      const routeObstacles: Rect[] = []
       deviceRects.forEach(({ id, rect }) => {
         if (id === link.fromDeviceId || id === link.toDeviceId) {
           if (rect.width > selfInset * 2 && rect.height > selfInset * 2) {
-            obstacles.push({
+            const selfRect = {
               x: rect.x + selfInset,
               y: rect.y + selfInset,
               width: rect.width - selfInset * 2,
               height: rect.height - selfInset * 2,
-            })
+            }
+            deviceObstacles.push(selfRect)
+            routeObstacles.push(selfRect)
           }
           return
         }
-        obstacles.push(rect)
+        deviceObstacles.push(rect)
+        routeObstacles.push(rect)
       })
       if (isInterArea) {
         areaRects.forEach(({ id, rect }) => {
           if (id === fromAreaId || id === toAreaId) return
-          obstacles.push(rect)
+          routeObstacles.push(rect)
         })
       }
-      obstaclesByLink.set(link.id, obstacles)
+      obstaclesByLink.set(link.id, deviceObstacles)
 
       // --- Bundle offset (cùng cặp device → tách đường) ---
       const preferAxis: 'x' | 'y' = Math.abs(toCenter.x - fromCenter.x) >= Math.abs(toCenter.y - fromCenter.y) ? 'x' : 'y'
@@ -713,12 +717,12 @@ export function routeLinks(
           { x: toStub.x, y: toStub.y },
           { x: toAnchor.x, y: toAnchor.y },
         ])
-        if (!pathBlocked(peerPath, obstacles, clearance)) path = peerPath
+        if (!pathBlocked(peerPath, routeObstacles, clearance)) path = peerPath
       }
 
       // 2. General orthogonal routing (with bundle offset)
       if (!path.length) {
-        const orth = buildOrthPath(fromShifted, toShifted, obstacles, clearance, preferAxis)
+        const orth = buildOrthPath(fromShifted, toShifted, routeObstacles, clearance, preferAxis)
         path = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
           { x: fromStub.x, y: fromStub.y },
@@ -732,11 +736,11 @@ export function routeLinks(
       }
 
       // 3. Fallback alternate axis (vẫn giữ fromBase/toBase → giữ fan spacing)
-      if (pathBlocked(path, obstacles, clearance)) {
+      if (pathBlocked(path, routeObstacles, clearance)) {
         const fallback = buildOrthPath(
           { x: fromBase.x, y: fromBase.y },
           { x: toBase.x, y: toBase.y },
-          obstacles, clearance,
+          routeObstacles, clearance,
           preferAxis === 'x' ? 'y' : 'x'
         )
         path = simplifyPath([
@@ -751,7 +755,7 @@ export function routeLinks(
       }
 
       // Chốt an toàn trước render: chỉ loại path xuyên thân object thật.
-      if (pathCrossesObjects(path, obstacles)) return null
+      if (pathCrossesObjects(path, deviceObstacles)) return null
 
       // --- Render ---
       const points = toPointsArray(path)

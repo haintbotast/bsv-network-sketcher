@@ -41,7 +41,7 @@
 - **Macro (Area):** sắp xếp các Area theo location/tầng; không để thiết bị xuyên Area.
 - **Micro (Device):** mỗi Area là một lưới **top‑to‑bottom** theo thứ tự: **Router/Firewall → Core Switch → Distribution/Access Switch → Server Switch → Server/Storage → Endpoints**.
 - **Micro row alignment:** khi một layer phải xuống nhiều hàng, các hàng phải được **căn giữa theo chiều ngang** trong chính layer đó (không dồn trái cứng).
-- **Hiển thị Area (L1):** UI có thể render Area theo khung **compact theo cụm thiết bị** để giảm khoảng trắng; không thay đổi tọa độ/kích thước Area gốc trong dữ liệu.
+- **Hiển thị Area (L1):** UI có thể render Area theo khung **compact theo cụm thiết bị** để giảm khoảng trắng; khung compact phải tính theo kích thước render thực tế của device (bao gồm port band top/bottom) và tự mở rộng khi object vượt khung base để luôn cover đầy đủ object.
 - Cho phép **nhiều hàng trong cùng tầng** và **so‑le nhẹ** để giảm đường vòng liên kết; vẫn giữ hướng top‑down.
 - Ưu tiên **thiết bị cùng loại ở cùng một hàng** nếu kích thước hàng cho phép (ví dụ cụm HA/Sync).
 - Ưu tiên **gom nhóm thiết bị có cùng prefix tên** (ví dụ `HN-SW-CORE-xx`, `HN-SW-DIST-xx`) để các thiết bị liên quan đứng gần nhau.
@@ -83,7 +83,7 @@
   - Nối orthogonal bằng thuật toán tuyến tính.
   - Nếu bị cản thì fallback orthogonal đơn giản (không dùng tối ưu toàn cục/A\*).
 - **Path validity gate (L1):** mọi candidate/fallback phải qua kiểm tra va chạm (`pathBlocked`); không chấp nhận tuyến ép xuyên object.
-- **Final render gate (L1):** trước khi render, path cuối phải pass kiểm tra **hard collision** (clearance = 0); nếu xuyên thân object thì không render link lỗi.
+- **Final render gate (L1):** trước khi render, path cuối phải pass kiểm tra **hard collision** trên **thân device** (clearance = 0); không loại link chỉ vì đi qua nền/viền area.
 - **Boundary escape fallback (L1):** khi các tuyến cục bộ đều bị chặn, router thử hành lang biên theo cụm obstacle **lân cận đoạn link trước**, chỉ mở rộng ra xa khi thật sự cần.
 - **Fallback detour guard (L1):** candidate có quãng đường vòng vượt ngưỡng hợp lý so với khoảng cách trực tiếp phải bị loại, tránh tuyến “đi xa bất thường”.
 - **Offset giảm dần trước fallback (L1):** trước khi chấp nhận fallback xa, router phải thử lại cùng cặp endpoint với mức tách `bundle/stem` giảm dần để tìm tuyến gần hơn.

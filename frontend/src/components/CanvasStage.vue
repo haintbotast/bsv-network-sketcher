@@ -339,15 +339,11 @@ const areaViewMap = computed(() => {
 const areaDisplayMap = computed(() => {
   const map = new Map<string, { x: number; y: number; width: number; height: number }>()
   const boundsByArea = new Map<string, { minX: number; minY: number; maxX: number; maxY: number }>()
+  const deviceAreaById = new Map(props.devices.map(device => [device.id, device.areaId]))
 
-  props.devices.forEach(device => {
-    const areaId = device.areaId
+  deviceViewMap.value.forEach((rect, deviceId) => {
+    const areaId = deviceAreaById.get(deviceId)
     if (!areaId) return
-    const autoCoords = props.autoLayoutCoords?.get(device.id)
-    const source = autoCoords
-      ? { ...device, x: autoCoords.x * 120, y: autoCoords.y * 120 }
-      : device
-    const rect = logicalRectToView(source, layoutViewport.value)
     const current = boundsByArea.get(areaId)
     if (!current) {
       boundsByArea.set(areaId, {
@@ -364,21 +360,34 @@ const areaDisplayMap = computed(() => {
     current.maxY = Math.max(current.maxY, rect.y + rect.height)
   })
 
-  const fitInBase = (base: { x: number; y: number; width: number; height: number }, target: { x: number; y: number; width: number; height: number }) => {
+  const normalizeCompactRect = (
+    base: { x: number; y: number; width: number; height: number },
+    target: { x: number; y: number; width: number; height: number }
+  ) => {
     const minW = Math.min(AREA_DISPLAY_MIN_WIDTH, base.width)
     const minH = Math.min(AREA_DISPLAY_MIN_HEIGHT, base.height)
-    let x = target.x
-    let y = target.y
-    let width = Math.max(minW, target.width)
-    let height = Math.max(minH, target.height)
+    return {
+      x: target.x,
+      y: target.y,
+      width: Math.max(minW, target.width),
+      height: Math.max(minH, target.height),
+    }
+  }
 
-    if (width > base.width) width = base.width
-    if (height > base.height) height = base.height
-    if (x < base.x) x = base.x
-    if (y < base.y) y = base.y
-    if (x + width > base.x + base.width) x = base.x + base.width - width
-    if (y + height > base.y + base.height) y = base.y + base.height - height
-    return { x, y, width, height }
+  const mergeBaseAndTarget = (
+    base: { x: number; y: number; width: number; height: number },
+    target: { x: number; y: number; width: number; height: number }
+  ) => {
+    const minX = Math.min(base.x, target.x)
+    const minY = Math.min(base.y, target.y)
+    const maxX = Math.max(base.x + base.width, target.x + target.width)
+    const maxY = Math.max(base.y + base.height, target.y + target.height)
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    }
   }
 
   props.areas.forEach(area => {
@@ -393,13 +402,19 @@ const areaDisplayMap = computed(() => {
       map.set(area.id, base)
       return
     }
-    const compact = fitInBase(base, {
+    const compact = normalizeCompactRect(base, {
       x: bounds.minX - AREA_DISPLAY_PAD_X,
       y: bounds.minY - AREA_DISPLAY_PAD_Y - AREA_DISPLAY_LABEL_BAND,
       width: (bounds.maxX - bounds.minX) + AREA_DISPLAY_PAD_X * 2,
       height: (bounds.maxY - bounds.minY) + AREA_DISPLAY_PAD_Y * 2 + AREA_DISPLAY_LABEL_BAND,
     })
-    map.set(area.id, compact)
+    const compactWithinBase =
+      compact.x >= base.x &&
+      compact.y >= base.y &&
+      compact.x + compact.width <= base.x + base.width &&
+      compact.y + compact.height <= base.y + base.height
+
+    map.set(area.id, compactWithinBase ? compact : mergeBaseAndTarget(base, compact))
   })
 
   return map
@@ -1755,7 +1770,7 @@ const { visibleLinks, visibleLinkShapes } = useLinkRouting({
   layoutViewport,
   renderTuning,
   deviceViewMap,
-  areaViewMap: areaDisplayMap,
+  areaViewMap: areaRenderMap,
   deviceAreaMap,
   areaBounds,
   isPanning

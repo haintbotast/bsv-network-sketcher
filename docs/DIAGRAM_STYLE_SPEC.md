@@ -289,9 +289,12 @@ Kỹ thuật: Dùng `v-shape` Konva với custom `sceneFunc` (`context.arc()`), 
 ### 6.1 Màu thiết bị
 - Dùng bảng mapping theo prefix tên (tham chiếu NS).
 - Không cho phép nhập màu tự do trong chế độ preset.
+- UI thuộc tính cho phép override màu **Device (viền)** theo bảng preset; để trống thì dùng màu mặc định theo loại.
+- UI thuộc tính cho phép chỉnh màu **Area (fill/stroke)** và `stroke_width` theo preset/giới hạn kỹ thuật.
 
 ### 6.2 Màu link theo purpose
 - Dùng bảng mapping (WAN/DMZ/LAN/MGMT/HA/STORAGE/BACKUP/VPN).
+- UI thuộc tính cho phép override `color_rgb` cho từng Link trong bảng preset; chọn "theo purpose" để quay về mapping chuẩn.
 
 ### 6.3 Bảng preset màu (theo style chung)
 

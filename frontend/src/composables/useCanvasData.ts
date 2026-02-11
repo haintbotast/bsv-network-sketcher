@@ -98,7 +98,8 @@ export function useCanvasData(
         width: widthUnits * UNIT_PX,
         height: heightUnits * UNIT_PX,
         fill: rgbToHex(style.fill_color_rgb),
-        stroke: rgbToHex(style.stroke_color_rgb)
+        stroke: rgbToHex(style.stroke_color_rgb),
+        strokeWidth: style.stroke_width
       }
     })
   })
@@ -118,7 +119,8 @@ export function useCanvasData(
         y: yUnits * UNIT_PX,
         width: widthUnits * UNIT_PX,
         height: heightUnits * UNIT_PX,
-        type: device.device_type || 'Unknown'
+        type: device.device_type || 'Unknown',
+        color: device.color_rgb ? rgbToHex(device.color_rgb) : null
       }
     })
   })
@@ -138,7 +140,8 @@ export function useCanvasData(
           fromPort: link.from_port,
           toPort: link.to_port,
           purpose: link.purpose || undefined,
-          style: (link.line_style || 'solid') as 'solid' | 'dashed' | 'dotted'
+          style: (link.line_style || 'solid') as 'solid' | 'dashed' | 'dotted',
+          color: link.color_rgb ? rgbToHex(link.color_rgb) : null
         }
       })
       .filter(Boolean) as LinkModel[]

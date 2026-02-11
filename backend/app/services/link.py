@@ -1,5 +1,6 @@
 """L1 Link service."""
 
+import json
 from typing import Optional
 
 from sqlalchemy import select
@@ -109,6 +110,10 @@ async def create_link(
     data: L1LinkCreate,
 ) -> L1Link:
     """Tạo link mới."""
+    color_rgb_json = None
+    if data.color_rgb:
+        color_rgb_json = json.dumps(data.color_rgb)
+
     link = L1Link(
         project_id=project_id,
         from_device_id=from_device.id,
@@ -117,6 +122,7 @@ async def create_link(
         to_port=data.to_port,
         purpose=data.purpose,
         line_style=data.line_style,
+        color_rgb_json=color_rgb_json,
     )
     db.add(link)
     await db.commit()
@@ -145,6 +151,13 @@ async def update_link(
         if to_device:
             link.to_device_id = to_device.id
 
+    if "color_rgb" in update_data:
+        color_rgb = update_data.pop("color_rgb")
+        if color_rgb:
+            link.color_rgb_json = json.dumps(color_rgb)
+        else:
+            link.color_rgb_json = None
+
     for field, value in update_data.items():
         setattr(link, field, value)
 
@@ -157,3 +170,13 @@ async def delete_link(db: AsyncSession, link: L1Link) -> None:
     """Xóa link."""
     await db.delete(link)
     await db.commit()
+
+
+def parse_link_color(link: L1Link) -> Optional[list[int]]:
+    """Parse color RGB từ link."""
+    if not link.color_rgb_json:
+        return None
+    try:
+        return json.loads(link.color_rgb_json)
+    except Exception:
+        return None

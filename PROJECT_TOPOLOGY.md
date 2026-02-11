@@ -77,6 +77,7 @@ UI thao tác → REST API → Service → DB → phản hồi → UI render
 - Micro layout L1 căn giữa các hàng thiết bị trong cùng layer khi phải tách nhiều hàng, giúp vị trí object cân đối hơn theo mẫu kỹ thuật.
 - Kéo‑thả thủ công `Area/Device` (khi bật chế độ sửa vị trí) lưu trực tiếp `position_x/position_y` về DB tại `drag-end` và không trigger auto-layout.
 - Lưu thuộc tính `Area/Device` nếu chỉ thay đổi nhóm vị trí (`position_x/position_y/grid_range`) thì cập nhật trực tiếp DB, không tự chạy lại auto-layout.
+- Thuộc tính màu/style lưu DB theo từng thực thể: `areas.style_json`, `devices.color_rgb_json`, `l1_links.color_rgb_json`; UI chỉ cho chọn trong palette preset, link không override màu sẽ tự map theo `purpose`.
 - Control viewport/view mode (`zoom/reset/L1/L2/L3/Sửa vị trí`) tập trung ở main navigator panel và canh giữa theo panel; khi drag object có guide + snap alignment theo object liên quan để chỉnh tay nhanh.
 - Tọa độ thủ công được chuẩn hóa theo mốc chuẩn X/Y (step 0.25 đv) trước khi lưu DB để đồng nhất dữ liệu.
 - Tọa độ chuẩn bổ sung `grid_range` kiểu Excel (`A1:B2`) cho `Area`/`Device`; backend tự đồng bộ `grid_range` ↔ `position_x/position_y/width/height`.

@@ -15,28 +15,13 @@ from app.services.link import (
     delete_link,
     get_link_by_id,
     get_links,
+    parse_link_color,
     update_link,
 )
+from app.services.link_palette import get_link_color_rgb
 from app.services.project import get_project_by_id
 
 router = APIRouter(tags=["links"])
-
-
-# Mapping purpose -> color RGB
-PURPOSE_COLORS = {
-    "WAN": [255, 0, 0],       # Red
-    "INTERNET": [255, 128, 0],  # Orange
-    "DMZ": [255, 255, 0],     # Yellow
-    "LAN": [112, 173, 71],    # Green
-    "MGMT": [0, 112, 192],    # Blue
-    "HA": [112, 48, 160],     # Purple
-    "HSRP": [147, 112, 219],  # Violet
-    "STACK": [45, 140, 240],  # Azure
-    "STORAGE": [165, 42, 42], # Brown
-    "BACKUP": [128, 128, 128],  # Gray
-    "VPN": [0, 176, 240],     # Cyan
-    "DEFAULT": [0, 0, 0],     # Black
-}
 
 ENDPOINT_TYPES = {"PC", "AP"}
 ENDPOINT_NAME_RE = re.compile(r"\b(PC|PRN|PRINTER|CAM|CCTV|PHONE|IPPHONE|ENDPOINT|CLIENT|TERMINAL)\b", re.IGNORECASE)
@@ -211,7 +196,7 @@ def _link_to_response(link) -> L1LinkResponse:
         response.from_device_name = link.from_device.name
     if link.to_device:
         response.to_device_name = link.to_device.name
-    response.color_rgb = PURPOSE_COLORS.get(link.purpose, PURPOSE_COLORS["DEFAULT"])
+    response.color_rgb = parse_link_color(link) or list(get_link_color_rgb(link.purpose))
     return response
 
 

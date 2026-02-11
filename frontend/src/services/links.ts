@@ -14,6 +14,7 @@ export function createLink(
     to_port: string
     purpose?: string
     line_style?: 'solid' | 'dashed' | 'dotted'
+    color_rgb?: [number, number, number] | null
   }
 ) {
   return apiRequest<LinkRecord>(`/api/v1/projects/${projectId}/links`, {
@@ -32,6 +33,7 @@ export function updateLink(
     to_port?: string
     purpose?: string
     line_style?: 'solid' | 'dashed' | 'dotted'
+    color_rgb?: [number, number, number] | null
   }
 ) {
   return apiRequest<LinkRecord>(`/api/v1/projects/${projectId}/links/${linkId}`, {

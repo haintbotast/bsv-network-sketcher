@@ -32,6 +32,7 @@ class L1LinkCreate(BaseModel):
     to_port: str = Field(..., min_length=1)
     purpose: LinkPurpose = "DEFAULT"
     line_style: LineStyle = "solid"
+    color_rgb: Optional[list[int]] = Field(None, min_length=3, max_length=3)
 
     @field_validator("from_port", "to_port")
     @classmethod
@@ -55,6 +56,7 @@ class L1LinkUpdate(BaseModel):
     to_port: Optional[str] = Field(None, min_length=1)
     purpose: Optional[LinkPurpose] = None
     line_style: Optional[LineStyle] = None
+    color_rgb: Optional[list[int]] = Field(None, min_length=3, max_length=3)
 
     @field_validator("from_port", "to_port")
     @classmethod

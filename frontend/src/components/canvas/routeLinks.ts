@@ -757,11 +757,12 @@ export function routeLinks(
       const points = toPointsArray(path)
       if (points.length < 4) return null
       const neutralL1Purposes = new Set(['', 'DEFAULT', 'LAN'])
-      const purposeStroke = resolveLinkPurposeColor(link.purpose)
+      const purposeStroke = link.color || resolveLinkPurposeColor(link.purpose)
       const peerVisual = peerPurpose ? PEER_PURPOSE_VISUAL[peerPurpose] : null
+      const hasCustomColor = !!link.color
       const stroke = peerVisual
         ? peerVisual.stroke
-        : ((isL1View && neutralL1Purposes.has(purpose)) ? '#2b2a28' : purposeStroke)
+        : (hasCustomColor ? purposeStroke : ((isL1View && neutralL1Purposes.has(purpose)) ? '#2b2a28' : purposeStroke))
       const dash = peerVisual
         ? peerVisual.dash
         : (link.style === 'dashed' ? [8, 6] : link.style === 'dotted' ? [2, 4] : [])

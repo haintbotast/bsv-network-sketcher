@@ -563,9 +563,15 @@ Request:
   "from_port": "Gi 0/1",
   "to_device": "Access-SW-1",
   "to_port": "Gi 0/24",
-  "purpose": "LAN"
+  "purpose": "LAN",
+  "line_style": "solid",
+  "color_rgb": [41, 128, 185]
 }
 ```
+
+Ghi chú:
+- `color_rgb` là tùy chọn override màu link theo dạng `[R, G, B]`.
+- Nếu bỏ trống hoặc gửi `null`, hệ thống sẽ dùng màu chuẩn theo `purpose`.
 
 Response (201 Created):
 ```json
@@ -639,7 +645,7 @@ Response (400 Bad Request - server uplink sai tầng):
 }
 ```
 
-**Ghi chú:** `PUT /api/v1/projects/{project_id}/links/{link_id}` áp dụng cùng validation như tạo mới (trùng link, port đã dùng, ràng buộc tầng).
+**Ghi chú:** `PUT /api/v1/projects/{project_id}/links/{link_id}` áp dụng cùng validation như tạo mới (trùng link, port đã dùng, ràng buộc tầng) và hỗ trợ `color_rgb` tùy chọn giống `POST`.
 
 Response (400 Bad Request - vi phạm quy tắc Access/Area/Server Switch):
 ```json

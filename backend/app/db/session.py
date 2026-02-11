@@ -146,6 +146,7 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
         await _ensure_column(conn, "areas", "grid_range", "TEXT")
         await _ensure_column(conn, "devices", "grid_range", "TEXT")
+        await _ensure_column(conn, "l1_links", "color_rgb_json", "TEXT")
         await _backfill_grid_ranges(conn)
         await _backfill_device_ports(conn)
 

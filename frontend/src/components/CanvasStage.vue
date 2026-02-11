@@ -503,10 +503,12 @@ const visibleAreas = computed(() => {
 
       // L1 view: areas fully visible with clear borders (NS gốc style)
       // Waypoint areas: nhỏ, mờ, viền nét đứt
-      const areaOpacity = isWaypoint ? 0.25 : 1
-      const areaFill = isWaypoint ? '#fbfbfb' : 'rgba(255,255,255,0)'
+      const areaOpacity = isWaypoint ? 0.25 : 0.18
+      const areaFill = isWaypoint ? '#fbfbfb' : area.fill
 
       const isSelected = props.selectedId === area.id
+      const baseStroke = area.stroke || '#cdcdcd'
+      const baseStrokeWidth = Math.max(area.strokeWidth ?? 1, 1)
       return {
         id: area.id,
         group: {
@@ -525,8 +527,8 @@ const visibleAreas = computed(() => {
           height: rect.height,
           fill: areaFill,
           opacity: areaOpacity,
-          stroke: isWaypoint ? '#bdbdbd' : (isSelected ? '#d66c3b' : '#cdcdcd'),
-          strokeWidth: isWaypoint ? 1 : (isSelected ? 2 : 1),
+          stroke: isWaypoint ? '#bdbdbd' : (isSelected ? '#d66c3b' : baseStroke),
+          strokeWidth: isWaypoint ? 1 : (isSelected ? Math.max(baseStrokeWidth + 1, 2) : baseStrokeWidth),
           dash: isWaypoint ? [4, 3] : [],
           cornerRadius: isWaypoint ? 2 : 4,
           shadowColor: 'transparent',
@@ -1451,6 +1453,7 @@ const visibleDevices = computed(() => {
       const labelX = iconFrame
         ? Math.min(iconFrame.x + iconFrame.size + DEVICE_ICON_LABEL_GAP, Math.max(rect.width - 20, 10))
         : 10
+      const deviceStroke = device.color || '#2b2a28'
       const topPorts = buildPortCells(device.id, bands.top, 0, rect.width, 'top')
       const bottomPorts = buildPortCells(
         device.id,
@@ -1476,7 +1479,7 @@ const visibleDevices = computed(() => {
           width: rect.width,
           height: bodyHeight,
           fill: '#ffffff',
-          stroke: isSelected ? '#d66c3b' : '#2b2a28',
+          stroke: isSelected ? '#d66c3b' : deviceStroke,
           strokeWidth: isSelected ? 2 : 1,
           cornerRadius: 0,
           shadowColor: 'transparent',

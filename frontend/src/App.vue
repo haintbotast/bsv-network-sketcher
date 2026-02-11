@@ -353,6 +353,36 @@
                 <input type="number" step="0.1" v-model.number="selectedDraft.height" @change="handleSelectedObjectChange" />
               </div>
             </div>
+            <div class="form-group">
+              <label>Màu nền area</label>
+              <div class="color-field-row">
+                <select v-model="areaFillColorKey">
+                  <option v-for="option in colorPresetOptions" :key="`area-fill-${option.value}`" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+                <span class="color-swatch" :style="{ backgroundColor: areaFillColorCss }" aria-hidden="true"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Màu viền area</label>
+              <div class="color-field-row">
+                <select v-model="areaStrokeColorKey">
+                  <option v-for="option in colorPresetOptions" :key="`area-stroke-${option.value}`" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+                <span class="color-swatch" :style="{ backgroundColor: areaStrokeColorCss }" aria-hidden="true"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Độ dày viền area</label>
+              <select v-model.number="areaStrokeWidthValue">
+                <option v-for="option in areaStrokeWidthOptions" :key="`area-stroke-width-${option}`" :value="option">
+                  {{ option }}
+                </option>
+              </select>
+            </div>
           </div>
 
           <!-- Device Properties -->
@@ -372,6 +402,17 @@
               <select v-model="selectedDraft.device_type" @change="handleSelectedObjectChange">
                 <option v-for="type in deviceTypes" :key="type" :value="type">{{ type }}</option>
               </select>
+            </div>
+            <div class="form-group">
+              <label>Màu thiết bị (viền)</label>
+              <div class="color-field-row">
+                <select v-model="deviceColorKey">
+                  <option v-for="option in deviceColorOptions" :key="`device-color-${option.value}`" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+                <span class="color-swatch" :style="{ backgroundColor: deviceColorCss }" aria-hidden="true"></span>
+              </div>
             </div>
             <div class="form-group">
               <label>Grid range (Excel)</label>
@@ -615,6 +656,18 @@
                 <option v-for="purpose in linkPurposes" :key="purpose" :value="purpose">{{ purpose }}</option>
               </select>
             </div>
+            <div class="form-group">
+              <label>Màu link</label>
+              <div class="color-field-row">
+                <select v-model="linkColorKey">
+                  <option v-for="option in linkColorOptions" :key="`link-color-${option.value}`" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+                <span class="color-swatch" :style="{ backgroundColor: linkColorCss }" aria-hidden="true"></span>
+              </div>
+              <span class="hint-text">Chọn "Theo purpose" để dùng màu chuẩn theo mục đích link.</span>
+            </div>
           </div>
 
           <div class="inspector-actions">
@@ -658,6 +711,7 @@ import {
   UNIT_PX,
   POSITION_STANDARD_STEP_UNITS,
   snapUnitsToStandard,
+  defaultAreaStyle,
   deviceTypes,
   linkPurposes,
 } from './composables/canvasConstants'
@@ -1311,6 +1365,157 @@ const deviceNameOptions = computed(() =>
 const deviceTypeOptions = deviceTypes.map(type => ({ value: type, label: type }))
 const linkPurposeOptions = linkPurposes.map(purpose => ({ value: purpose, label: purpose }))
 const linkLineStyleOptions = linkLineStyles.map(style => ({ value: style, label: style }))
+type RgbTuple = [number, number, number]
+type ColorPresetOption = { value: string; label: string; rgb: RgbTuple }
+
+const colorPresetOptions: ColorPresetOption[] = [
+  { value: '43,42,40', label: 'Neutral (#2B2A28)', rgb: [43, 42, 40] },
+  { value: '52,73,94', label: 'Slate (#34495E)', rgb: [52, 73, 94] },
+  { value: '39,174,96', label: 'LAN Green (#27AE60)', rgb: [39, 174, 96] },
+  { value: '41,128,185', label: 'MGMT Blue (#2980B9)', rgb: [41, 128, 185] },
+  { value: '22,160,133', label: 'HA Teal (#16A085)', rgb: [22, 160, 133] },
+  { value: '45,140,240', label: 'STACK Blue (#2D8CF0)', rgb: [45, 140, 240] },
+  { value: '230,126,34', label: 'WAN Orange (#E67E22)', rgb: [230, 126, 34] },
+  { value: '231,76,60', label: 'Internet Red (#E74C3C)', rgb: [231, 76, 60] },
+  { value: '155,89,182', label: 'VPN Purple (#9B59B6)', rgb: [155, 89, 182] },
+]
+
+const colorPresetMap = new Map(colorPresetOptions.map(option => [option.value, option.rgb] as const))
+const areaStrokeWidthOptions = [0.5, 1, 1.5, 2, 2.5, 3]
+const deviceColorOptions = [
+  { value: '', label: 'Mặc định (không override)' },
+  ...colorPresetOptions,
+]
+const linkColorOptions = [
+  { value: '', label: 'Theo purpose (khuyến nghị)' },
+  ...colorPresetOptions,
+]
+
+function rgbTupleToKey(rgb?: number[] | null) {
+  if (!rgb || rgb.length < 3) return ''
+  const [r, g, b] = rgb
+  return `${r},${g},${b}`
+}
+
+function keyToRgbTuple(key: string): RgbTuple | null {
+  if (!key) return null
+  const rgb = colorPresetMap.get(key)
+  return rgb ? [...rgb] as RgbTuple : null
+}
+
+function rgbTupleToCss(rgb?: number[] | null) {
+  if (!rgb || rgb.length < 3) return '#ffffff'
+  const [r, g, b] = rgb
+  return `rgb(${r}, ${g}, ${b})`
+}
+
+const areaFillColorKey = computed({
+  get() {
+    if (selectedObjectType.value !== 'Area' || !selectedDraft.value) return rgbTupleToKey(defaultAreaStyle.fill_color_rgb)
+    const style = selectedDraft.value.style || defaultAreaStyle
+    return rgbTupleToKey(style.fill_color_rgb || defaultAreaStyle.fill_color_rgb)
+  },
+  set(value: string) {
+    if (selectedObjectType.value !== 'Area' || !selectedDraft.value) return
+    const rgb = keyToRgbTuple(value)
+    if (!rgb) return
+    const style = selectedDraft.value.style || defaultAreaStyle
+    selectedDraft.value.style = {
+      ...style,
+      fill_color_rgb: rgb,
+      stroke_color_rgb: style.stroke_color_rgb || defaultAreaStyle.stroke_color_rgb,
+      stroke_width: style.stroke_width ?? defaultAreaStyle.stroke_width,
+    }
+    handleSelectedObjectChange()
+  }
+})
+
+const areaStrokeColorKey = computed({
+  get() {
+    if (selectedObjectType.value !== 'Area' || !selectedDraft.value) return rgbTupleToKey(defaultAreaStyle.stroke_color_rgb)
+    const style = selectedDraft.value.style || defaultAreaStyle
+    return rgbTupleToKey(style.stroke_color_rgb || defaultAreaStyle.stroke_color_rgb)
+  },
+  set(value: string) {
+    if (selectedObjectType.value !== 'Area' || !selectedDraft.value) return
+    const rgb = keyToRgbTuple(value)
+    if (!rgb) return
+    const style = selectedDraft.value.style || defaultAreaStyle
+    selectedDraft.value.style = {
+      ...style,
+      fill_color_rgb: style.fill_color_rgb || defaultAreaStyle.fill_color_rgb,
+      stroke_color_rgb: rgb,
+      stroke_width: style.stroke_width ?? defaultAreaStyle.stroke_width,
+    }
+    handleSelectedObjectChange()
+  }
+})
+
+const areaStrokeWidthValue = computed({
+  get() {
+    if (selectedObjectType.value !== 'Area' || !selectedDraft.value) return defaultAreaStyle.stroke_width
+    const style = selectedDraft.value.style || defaultAreaStyle
+    return Number(style.stroke_width ?? defaultAreaStyle.stroke_width)
+  },
+  set(value: number) {
+    if (selectedObjectType.value !== 'Area' || !selectedDraft.value) return
+    const normalized = Math.max(0.5, Math.min(5, Number(value)))
+    const style = selectedDraft.value.style || defaultAreaStyle
+    selectedDraft.value.style = {
+      ...style,
+      fill_color_rgb: style.fill_color_rgb || defaultAreaStyle.fill_color_rgb,
+      stroke_color_rgb: style.stroke_color_rgb || defaultAreaStyle.stroke_color_rgb,
+      stroke_width: normalized,
+    }
+    handleSelectedObjectChange()
+  }
+})
+
+const areaFillColorCss = computed(() => {
+  if (selectedObjectType.value !== 'Area' || !selectedDraft.value) return rgbTupleToCss(defaultAreaStyle.fill_color_rgb)
+  return rgbTupleToCss(selectedDraft.value.style?.fill_color_rgb || defaultAreaStyle.fill_color_rgb)
+})
+
+const areaStrokeColorCss = computed(() => {
+  if (selectedObjectType.value !== 'Area' || !selectedDraft.value) return rgbTupleToCss(defaultAreaStyle.stroke_color_rgb)
+  return rgbTupleToCss(selectedDraft.value.style?.stroke_color_rgb || defaultAreaStyle.stroke_color_rgb)
+})
+
+const deviceColorKey = computed({
+  get() {
+    if (selectedObjectType.value !== 'Device' || !selectedDraft.value) return ''
+    return rgbTupleToKey(selectedDraft.value.color_rgb)
+  },
+  set(value: string) {
+    if (selectedObjectType.value !== 'Device' || !selectedDraft.value) return
+    const rgb = keyToRgbTuple(value)
+    selectedDraft.value.color_rgb = rgb
+    handleSelectedObjectChange()
+  }
+})
+
+const deviceColorCss = computed(() => {
+  if (selectedObjectType.value !== 'Device' || !selectedDraft.value) return '#ffffff'
+  return rgbTupleToCss(selectedDraft.value.color_rgb)
+})
+
+const linkColorKey = computed({
+  get() {
+    if (selectedObjectType.value !== 'Link' || !selectedDraft.value) return ''
+    return rgbTupleToKey(selectedDraft.value.color_rgb)
+  },
+  set(value: string) {
+    if (selectedObjectType.value !== 'Link' || !selectedDraft.value) return
+    const rgb = keyToRgbTuple(value)
+    selectedDraft.value.color_rgb = rgb
+    handleSelectedObjectChange()
+  }
+})
+
+const linkColorCss = computed(() => {
+  if (selectedObjectType.value !== 'Link' || !selectedDraft.value) return '#ffffff'
+  return rgbTupleToCss(selectedDraft.value.color_rgb)
+})
 
 const areaColumns: ColumnDef[] = [
   { key: 'name', label: 'Tên' },
@@ -1931,7 +2136,7 @@ async function saveSelectedObject() {
         position_y: normalizedPositionY,
         width: selectedDraft.value.width,
         height: selectedDraft.value.height,
-        color_rgb: selectedDraft.value.color_rgb || undefined
+        color_rgb: selectedDraft.value.color_rgb ?? null
       })
       const index = devices.value.findIndex(device => device.id === selectedDraft.value.id)
       if (index >= 0 && updated) devices.value[index] = updated as DeviceRow
@@ -1942,7 +2147,8 @@ async function saveSelectedObject() {
         to_device: selectedDraft.value.to_device_name || undefined,
         to_port: selectedDraft.value.to_port,
         purpose: selectedDraft.value.purpose || undefined,
-        line_style: selectedDraft.value.line_style || undefined
+        line_style: selectedDraft.value.line_style || undefined,
+        color_rgb: selectedDraft.value.color_rgb ?? null
       })
       const index = links.value.findIndex(link => link.id === selectedDraft.value.id)
       if (index >= 0 && updated) links.value[index] = updated as LinkRow
@@ -2414,6 +2620,24 @@ onMounted(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+.color-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-field-row select {
+  flex: 1;
+}
+
+.color-swatch {
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(28, 28, 28, 0.2);
+  border-radius: 6px;
+  flex: 0 0 22px;
 }
 
 .inspector-actions {

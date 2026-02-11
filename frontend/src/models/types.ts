@@ -23,6 +23,7 @@ export type AreaModel = {
   height: number
   fill: string
   stroke: string
+  strokeWidth?: number
 }
 
 export type DeviceModel = {
@@ -34,6 +35,7 @@ export type DeviceModel = {
   width: number
   height: number
   type: string
+  color?: string | null
 }
 
 export type LinkModel = {
@@ -44,6 +46,7 @@ export type LinkModel = {
   toPort: string
   purpose?: string
   style: 'solid' | 'dashed' | 'dotted'
+  color?: string | null
 }
 
 export type PortAnchorOverride = {

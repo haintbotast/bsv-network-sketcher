@@ -202,6 +202,7 @@ class L1Link(Base):
     to_port: Mapped[str] = mapped_column(String(50), nullable=False)
     purpose: Mapped[str] = mapped_column(String(20), default="DEFAULT")
     line_style: Mapped[str] = mapped_column(String(10), default="solid")
+    color_rgb_json: Mapped[Optional[str]] = mapped_column(Text)  # [R, G, B] as JSON
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relationships

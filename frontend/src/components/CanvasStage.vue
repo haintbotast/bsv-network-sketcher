@@ -634,13 +634,15 @@ const DEVICE_STANDARD_TOTAL_HEIGHT = 76
 const DEVICE_BODY_VERTICAL_PADDING = 6
 const DEVICE_MIN_WIDTH = 96
 const DEVICE_ICON_STROKE_WIDTH = 1
-const DEVICE_ICON_MIN_SIZE = 12
-const DEVICE_ICON_MAX_SIZE = 18
-const DEVICE_ICON_MARGIN_LEFT = 8
-const DEVICE_ICON_LABEL_GAP = 8
+const DEVICE_ICON_MIN_SIZE = 14
+const DEVICE_ICON_MAX_SIZE = 24
+const DEVICE_ICON_MARGIN_LEFT = 10
+const DEVICE_ICON_LABEL_GAP = 10
 const DEVICE_ICON_COLOR = '#4f4a44'
 
-type DeviceIconKind = 'router' | 'switch' | 'firewall' | 'server' | 'storage' | 'ap' | 'endpoint' | 'unknown'
+type DeviceIconKind = 'router' | 'switch' | 'firewall' | 'server' | 'storage' | 'ap' | 'endpoint' | 'cloud' | 'unknown'
+
+const CLOUD_ICON_KEYWORDS = ['CLOUD', 'INTERNET', 'SAAS', 'PAAS', 'IAAS', 'O365', 'OFFICE365']
 
 function clampNumber(value: number, min: number, max: number) {
   if (value < min) return min
@@ -675,6 +677,8 @@ function resolveDeviceRole(device: DeviceModel) {
 }
 
 function resolveDeviceIconKind(device: DeviceModel): DeviceIconKind {
+  const name = (device.name || '').toUpperCase()
+  if (CLOUD_ICON_KEYWORDS.some(keyword => name.includes(keyword))) return 'cloud'
   if (device.type === 'Storage') return 'storage'
   if (device.type === 'AP') return 'ap'
   if (device.type === 'PC') return 'endpoint'
@@ -683,7 +687,6 @@ function resolveDeviceIconKind(device: DeviceModel): DeviceIconKind {
   if (role === 'firewall') return 'firewall'
   if (role === 'server') return 'server'
   if (role === 'endpoint') {
-    const name = (device.name || '').toUpperCase()
     if (name.includes('AP') || name.includes('ACCESS POINT')) return 'ap'
     if (name.includes('NAS') || name.includes('SAN') || name.includes('STORAGE')) return 'storage'
     return 'endpoint'
@@ -738,8 +741,8 @@ type DeviceIconFrame = {
 const DEVICE_PORT_BAND_HEIGHT = DEVICE_PORT_CELL_HEIGHT + DEVICE_PORT_BAND_PADDING_Y * 2
 
 function buildDeviceIconFrame(bodyY: number, bodyHeight: number, bodyWidth: number): DeviceIconFrame | null {
-  if (bodyHeight <= 8 || bodyWidth <= DEVICE_ICON_MARGIN_LEFT + DEVICE_ICON_MIN_SIZE + 12) return null
-  const rawSize = Math.min(bodyHeight - 6, bodyWidth * 0.16, DEVICE_ICON_MAX_SIZE)
+  if (bodyHeight <= 10 || bodyWidth <= DEVICE_ICON_MARGIN_LEFT + DEVICE_ICON_MIN_SIZE + 14) return null
+  const rawSize = Math.min(bodyHeight - 4, bodyWidth * 0.22, DEVICE_ICON_MAX_SIZE)
   const size = clampNumber(rawSize, DEVICE_ICON_MIN_SIZE, DEVICE_ICON_MAX_SIZE)
   return {
     x: DEVICE_ICON_MARGIN_LEFT,
@@ -865,6 +868,17 @@ function buildDeviceIconShape(
           ctx.moveTo(cx - r * 0.72, cy + size * 0.14)
           ctx.arc(cx, cy + size * 0.14, r, Math.PI * 1.18, Math.PI * 1.82)
         })
+      } else if (kind === 'cloud') {
+        const left = x + size * 0.1
+        const right = x + size * 0.9
+        const bottom = y + size * 0.78
+        ctx.moveTo(left, bottom)
+        ctx.bezierCurveTo(x + size * 0.05, y + size * 0.62, x + size * 0.18, y + size * 0.5, x + size * 0.3, y + size * 0.53)
+        ctx.bezierCurveTo(x + size * 0.34, y + size * 0.34, x + size * 0.5, y + size * 0.3, x + size * 0.6, y + size * 0.44)
+        ctx.bezierCurveTo(x + size * 0.7, y + size * 0.36, x + size * 0.86, y + size * 0.44, right, y + size * 0.58)
+        ctx.bezierCurveTo(right, y + size * 0.7, x + size * 0.8, bottom, x + size * 0.66, bottom)
+        ctx.lineTo(x + size * 0.3, bottom)
+        ctx.bezierCurveTo(x + size * 0.18, bottom, x + size * 0.1, y + size * 0.86, left, bottom)
       } else if (kind === 'endpoint') {
         const left = x + size * 0.08
         const top = y + size * 0.16

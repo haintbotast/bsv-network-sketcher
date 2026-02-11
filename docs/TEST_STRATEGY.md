@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 1.3
 > **Tạo:** 2026-01-23
-> **Cập nhật:** 2026-02-10  
+> **Cập nhật:** 2026-02-11  
 > **Mục tiêu:** Quy định chiến lược kiểm thử và golden files.
 
 ## 1. Kiểm thử backend
@@ -23,6 +23,8 @@
 - **l1_device_body_min_height_policy:** thân Device (vùng đặt nhãn) luôn có chiều cao tối thiểu 24px để bảo đảm đọc được tên thiết bị khi có port band.
 - **l1_device_backend_frontend_size_parity_policy:** công thức ước lượng kích thước Device của backend phải khớp baseline render frontend (tổng cao chuẩn 76px và body tối thiểu theo nhãn) để tránh chồng lấn khi auto-layout.
 - **l1_device_icon_mapping_policy:** icon nhận diện loại thiết bị phải map đúng nhóm thiết bị (`Router/Switch/Firewall/Server/Storage/AP/Endpoint/Unknown`) và hiển thị nhất quán giữa các lần render.
+- **l1_cloud_icon_mapping_policy:** thiết bị/object có định danh cloud (ví dụ `CLOUD/INTERNET/SAAS/PAAS/IAAS/O365`) phải map icon cloud nhất quán.
+- **l1_device_icon_readability_policy:** icon nhận diện phải đủ lớn để quan sát ở mức zoom mặc định (khuyến nghị 14-24px theo chiều cao body) nhưng không chạm port band.
 - **l1_device_icon_port_safety_policy:** icon chỉ nằm trong thân device, không chạm port band top/bottom và không làm lệch anchor/port cell.
 - **peer_control_link_render:** `STACK/HA/HSRP` phải có style hiển thị riêng (màu/nét/lane) và không hòa lẫn với uplink/data.
 - **port_anchor_override:** override anchor per-port **được ưu tiên** và **không bị auto-layout ghi đè**; kiểm tra thêm trường hợp `offset_ratio = null` để giữ auto offset.

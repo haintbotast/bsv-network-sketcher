@@ -1,8 +1,8 @@
 # Đặc tả Style sơ đồ (Diagram Style Spec)
 
-> **Phiên bản:** 1.1  
+> **Phiên bản:** 1.2  
 > **Tạo:** 2026-01-23  
-> **Cập nhật:** 2026-02-10  
+> **Cập nhật:** 2026-02-11  
 > **Mục tiêu:** Chuẩn hóa hình khối, nét vẽ, màu sắc, chữ và nền cho toàn hệ thống (UI + Konva + export).
 
 ---
@@ -231,10 +231,11 @@ Quy định khi áp dụng:
 | Storage | Cylinder | Nét mảnh, không fill |
 | AP | Chấm + 2 cung sóng | Nét mảnh, không fill |
 | Endpoint/PC | Màn hình + chân đế + tower | Nét mảnh, không fill |
+| Cloud object | Cụm mây nét đơn | Nét mảnh, không fill |
 | Unknown | Khung vuông + `?` | Nét đứt |
 
 Ràng buộc kỹ thuật:
-- Kích thước icon khuyến nghị: **12-18 px** tùy chiều cao body.
+- Kích thước icon khuyến nghị: **14-24 px** tùy chiều cao body.
 - Icon canh trái trong thân device; nhãn tên thiết bị dịch sang phải để không chồng icon.
 - Icon không được thay đổi hitbox/collision của device; routing và kiểm tra va chạm vẫn dựa trên khung chữ nhật của object.
 

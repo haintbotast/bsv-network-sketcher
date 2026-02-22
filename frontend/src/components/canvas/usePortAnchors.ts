@@ -28,21 +28,27 @@ export function usePortAnchors(deps: {
 }) {
   const { props, renderTuning, deviceViewMap, portAnchorOverrides } = deps
   const normalizeOverrideSide = (side: 'left' | 'right' | 'top' | 'bottom') => {
-    if ((props.viewMode || 'L1') !== 'L1') return side
-    if (side === 'top') return 'top'
-    return 'bottom'
+    return side
   }
 
   const deviceInfoMap = computed(() => {
     return buildDeviceTierMap((props as { devices?: DeviceModel[] }).devices)
   })
 
+  const devicePositions = computed(() => {
+    const map = new Map<string, { x: number; y: number }>()
+    deviceViewMap.value.forEach((rect, id) => {
+      map.set(id, { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 })
+    })
+    return map
+  })
+
   const resolveAutoSide = (
     deviceId: string,
     neighborId: string,
     port: string | undefined,
-  ): 'top' | 'bottom' => {
-    return resolveAutoPortSide(deviceId, neighborId, port, deviceInfoMap.value)
+  ): 'top' | 'bottom' | 'left' | 'right' => {
+    return resolveAutoPortSide(deviceId, neighborId, port, deviceInfoMap.value, devicePositions.value)
   }
 
   const devicePortList = computed(() => {

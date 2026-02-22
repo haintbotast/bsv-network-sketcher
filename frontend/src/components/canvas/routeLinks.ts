@@ -6,7 +6,7 @@ import {
   segmentIntersectsRect,
 } from './linkRoutingUtils'
 import { resolveLinkPurposeColor } from '../../composables/canvasConstants'
-import { connectOrthogonal } from '../../utils/link_routing'
+import { connectOrthogonal, routeOrthogonalPath, buildGridSpec } from '../../utils/link_routing'
 
 export type RouteLinksParams = {
   isL1View: boolean
@@ -193,6 +193,22 @@ function simplifyPath(path: Point[]) {
   return out
 }
 
+function countBends(path: Point[]) {
+  if (path.length <= 2) return 0
+  let bends = 0
+  for (let i = 1; i < path.length - 1; i++) {
+    const prev = path[i - 1]
+    const curr = path[i]
+    const next = path[i + 1]
+    const wasHorizontal = Math.abs(curr.x - prev.x) > 0.5
+    const nowVertical = Math.abs(next.y - curr.y) > 0.5
+    const wasVertical = Math.abs(curr.y - prev.y) > 0.5
+    const nowHorizontal = Math.abs(next.x - curr.x) > 0.5
+    if ((wasHorizontal && nowVertical) || (wasVertical && nowHorizontal)) bends++
+  }
+  return bends
+}
+
 function toPointsArray(path: Point[]) {
   const points: number[] = []
   path.forEach(point => {
@@ -360,25 +376,38 @@ function buildOrthPath(start: Point, end: Point, obstacles: Rect[], clearance: n
   const alt = simplifyPath([start, altMid, end])
   if (!pathBlocked(alt, obstacles, clearance)) return alt
 
-  // 4. U-shape (bounding box of relevant obstacles)
+  // 4. A* pathfinding (ưu tiên ít rẽ, thay thế U-shape trực tiếp)
+  const padding = Math.max(clearance * 3, 40)
+  const bounds = {
+    minX: Math.min(start.x, end.x) - padding,
+    minY: Math.min(start.y, end.y) - padding,
+    maxX: Math.max(start.x, end.x) + padding,
+    maxY: Math.max(start.y, end.y) + padding,
+  }
+  obstacles.forEach(obs => {
+    bounds.minX = Math.min(bounds.minX, obs.x - padding)
+    bounds.minY = Math.min(bounds.minY, obs.y - padding)
+    bounds.maxX = Math.max(bounds.maxX, obs.x + obs.width + padding)
+    bounds.maxY = Math.max(bounds.maxY, obs.y + obs.height + padding)
+  })
+  const gridSize = Math.max(8, Math.min(20, Math.sqrt((bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY) / 25000)))
+  const grid = buildGridSpec(bounds, gridSize, 30000)
+  const astarResult = routeOrthogonalPath({
+    start, end, obstacles, clearance, grid,
+    turnPenalty: grid.size * 2,
+    preferAxis,
+    maxIterations: 20000,
+  })
+  if (astarResult && astarResult.points.length >= 2) {
+    const candidate = simplifyPath(astarResult.points)
+    if (!pathBlocked(candidate, obstacles, clearance)) return candidate
+  }
+
+  // 5. U-shape fallback (bounding box of relevant obstacles)
   const uPath = findUShapePath(start, end, obstacles, clearance, preferAxis)
   if (uPath) return uPath
   const uPathAlt = findUShapePath(start, end, obstacles, clearance, preferAxis === 'x' ? 'y' : 'x')
   if (uPathAlt) return uPathAlt
-
-  // 5. Per-obstacle avoidance (4 directions around each blocking obstacle)
-  const avoidGap = Math.max(clearance, 12)
-  for (const obs of obstacles) {
-    if (!segmentIntersectsRect(start, end, obs, clearance)) continue
-    for (const p of [
-      simplifyPath([start, { x: obs.x + obs.width + avoidGap, y: start.y }, { x: obs.x + obs.width + avoidGap, y: end.y }, end]),
-      simplifyPath([start, { x: obs.x - avoidGap, y: start.y }, { x: obs.x - avoidGap, y: end.y }, end]),
-      simplifyPath([start, { x: start.x, y: obs.y + obs.height + avoidGap }, { x: end.x, y: obs.y + obs.height + avoidGap }, end]),
-      simplifyPath([start, { x: start.x, y: obs.y - avoidGap }, { x: end.x, y: obs.y - avoidGap }, end]),
-    ]) {
-      if (!pathBlocked(p, obstacles, clearance)) return p
-    }
-  }
 
   // 6. Boundary escape (increasing padding around obstacle bounds)
   const escaped = buildBoundaryEscapePath(start, end, obstacles, clearance, preferAxis)
@@ -627,7 +656,6 @@ export function routeLinks(
       const toStub = offsetFromAnchor(toAnchor, toStubDistance)
 
       // Stem jog: tách link cùng port bằng offset vuông góc với stub
-      // anchor → stub (thẳng) → base (jog ngang/dọc) → shifted (bundle) → routing
       const stemGap = Math.max(3, 4.5 * scale)
       const fromStem = fromFanRank && fromFanRank.total > 1
         ? (fromFanRank.index - (fromFanRank.total - 1) / 2) * stemGap
@@ -635,12 +663,6 @@ export function routeLinks(
       const toStem = toFanRank && toFanRank.total > 1
         ? (toFanRank.index - (toFanRank.total - 1) / 2) * stemGap
         : 0
-      const fromBase: Point = (fromAnchor.side === 'bottom' || fromAnchor.side === 'top')
-        ? { x: fromStub.x + fromStem, y: fromStub.y }
-        : { x: fromStub.x, y: fromStub.y + fromStem }
-      const toBase: Point = (toAnchor.side === 'bottom' || toAnchor.side === 'top')
-        ? { x: toStub.x + toStem, y: toStub.y }
-        : { x: toStub.x, y: toStub.y + toStem }
 
       // --- Obstacles (self device inset) ---
       const selfInset = Math.max(clearance + 1, 4)
@@ -692,66 +714,94 @@ export function routeLinks(
       const bundleOffsetX = clamp(pairBundleOffsetX + globalLaneOffsetX, -bundleLimitX, bundleLimitX)
       const bundleOffsetY = clamp(pairBundleOffsetY + globalLaneOffsetY, -bundleLimitY, bundleLimitY)
 
-      const fromShifted: Point = { x: fromBase.x + bundleOffsetX, y: fromBase.y + bundleOffsetY }
-      const toShifted: Point = { x: toBase.x + bundleOffsetX, y: toBase.y + bundleOffsetY }
-      const fromShiftPath = buildOrthShiftPath(fromBase, fromShifted, preferAxis)
-      const toShiftPath = buildOrthShiftPath(toShifted, toBase, preferAxis)
+      // Merged exit point: gộp stub + stem + bundle thành 1 điểm thoát duy nhất
+      const fromIsVerticalExit = fromAnchor.side === 'bottom' || fromAnchor.side === 'top'
+      const toIsVerticalExit = toAnchor.side === 'bottom' || toAnchor.side === 'top'
+      const fromExit: Point = {
+        x: fromStub.x + (fromIsVerticalExit ? fromStem + bundleOffsetX : bundleOffsetX),
+        y: fromStub.y + (fromIsVerticalExit ? bundleOffsetY : fromStem + bundleOffsetY),
+      }
+      const toExit: Point = {
+        x: toStub.x + (toIsVerticalExit ? toStem + bundleOffsetX : bundleOffsetX),
+        y: toStub.y + (toIsVerticalExit ? bundleOffsetY : toStem + bundleOffsetY),
+      }
 
-      // --- Route: mọi nhánh đều dùng shifted points (giữ spacing đồng nhất) ---
+      // --- Route: anchor → exit → routing → exit → anchor ---
       let path: Point[] = []
 
       // 1. Peer purpose (intra-area HA/stack/hsrp)
       if (isL1View && peerPurpose && isIntraArea) {
         const laneY = resolvePeerLaneY(
           fromAnchor.side as ExitSide, toAnchor.side as ExitSide,
-          fromShifted, toShifted, fromCenter, toCenter, peerPurpose, scale
+          fromExit, toExit, fromCenter, toCenter, peerPurpose, scale
         )
         const peerPath = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
-          { x: fromStub.x, y: fromStub.y },
-          { x: fromBase.x, y: fromBase.y },
-          ...fromShiftPath,
-          { x: fromShifted.x, y: laneY },
-          { x: toShifted.x, y: laneY },
-          ...toShiftPath,
-          { x: toStub.x, y: toStub.y },
+          fromExit,
+          { x: fromExit.x, y: laneY },
+          { x: toExit.x, y: laneY },
+          toExit,
           { x: toAnchor.x, y: toAnchor.y },
         ])
         if (!pathBlocked(peerPath, routeObstacles, clearance)) path = peerPath
       }
 
-      // 2. General orthogonal routing (with bundle offset)
+      // 2. General orthogonal routing (with merged exit points)
       if (!path.length) {
-        const orth = buildOrthPath(fromShifted, toShifted, routeObstacles, clearance, preferAxis)
+        const orth = buildOrthPath(fromExit, toExit, routeObstacles, clearance, preferAxis)
         path = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
-          { x: fromStub.x, y: fromStub.y },
-          { x: fromBase.x, y: fromBase.y },
-          ...fromShiftPath,
+          fromExit,
           ...orth,
-          ...toShiftPath,
-          { x: toStub.x, y: toStub.y },
+          toExit,
           { x: toAnchor.x, y: toAnchor.y },
         ])
       }
 
-      // 3. Fallback alternate axis (vẫn giữ fromBase/toBase → giữ fan spacing)
+      // 3. Fallback alternate axis
       if (pathBlocked(path, routeObstacles, clearance)) {
         const fallback = buildOrthPath(
-          { x: fromBase.x, y: fromBase.y },
-          { x: toBase.x, y: toBase.y },
+          fromExit, toExit,
           routeObstacles, clearance,
           preferAxis === 'x' ? 'y' : 'x'
         )
         path = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
-          { x: fromStub.x, y: fromStub.y },
-          { x: fromBase.x, y: fromBase.y },
+          fromExit,
           ...fallback,
-          { x: toBase.x, y: toBase.y },
-          { x: toStub.x, y: toStub.y },
+          toExit,
           { x: toAnchor.x, y: toAnchor.y },
         ])
+      }
+
+      // Max bends constraint: giới hạn số lần rẽ tối đa
+      const maxBends = renderTuning.max_bends ?? 4
+      if (countBends(path) > maxBends) {
+        // Thử Z-shape đơn giản (2 bends) qua trung điểm
+        const midY = (fromExit.y + toExit.y) / 2
+        const midX = (fromExit.x + toExit.x) / 2
+        const zPathH = simplifyPath([
+          { x: fromAnchor.x, y: fromAnchor.y },
+          fromExit,
+          { x: fromExit.x, y: midY },
+          { x: toExit.x, y: midY },
+          toExit,
+          { x: toAnchor.x, y: toAnchor.y },
+        ])
+        const zPathV = simplifyPath([
+          { x: fromAnchor.x, y: fromAnchor.y },
+          fromExit,
+          { x: midX, y: fromExit.y },
+          { x: midX, y: toExit.y },
+          toExit,
+          { x: toAnchor.x, y: toAnchor.y },
+        ])
+        // Chọn Z-path không xuyên device và ít bends nhất
+        const candidates = [zPathH, zPathV].filter(p => !pathCrossesObjects(p, deviceObstacles))
+        if (candidates.length) {
+          candidates.sort((a, b) => countBends(a) - countBends(b))
+          path = candidates[0]
+        }
       }
 
       // Chốt an toàn trước render: chỉ loại path xuyên thân object thật.

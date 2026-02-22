@@ -36,6 +36,7 @@ export type RenderTuning = {
   icon_max_size?: number
   icon_color_default?: string
   icon_colors?: Record<string, string>
+  max_bends?: number
 }
 
 export type LinkMeta = {

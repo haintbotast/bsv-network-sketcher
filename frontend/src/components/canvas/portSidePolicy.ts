@@ -39,14 +39,31 @@ export function resolveAutoPortSide(
   deviceId: string,
   neighborId: string,
   portName: string | undefined,
-  deviceTierMap: Map<string, { type: string; name: string; tier: number }>
-): 'top' | 'bottom' {
+  deviceTierMap: Map<string, { type: string; name: string; tier: number }>,
+  devicePositions?: Map<string, { x: number; y: number }>
+): 'top' | 'bottom' | 'left' | 'right' {
   const info = deviceTierMap.get(deviceId)
   const neighbor = deviceTierMap.get(neighborId)
 
   if (info && neighbor && info.tier !== neighbor.tier) {
     return info.tier > neighbor.tier ? 'top' : 'bottom'
   }
+
+  if (devicePositions) {
+    const pos = devicePositions.get(deviceId)
+    const neighborPos = devicePositions.get(neighborId)
+    if (pos && neighborPos) {
+      const dx = Math.abs(neighborPos.x - pos.x)
+      const dy = Math.abs(neighborPos.y - pos.y)
+      if (dx > dy * 1.5) {
+        return neighborPos.x > pos.x ? 'right' : 'left'
+      }
+      if (dy > dx * 1.5) {
+        return neighborPos.y > pos.y ? 'bottom' : 'top'
+      }
+    }
+  }
+
   if (isUplinkPortName(portName)) return 'top'
   return 'bottom'
 }

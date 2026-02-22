@@ -1203,15 +1203,23 @@ const devicePortBands = computed(() => {
     map.set(deviceId, entry)
   }
 
+  const devicePos = new Map<string, { x: number; y: number }>()
+  deviceViewMap.value.forEach((rect, id) => {
+    devicePos.set(id, { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 })
+  })
+
+  const toBand = (side: 'top' | 'bottom' | 'left' | 'right'): 'top' | 'bottom' =>
+    side === 'top' ? 'top' : 'bottom'
+
   props.links.forEach(link => {
     const fromPort = (link.fromPort || '').trim()
     const toPort = (link.toPort || '').trim()
 
     let fromSide = fromPort
-      ? resolveAutoPortSide(link.fromDeviceId, link.toDeviceId, fromPort, deviceTierMap.value)
+      ? toBand(resolveAutoPortSide(link.fromDeviceId, link.toDeviceId, fromPort, deviceTierMap.value, devicePos))
       : 'bottom'
     let toSide = toPort
-      ? resolveAutoPortSide(link.toDeviceId, link.fromDeviceId, toPort, deviceTierMap.value)
+      ? toBand(resolveAutoPortSide(link.toDeviceId, link.fromDeviceId, toPort, deviceTierMap.value, devicePos))
       : 'bottom'
 
     const fromOverride = props.portAnchorOverrides?.get(link.fromDeviceId)?.get(fromPort)

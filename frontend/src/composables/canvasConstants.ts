@@ -86,7 +86,7 @@ export function resolveLinkPurposeColor(purpose?: string | null) {
 }
 
 export const defaultAreaStyle: AreaStyle = {
-  fill_color_rgb: [240, 240, 240],
+  fill_color_rgb: [228, 232, 238],
   stroke_color_rgb: [51, 51, 51],
   stroke_width: 1
 }

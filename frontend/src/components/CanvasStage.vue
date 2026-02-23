@@ -524,7 +524,7 @@ const visibleAreas = computed(() => {
 
       // L1 view: areas fully visible with clear borders (NS gốc style)
       // Waypoint areas: nhỏ, mờ, viền nét đứt
-      const areaOpacity = isWaypoint ? 0.25 : 0.18
+      const areaOpacity = isWaypoint ? 0.25 : 0.35
       const areaFill = isWaypoint ? '#fbfbfb' : area.fill
 
       const isSelected = props.selectedId === area.id
@@ -2025,7 +2025,10 @@ function isStageTarget(event: any) {
   const name = typeof target.name === 'function'
     ? target.name()
     : (typeof target.getAttr === 'function' ? target.getAttr('name') : '')
-  return name === 'grid-bg'
+  if (name === 'grid-bg') return true
+  // Khi không ở edit mode, cho phép pan qua object/area (vì drag disabled)
+  if (!props.positionEditEnabled) return true
+  return false
 }
 
 function onPointerDown(event: any) {

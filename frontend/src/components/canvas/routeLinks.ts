@@ -394,7 +394,7 @@ function buildOrthPath(start: Point, end: Point, obstacles: Rect[], clearance: n
   const grid = buildGridSpec(bounds, gridSize, 30000)
   const astarResult = routeOrthogonalPath({
     start, end, obstacles, clearance, grid,
-    turnPenalty: grid.size * 2,
+    turnPenalty: grid.size * 3,
     preferAxis,
     maxIterations: 20000,
   })
@@ -737,10 +737,12 @@ export function routeLinks(
         )
         const peerPath = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
+          { x: fromStub.x, y: fromStub.y },
           fromExit,
           { x: fromExit.x, y: laneY },
           { x: toExit.x, y: laneY },
           toExit,
+          { x: toStub.x, y: toStub.y },
           { x: toAnchor.x, y: toAnchor.y },
         ])
         if (!pathBlocked(peerPath, routeObstacles, clearance)) path = peerPath
@@ -751,9 +753,11 @@ export function routeLinks(
         const orth = buildOrthPath(fromExit, toExit, routeObstacles, clearance, preferAxis)
         path = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
+          { x: fromStub.x, y: fromStub.y },
           fromExit,
           ...orth,
           toExit,
+          { x: toStub.x, y: toStub.y },
           { x: toAnchor.x, y: toAnchor.y },
         ])
       }
@@ -767,9 +771,11 @@ export function routeLinks(
         )
         path = simplifyPath([
           { x: fromAnchor.x, y: fromAnchor.y },
+          { x: fromStub.x, y: fromStub.y },
           fromExit,
           ...fallback,
           toExit,
+          { x: toStub.x, y: toStub.y },
           { x: toAnchor.x, y: toAnchor.y },
         ])
       }
@@ -796,8 +802,8 @@ export function routeLinks(
           toExit,
           { x: toAnchor.x, y: toAnchor.y },
         ])
-        // Chọn Z-path không xuyên device và ít bends nhất
-        const candidates = [zPathH, zPathV].filter(p => !pathCrossesObjects(p, deviceObstacles))
+        // Chọn Z-path không xuyên obstacles và ít bends nhất
+        const candidates = [zPathH, zPathV].filter(p => !pathCrossesObjects(p, routeObstacles))
         if (candidates.length) {
           candidates.sort((a, b) => countBends(a) - countBends(b))
           path = candidates[0]

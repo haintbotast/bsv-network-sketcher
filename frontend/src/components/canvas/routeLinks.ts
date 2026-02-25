@@ -20,11 +20,6 @@ export type RouteLinksParams = {
 
 const LABEL_STUB_PADDING = 4
 const FAN_SPREAD_BASE = 18
-const GLOBAL_LANE_BUCKET_FACTOR = 1.15
-const GLOBAL_LANE_GAP_X_FACTOR = 0.64
-const GLOBAL_LANE_GAP_Y_FACTOR = 0.96
-const GLOBAL_LANE_LIMIT_X = 44
-const GLOBAL_LANE_LIMIT_Y = 56
 
 type PeerPurposeKind = 'stack' | 'ha' | 'hsrp'
 
@@ -61,93 +56,8 @@ function resolveFanDistance(rank: FanRank | undefined, spread: number) {
   return clamp(rank.index / (rank.total - 1), 0, 1) * spread
 }
 
-function resolveFanCenteredRank(rank: FanRank | undefined) {
-  if (!rank || rank.total <= 1) return 0
-  return rank.index - (rank.total - 1) / 2
-}
 
-function buildAreaPairKey(a: string, b: string) {
-  return a < b ? `${a}|${b}` : `${b}|${a}`
-}
 
-function resolveLaneScopeKey(fromAreaId?: string, toAreaId?: string) {
-  if (!fromAreaId && !toAreaId) return 'global'
-  if (!fromAreaId || !toAreaId) return `edge:${fromAreaId || toAreaId}`
-  if (fromAreaId === toAreaId) return `intra:${fromAreaId}`
-  return `inter:${buildAreaPairKey(fromAreaId, toAreaId)}`
-}
-
-function buildGlobalLaneRanks(
-  linkMetas: Array<LinkMeta | null>,
-  resolvedAnchorsByLink: Map<string, {
-    fromAnchor: { x: number; y: number; side: ExitSide }
-    toAnchor: { x: number; y: number; side: ExitSide }
-  }>,
-  bucketSize: number,
-) {
-  const laneXGroups = new Map<string, Array<{ linkId: string; order: number }>>()
-  const laneYGroups = new Map<string, Array<{ linkId: string; order: number }>>()
-
-  linkMetas.forEach(meta => {
-    if (!meta) return
-    const anchors = resolvedAnchorsByLink.get(meta.link.id)
-    if (!anchors) return
-
-    const scope = resolveLaneScopeKey(meta.fromAreaId || undefined, meta.toAreaId || undefined)
-    const corridorX = (anchors.fromAnchor.x + anchors.toAnchor.x) / 2
-    const corridorY = (anchors.fromAnchor.y + anchors.toAnchor.y) / 2
-    const orderX = (anchors.fromAnchor.x + anchors.toAnchor.x) / 2
-    const orderY = (anchors.fromAnchor.y + anchors.toAnchor.y) / 2
-
-    const keyX = `${scope}|x|${Math.round(corridorX / bucketSize)}`
-    const keyY = `${scope}|y|${Math.round(corridorY / bucketSize)}`
-
-    const xList = laneXGroups.get(keyX) || []
-    xList.push({ linkId: meta.link.id, order: orderY })
-    laneXGroups.set(keyX, xList)
-
-    const yList = laneYGroups.get(keyY) || []
-    yList.push({ linkId: meta.link.id, order: orderX })
-    laneYGroups.set(keyY, yList)
-  })
-
-  const toRankMap = (groups: Map<string, Array<{ linkId: string; order: number }>>) => {
-    const rankMap = new Map<string, FanRank>()
-    groups.forEach(entries => {
-      entries.sort((a, b) => a.order - b.order || a.linkId.localeCompare(b.linkId))
-      const total = entries.length
-      entries.forEach((entry, index) => {
-        rankMap.set(entry.linkId, { index, total })
-      })
-    })
-    return rankMap
-  }
-
-  return {
-    globalLaneRankXByLink: toRankMap(laneXGroups),
-    globalLaneRankYByLink: toRankMap(laneYGroups),
-  }
-}
-
-function resolveGlobalLaneOffset(
-  rank: FanRank | undefined,
-  axis: 'x' | 'y',
-  scale: number,
-  renderTuning: RenderTuning
-) {
-  const centered = resolveFanCenteredRank(rank)
-  if (!centered) return 0
-  const densityBoost = rank && rank.total > 4
-    ? Math.min(1.9, 1 + (rank.total - 4) * 0.09)
-    : 1
-  const baseGap = Math.max(3.5, (renderTuning.bundle_gap ?? 0) * scale)
-  const axisGap = axis === 'x'
-    ? Math.max(5.5, baseGap * GLOBAL_LANE_GAP_X_FACTOR * densityBoost)
-    : Math.max(6.5, baseGap * GLOBAL_LANE_GAP_Y_FACTOR * densityBoost)
-  const baseLimit = axis === 'x' ? GLOBAL_LANE_LIMIT_X : GLOBAL_LANE_LIMIT_Y
-  const limit = Math.max(axis === 'x' ? 16 : 20, baseLimit * scale)
-  return clamp(centered * axisGap, -limit, limit)
-}
 
 // --- Peer purpose detection ---
 
@@ -171,7 +81,7 @@ function resolvePeerPurposeKind(
 
 function simplifyPath(path: Point[]) {
   if (path.length <= 2) return path
-  const eps = 0.5
+  const eps = 1.0
   const out: Point[] = []
 
   path.forEach(point => {
@@ -585,13 +495,6 @@ export function routeLinks(
     })
   })
 
-  // Global corridor split: tách làn toàn cục theo cả X và Y để giảm dính bó ngang/dọc.
-  const globalLaneBucket = Math.max(12, (renderTuning.bundle_gap ?? 0) * scale * GLOBAL_LANE_BUCKET_FACTOR)
-  const {
-    globalLaneRankXByLink,
-    globalLaneRankYByLink,
-  } = buildGlobalLaneRanks(linkMetas, resolvedAnchorsByLink, globalLaneBucket)
-
   // --- Per-link routing ---
   const obstaclesByLink = new Map<string, Rect[]>()
   const links = linkMetas
@@ -628,13 +531,9 @@ export function routeLinks(
       const baseLabelDistance = Math.max(0, labelOffset - labelInset)
       const fromFanRank = fanRankByEndpoint.get(fanEndpointKey(link.id, 'from'))
       const toFanRank = fanRankByEndpoint.get(fanEndpointKey(link.id, 'to'))
-      const densePortGroup = Math.max(fromFanRank?.total ?? 1, toFanRank?.total ?? 1)
-      const denseTurnBoost = densePortGroup > 4
-        ? Math.min(8 * scale, (densePortGroup - 4) * 1.6 * scale)
-        : 0
       const minPortTurnDistance = Math.max(
-        30 * scale + denseTurnBoost,
-        labelOffset + 24 * scale + denseTurnBoost
+        16 * scale,
+        labelOffset + 8 * scale
       )
       const fromLabelWidth = meta.fromLabelWidth ?? 0
       const toLabelWidth = meta.toLabelWidth ?? 0
@@ -655,14 +554,7 @@ export function routeLinks(
       const fromStub = offsetFromAnchor(fromAnchor, fromStubDistance)
       const toStub = offsetFromAnchor(toAnchor, toStubDistance)
 
-      // Stem jog: tách link cùng port bằng offset vuông góc với stub
-      const stemGap = Math.max(3, 4.5 * scale)
-      const fromStem = fromFanRank && fromFanRank.total > 1
-        ? (fromFanRank.index - (fromFanRank.total - 1) / 2) * stemGap
-        : 0
-      const toStem = toFanRank && toFanRank.total > 1
-        ? (toFanRank.index - (toFanRank.total - 1) / 2) * stemGap
-        : 0
+      // Stem jog removed: fan ranking đã spread anchor dọc cạnh device, không cần micro-offset vuông góc
 
       // --- Obstacles (self device inset) ---
       const selfInset = Math.max(clearance + 1, 4)
@@ -685,12 +577,11 @@ export function routeLinks(
         deviceObstacles.push(rect)
         routeObstacles.push(rect)
       })
-      if (isInterArea) {
-        areaRects.forEach(({ id, rect }) => {
-          if (id === fromAreaId || id === toAreaId) return
-          routeObstacles.push(rect)
-        })
-      }
+      // Thêm area rects khác làm obstacle (tránh link xuyên area lân cận)
+      areaRects.forEach(({ id, rect }) => {
+        if (id === fromAreaId || id === toAreaId) return
+        routeObstacles.push(rect)
+      })
       obstaclesByLink.set(link.id, deviceObstacles)
 
       // --- Bundle offset (cùng cặp device → tách đường) ---
@@ -702,28 +593,18 @@ export function routeLinks(
         : 0
       const pairBundleOffsetX = preferAxis === 'y' ? pairBundleOffset : 0
       const pairBundleOffsetY = preferAxis === 'x' ? pairBundleOffset : 0
-      const globalLaneOffsetX = isL1View
-        ? resolveGlobalLaneOffset(globalLaneRankXByLink.get(link.id), 'y', scale, renderTuning)
-        : 0
-      const globalLaneOffsetY = isL1View
-        ? resolveGlobalLaneOffset(globalLaneRankYByLink.get(link.id), 'x', scale, renderTuning)
-        : 0
+      // Global lane offset removed: nudgeOverlappingSegments xử lý tách parallel segments
+      const bundleOffsetX = pairBundleOffsetX
+      const bundleOffsetY = pairBundleOffsetY
 
-      const bundleLimitX = Math.max(18, GLOBAL_LANE_LIMIT_X * scale)
-      const bundleLimitY = Math.max(20, GLOBAL_LANE_LIMIT_Y * scale)
-      const bundleOffsetX = clamp(pairBundleOffsetX + globalLaneOffsetX, -bundleLimitX, bundleLimitX)
-      const bundleOffsetY = clamp(pairBundleOffsetY + globalLaneOffsetY, -bundleLimitY, bundleLimitY)
-
-      // Merged exit point: gộp stub + stem + bundle thành 1 điểm thoát duy nhất
-      const fromIsVerticalExit = fromAnchor.side === 'bottom' || fromAnchor.side === 'top'
-      const toIsVerticalExit = toAnchor.side === 'bottom' || toAnchor.side === 'top'
+      // Exit point: stub + bundle offset (stem và globalLane đã loại bỏ)
       const fromExit: Point = {
-        x: fromStub.x + (fromIsVerticalExit ? fromStem + bundleOffsetX : bundleOffsetX),
-        y: fromStub.y + (fromIsVerticalExit ? bundleOffsetY : fromStem + bundleOffsetY),
+        x: fromStub.x + bundleOffsetX,
+        y: fromStub.y + bundleOffsetY,
       }
       const toExit: Point = {
-        x: toStub.x + (toIsVerticalExit ? toStem + bundleOffsetX : bundleOffsetX),
-        y: toStub.y + (toIsVerticalExit ? bundleOffsetY : toStem + bundleOffsetY),
+        x: toStub.x + bundleOffsetX,
+        y: toStub.y + bundleOffsetY,
       }
 
       // --- Route: anchor → exit → routing → exit → anchor ---
@@ -748,7 +629,7 @@ export function routeLinks(
         if (!pathBlocked(peerPath, routeObstacles, clearance)) path = peerPath
       }
 
-      // 2. General orthogonal routing (with merged exit points)
+      // 2. General orthogonal routing
       if (!path.length) {
         const orth = buildOrthPath(fromExit, toExit, routeObstacles, clearance, preferAxis)
         path = simplifyPath([
